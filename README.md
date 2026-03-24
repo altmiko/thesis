@@ -1,0 +1,2 @@
+# thesis
+Bachelor's thesis

@@ -1,0 +1,26 @@
+[
+    {
+        "params": {
+            "_lambda": 1,
+            "optimizer": "adam",
+            "lr": 0.1,
+            "max_iter": 300,
+            "sample_num": 500,
+            "kappa": 0
+        },
+        "metrics": {
+            "success_rate": 0.828,
+            "mean_l2_distance": 0.5188910365104675,
+            "mean_linf_distance": 0.35117414593696594,
+            "perturbed_features_latent": 7.265700483091788,
+            "perturbed_features_input": 7.009661835748792,
+            "mean_confidence_successful": 0.515762371753437,
+            "mean_confidence_unsuccessful": 0.2422268203524656,
+            "min_confidence_unsuccessful": 0.005743205547332764,
+            "max_confidence_unsuccessful": 0.4990537762641907,
+            "mean_md_distance": 2.485076060900489,
+            "outlier_rate": 0.021739130434782608,
+            "outliers": "9/414"
+        }
+    }
+]

@@ -1,0 +1,252 @@
+[
+    {
+        "params": {
+            "_lambda": 1,
+            "lambda_sparsity": 0.01,
+            "optimizer": "adam",
+            "lr": 0.1,
+            "max_iter": 300,
+            "sample_num": 500,
+            "kappa": 0
+        },
+        "metrics": {
+            "success_rate": 0.506,
+            "mean_l2_distance": 0.6077836155891418,
+            "mean_linf_distance": 0.2945929169654846,
+            "perturbed_features_latent": 15.984189723320158,
+            "perturbed_features_input": 4.6561264822134385,
+            "mean_confidence_successful": 0.5606231379208593,
+            "mean_confidence_unsuccessful": 0.1954246040297906,
+            "min_confidence_unsuccessful": 0.0,
+            "max_confidence_unsuccessful": 0.49575483798980713,
+            "mean_md_distance": 4.013050091195128,
+            "outlier_rate": 0.16600790513833993,
+            "outliers": "42/253"
+        }
+    },
+    {
+        "params": {
+            "_lambda": 1,
+            "lambda_sparsity": 0.1,
+            "optimizer": "adam",
+            "lr": 0.1,
+            "max_iter": 300,
+            "sample_num": 500,
+            "kappa": 0
+        },
+        "metrics": {
+            "success_rate": 0.458,
+            "mean_l2_distance": 0.5628183484077454,
+            "mean_linf_distance": 0.27550673484802246,
+            "perturbed_features_latent": 15.97816593886463,
+            "perturbed_features_input": 4.585152838427947,
+            "mean_confidence_successful": 0.5529954079945275,
+            "mean_confidence_unsuccessful": 0.20260744253207838,
+            "min_confidence_unsuccessful": 0.0,
+            "max_confidence_unsuccessful": 0.49952834844589233,
+            "mean_md_distance": 4.015031686429743,
+            "outlier_rate": 0.17903930131004367,
+            "outliers": "41/229"
+        }
+    },
+    {
+        "params": {
+            "_lambda": 1,
+            "lambda_sparsity": 0.25,
+            "optimizer": "adam",
+            "lr": 0.1,
+            "max_iter": 300,
+            "sample_num": 500,
+            "kappa": 0
+        },
+        "metrics": {
+            "success_rate": 0.4,
+            "mean_l2_distance": 0.5475204586982727,
+            "mean_linf_distance": 0.27070391178131104,
+            "perturbed_features_latent": 15.995,
+            "perturbed_features_input": 4.59,
+            "mean_confidence_successful": 0.55413379419595,
+            "mean_confidence_unsuccessful": 0.19876158912976583,
+            "min_confidence_unsuccessful": 0.0,
+            "max_confidence_unsuccessful": 0.4981217384338379,
+            "mean_md_distance": 3.9759241621512458,
+            "outlier_rate": 0.175,
+            "outliers": "35/200"
+        }
+    },
+    {
+        "params": {
+            "_lambda": 1,
+            "lambda_sparsity": 0.5,
+            "optimizer": "adam",
+            "lr": 0.1,
+            "max_iter": 300,
+            "sample_num": 500,
+            "kappa": 0
+        },
+        "metrics": {
+            "success_rate": 0.348,
+            "mean_l2_distance": 0.4403360188007355,
+            "mean_linf_distance": 0.21957266330718994,
+            "perturbed_features_latent": 15.994252873563218,
+            "perturbed_features_input": 4.5344827586206895,
+            "mean_confidence_successful": 0.5566570467005173,
+            "mean_confidence_unsuccessful": 0.19229037538627905,
+            "min_confidence_unsuccessful": 0.0,
+            "max_confidence_unsuccessful": 0.4974186420440674,
+            "mean_md_distance": 3.815041508361927,
+            "outlier_rate": 0.15517241379310345,
+            "outliers": "27/174"
+        }
+    },
+    {
+        "params": {
+            "_lambda": 1,
+            "lambda_sparsity": 0.75,
+            "optimizer": "adam",
+            "lr": 0.1,
+            "max_iter": 300,
+            "sample_num": 500,
+            "kappa": 0
+        },
+        "metrics": {
+            "success_rate": 0.304,
+            "mean_l2_distance": 0.3051983714103699,
+            "mean_linf_distance": 0.1504838615655899,
+            "perturbed_features_latent": 16.0,
+            "perturbed_features_input": 4.440789473684211,
+            "mean_confidence_successful": 0.5619193128016042,
+            "mean_confidence_unsuccessful": 0.18376859628606115,
+            "min_confidence_unsuccessful": 0.0,
+            "max_confidence_unsuccessful": 0.496715247631073,
+            "mean_md_distance": 3.6609899901632623,
+            "outlier_rate": 0.125,
+            "outliers": "19/152"
+        }
+    },
+    {
+        "params": {
+            "_lambda": 1,
+            "lambda_sparsity": 1,
+            "optimizer": "adam",
+            "lr": 0.1,
+            "max_iter": 300,
+            "sample_num": 500,
+            "kappa": 0
+        },
+        "metrics": {
+            "success_rate": 0.29,
+            "mean_l2_distance": 0.27978459000587463,
+            "mean_linf_distance": 0.14490680396556854,
+            "perturbed_features_latent": 15.986206896551725,
+            "perturbed_features_input": 4.551724137931035,
+            "mean_confidence_successful": 0.5651445201501764,
+            "mean_confidence_unsuccessful": 0.18021442890167236,
+            "min_confidence_unsuccessful": 0.0,
+            "max_confidence_unsuccessful": 0.49746090173721313,
+            "mean_md_distance": 3.615613613679854,
+            "outlier_rate": 0.11724137931034483,
+            "outliers": "17/145"
+        }
+    },
+    {
+        "params": {
+            "_lambda": 1,
+            "lambda_sparsity": 1.25,
+            "optimizer": "adam",
+            "lr": 0.1,
+            "max_iter": 300,
+            "sample_num": 500,
+            "kappa": 0
+        },
+        "metrics": {
+            "success_rate": 0.266,
+            "mean_l2_distance": 0.2501206696033478,
+            "mean_linf_distance": 0.12958262860774994,
+            "perturbed_features_latent": 15.992481203007518,
+            "perturbed_features_input": 4.586466165413534,
+            "mean_confidence_successful": 0.569412576328767,
+            "mean_confidence_unsuccessful": 0.18249578842999825,
+            "min_confidence_unsuccessful": 0.0,
+            "max_confidence_unsuccessful": 0.49966520071029663,
+            "mean_md_distance": 3.547147310508315,
+            "outlier_rate": 0.12030075187969924,
+            "outliers": "16/133"
+        }
+    },
+    {
+        "params": {
+            "_lambda": 1,
+            "lambda_sparsity": 2,
+            "optimizer": "adam",
+            "lr": 0.1,
+            "max_iter": 300,
+            "sample_num": 500,
+            "kappa": 0
+        },
+        "metrics": {
+            "success_rate": 0.252,
+            "mean_l2_distance": 0.2508753836154938,
+            "mean_linf_distance": 0.13049674034118652,
+            "perturbed_features_latent": 16.0,
+            "perturbed_features_input": 4.658730158730159,
+            "mean_confidence_successful": 0.5830743745383289,
+            "mean_confidence_unsuccessful": 0.16970897262746637,
+            "min_confidence_unsuccessful": 0.0,
+            "max_confidence_unsuccessful": 0.4972228407859802,
+            "mean_md_distance": 3.638543526531569,
+            "outlier_rate": 0.12698412698412698,
+            "outliers": "16/126"
+        }
+    },
+    {
+        "params": {
+            "_lambda": 1,
+            "lambda_sparsity": 5,
+            "optimizer": "adam",
+            "lr": 0.1,
+            "max_iter": 300,
+            "sample_num": 500,
+            "kappa": 0
+        },
+        "metrics": {
+            "success_rate": 0.248,
+            "mean_l2_distance": 0.41971245408058167,
+            "mean_linf_distance": 0.22414639592170715,
+            "perturbed_features_latent": 16.0,
+            "perturbed_features_input": 5.225806451612903,
+            "mean_confidence_successful": 0.6239328615427497,
+            "mean_confidence_unsuccessful": 0.15890966863074202,
+            "min_confidence_unsuccessful": 0.0,
+            "max_confidence_unsuccessful": 0.49483805894851685,
+            "mean_md_distance": 3.59396077856167,
+            "outlier_rate": 0.10483870967741936,
+            "outliers": "13/124"
+        }
+    },
+    {
+        "params": {
+            "_lambda": 1,
+            "lambda_sparsity": 10,
+            "optimizer": "adam",
+            "lr": 0.1,
+            "max_iter": 300,
+            "sample_num": 500,
+            "kappa": 0
+        },
+        "metrics": {
+            "success_rate": 0.25,
+            "mean_l2_distance": 0.6554663777351379,
+            "mean_linf_distance": 0.36108002066612244,
+            "perturbed_features_latent": 15.992,
+            "perturbed_features_input": 5.368,
+            "mean_confidence_successful": 0.6308530798703432,
+            "mean_confidence_unsuccessful": 0.157612495581309,
+            "min_confidence_unsuccessful": 0.0,
+            "max_confidence_unsuccessful": 0.49678242206573486,
+            "mean_md_distance": 4.028810148368021,
+            "outlier_rate": 0.176,
+            "outliers": "22/125"
+        }
+    }
+]

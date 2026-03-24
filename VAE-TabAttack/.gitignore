@@ -1,0 +1,29 @@
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# MacOS
+.DS_Store
+
+# VSCode
+.vscode/
+
+# wandb
+wandb/
+
+adversarial_examples/
+# results/
+archive/
+Try_10_inputs/
+Try_100_inputs/
+
+mushroom/
+Mushroom/
+
+# jupyter notebook
+.ipynb_checkpoints/
+
+**/deltaz
+**/pgd
+**/sparsity
