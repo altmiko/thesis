@@ -59,6 +59,8 @@ N_FEATURES = 37
 
 # ── Fixed hyper-parameters ─────────────────────────────────────────────────────
 LATENT_DIM = 16
+LAMBDA_CONSTRAINT = 10.0
+LAMBDA_PROTO = 2.0
 KAPPA = 0.0
 BATCH_SIZE = 256
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -227,11 +229,11 @@ def compute_safe_feature_mask(
     Returns a float mask of shape (N_FEATURES,).
     Safe continuous features (pairwise |corr| < threshold with all others) = 1.0
     High-correlation continuous features = 0.0
-    Binary features = 0.0  (never perturb directly; VAE handles them)
+    Binary features = 1.0  (Always mutated via VAE, passing the STE gradients cleanly)
 
     The mask is applied as:
         x_adv = x_orig + mask * (x_decoded - x_orig)
-    so high-correlation and binary features stay exactly as decoded by the VAE.
+    so high-correlation features are strictly locked, but safe and binary features pass through.
     """
     df = pd.DataFrame(X_train[:, CONTINUOUS_IDX])
     corr = df.corr().abs()
@@ -298,7 +300,7 @@ def check_validity(
 
 
 def constraint_loss(
-    x_adv: torch.Tensor, cont_min_t: torch.Tensor, cont_max_t: torch.Tensor
+    x_adv: torch.Tensor, cont_min_t: torch.Tensor, cont_max_t: torch.Tensor, reduce=True
 ) -> torch.Tensor:
     """
     Penalises three kinds of violations:
@@ -307,20 +309,23 @@ def constraint_loss(
     2. Binary non-binary values  → distance from nearest {0,1}
     3. Large total perturbation  → L1 norm of change (light regulariser)
 
-    Returns a scalar tensor.
+    Returns a tensor (scalar if reduce=True, else shape (B,)).
     """
     cont = x_adv[:, CONTINUOUS_IDX]
     binary = x_adv[:, BINARY_IDX]
+    loss = torch.zeros(x_adv.size(0), device=x_adv.device)
 
     # 1. Bounds violation
-    upper_viol = torch.relu(cont - cont_max_t).sum()
-    lower_viol = torch.relu(cont_min_t - cont).sum()
+    loss += torch.relu(cont - cont_max_t).sum(dim=1)
+    loss += torch.relu(cont_min_t - cont).sum(dim=1)
 
     # 2. Binary consistency: push toward hard 0/1
     bin_target = (binary >= 0.5).float()
-    binary_viol = torch.abs(binary - bin_target).mean()
+    loss += torch.abs(binary - bin_target).mean(dim=1)
 
-    return upper_viol + lower_viol + binary_viol
+    if reduce:
+        return loss.sum()
+    return loss
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -486,10 +491,10 @@ def latent_attack_cnnlstm(
     ─────────────────────────────────────────────────────────────────────────
     """
     vae.eval()
-    cnnlstm.train()  # enable dropout for gradient flow
+    cnnlstm.train()  # req for cuDNN RNN backward
     for module in cnnlstm.modules():
-        if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d)):
-            module.eval()
+        if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.Dropout)):
+            module.eval() # explicitly disable dropout logic to avoid noisy gradients
 
     B = x_batch.size(0)
 
@@ -538,15 +543,13 @@ def latent_attack_cnnlstm(
         logits = cnnlstm(x_adv_t)
         loss_cw = cw_loss(logits, orig_labels)
         loss_con = constraint_loss(x_adv_t, cont_min_t, cont_max_t)
-        loss_recon = torch.mean((x_adv_t - x_batch) ** 2)
         loss_proto = compute_protocol_loss(x_adv_t, SCALER_MEAN_T, SCALER_SCALE_T)
 
         loss = (
             0.1 * z_proj.norm(dim=1).mean()  # keep latent perturbation small
             + lambda_cw * loss_cw  # fool the classifier
             + LAMBDA_CONSTRAINT * loss_con  # stay valid
-            + LAMBDA_RECON * loss_recon  # stay close to original
-            + 10.0 * loss_proto # Push to adhere to logical protocol bounds
+            + LAMBDA_PROTO * loss_proto # Push to adhere to logical protocol bounds
         )
 
         loss.backward()
@@ -617,6 +620,9 @@ def latent_attack_lgbm(
     mu_np = mu.cpu().numpy().copy()
     mu_orig_np = mu.cpu().numpy().copy()
     mask_np = safe_mask.cpu().numpy()  # (N_FEATURES,)
+    
+    cont_min_t = torch.tensor(cont_min_np[CONTINUOUS_IDX], dtype=torch.float32, device=DEVICE)
+    cont_max_t = torch.tensor(cont_max_np[CONTINUOUS_IDX], dtype=torch.float32, device=DEVICE)
 
     best_x_adv = x_batch.cpu().numpy().copy()
     init_proba = lgbm_model.predict_proba(best_x_adv)
@@ -653,18 +659,22 @@ def latent_attack_lgbm(
         # Apply feature mask: blend decoded with original
         x_cand = x_orig_np + mask_np * (x_decoded - x_orig_np)
 
-        # Hard clamp continuous features
-        x_cand[:, CONTINUOUS_IDX] = np.clip(
-            x_cand[:, CONTINUOUS_IDX],
-            cont_min_np[CONTINUOUS_IDX],
-            cont_max_np[CONTINUOUS_IDX],
-        )
-
-        # Score candidates; keep best (lowest score on true class)
+        # Constraint and protocol loss to prefer valid candidates (vectorized)
+        c_loss = constraint_loss(torch.tensor(x_cand, device=DEVICE, dtype=torch.float32), cont_min_t, cont_max_t, reduce=False)
+        p_loss = compute_protocol_loss(torch.tensor(x_cand, device=DEVICE, dtype=torch.float32), SCALER_MEAN_T, SCALER_SCALE_T, reduce=False)
+        
+        # Evaluate fitness
         proba = lgbm_model.predict_proba(x_cand)
         cand_score = proba[:, original_class_idx]
+        
+        c_loss_np = c_loss.cpu().numpy()
+        p_loss_np = p_loss.cpu().numpy()
+        
+        # Fitness combines objective distance and valid bounds constraints.
+        cand_fitness = cand_score + 1.0 * c_loss_np + LAMBDA_PROTO * p_loss_np
+        best_fitness = best_scores + 1.0 * constraint_loss(torch.tensor(best_x_adv, device=DEVICE, dtype=torch.float32), cont_min_t, cont_max_t, reduce=False).cpu().numpy() + LAMBDA_PROTO * compute_protocol_loss(torch.tensor(best_x_adv, device=DEVICE, dtype=torch.float32), SCALER_MEAN_T, SCALER_SCALE_T, reduce=False).cpu().numpy()
 
-        improved = cand_score < best_scores
+        improved = cand_fitness < best_fitness
         best_scores[improved] = cand_score[improved]
         best_x_adv[improved] = x_cand[improved]
         mu_np[improved] = z_cand[improved]
