@@ -34,6 +34,8 @@ import torch.nn as nn
 import torch.optim as optim
 import lightgbm as lgb
 from tqdm import tqdm
+from loss_protocol import compute_protocol_loss
+from loss_protocol import compute_protocol_loss
 from datetime import datetime
 import io
 import sys
@@ -62,6 +64,9 @@ BATCH_SIZE = 256
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 N_ATTACK_SAMPLES = 500
 OVERSAMPLE_FACTOR = 5
+
+SCALER_MEAN_T = None
+SCALER_SCALE_T = None
 PROBE_SIZE = 50
 
 # ── Constraint loss weights ────────────────────────────────────────────────────
@@ -534,12 +539,14 @@ def latent_attack_cnnlstm(
         loss_cw = cw_loss(logits, orig_labels)
         loss_con = constraint_loss(x_adv_t, cont_min_t, cont_max_t)
         loss_recon = torch.mean((x_adv_t - x_batch) ** 2)
+        loss_proto = compute_protocol_loss(x_adv_t, SCALER_MEAN_T, SCALER_SCALE_T)
 
         loss = (
             0.1 * z_proj.norm(dim=1).mean()  # keep latent perturbation small
             + lambda_cw * loss_cw  # fool the classifier
             + LAMBDA_CONSTRAINT * loss_con  # stay valid
             + LAMBDA_RECON * loss_recon  # stay close to original
+            + 10.0 * loss_proto # Push to adhere to logical protocol bounds
         )
 
         loss.backward()
@@ -881,6 +888,13 @@ def main(use_train_bounds=False, use_ste=True):
     print(f"Device: {DEVICE}")
     print(f"Using straight-through estimator: {use_ste}")
     print(f"Using {'train' if use_train_bounds else 'test'} set bounds for validity")
+
+    global SCALER_MEAN_T, SCALER_SCALE_T
+    sc_path = os.path.join(PROCESSED, "scaler.pkl")
+    with open(sc_path, "rb") as f:
+        scaler = pickle.load(f)
+    SCALER_MEAN_T = torch.tensor(scaler.mean_, dtype=torch.float32, device=DEVICE)
+    SCALER_SCALE_T = torch.tensor(scaler.scale_, dtype=torch.float32, device=DEVICE)
 
     with open(os.path.join(NIDS_DIR, "label_encoder.pkl"), "rb") as f:
         le = pickle.load(f)
