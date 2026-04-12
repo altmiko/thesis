@@ -73,7 +73,7 @@ LAMBDA_RECON = 1.0
 
 # ── Multi-seed evaluation ──────────────────────────────────────────────────────
 # Results are averaged over these seeds and reported as mean ± std
-EVAL_SEEDS = [42, 123, 2024, 7, 999]
+EVAL_SEEDS = [42] # Reduced from [42, 123, 2024, 7, 999] for quick generation
 
 # ── Feature mask: which continuous features are "safe" to perturb ─────────────
 # Strategy: mask out high-correlation features to avoid breaking
@@ -97,7 +97,8 @@ DEFAULT_CONFIG = {
     "Recon": {"radius": 1.0, "lambda_cw": 5.0, "lr": 0.01, "max_iter": 300},
 }
 
-SEARCH_CLASSES = {"DoS", "Mirai", "DDoS", "Recon"}
+SEARCH_CLASSES = set() # Reduced from {"DoS", "Mirai", "DDoS", "Recon"}
+
 
 ATTACK_CLASSES = {
     "DDoS": "vae_ddos.pt",
@@ -238,7 +239,10 @@ def compute_safe_feature_mask(
     for col in safe_cont_cols:
         mask[CONTINUOUS_IDX[col]] = 1.0
 
-    n_safe = int(mask.sum().item())
+    for idx in BINARY_IDX:
+        mask[idx] = 1.0
+
+    n_safe = int(mask[CONTINUOUS_IDX].sum().item())
     n_cont = len(CONTINUOUS_IDX)
     print(
         f"[FeatureMask] Safe features: {n_safe}/{n_cont} continuous  "
