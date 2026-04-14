@@ -66,6 +66,7 @@ BATCH_SIZE = 256
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 N_ATTACK_SAMPLES = 500
 OVERSAMPLE_FACTOR = 5
+SHARED_EVAL_IDX_PATH = os.path.join(ROOT, "results", "baseline", "shared_eval_indices.npy")
 
 SCALER_MEAN_T = None
 SCALER_SCALE_T = None
@@ -959,6 +960,30 @@ def main(use_train_bounds=False, use_ste=True):
 
     lgbm = load_lgbm()
     cnnlstm = load_cnnlstm(num_classes)
+
+    use_shared_eval = False
+    X_eval = X_test
+    y_eval = y_test
+    if os.path.exists(SHARED_EVAL_IDX_PATH):
+        shared_idx = np.load(SHARED_EVAL_IDX_PATH).astype(np.int64)
+        valid = (shared_idx >= 0) & (shared_idx < X_test.shape[0])
+        shared_idx = shared_idx[valid]
+        if len(shared_idx) > 0:
+            X_eval = X_test[shared_idx]
+            y_eval = y_test[shared_idx]
+            use_shared_eval = True
+            print(
+                f"[Sync] Using shared eval indices from {SHARED_EVAL_IDX_PATH} "
+                f"(n={len(shared_idx)})"
+            )
+        else:
+            print(
+                f"[Sync] Shared eval indices found but empty/invalid; "
+                "falling back to native sampling"
+            )
+    else:
+        print("[Sync] Shared eval indices not found; using native sampling")
+
     print("Victim models loaded.\n")
 
     all_results = {}
@@ -972,18 +997,26 @@ def main(use_train_bounds=False, use_ste=True):
         class_idx = class_names.index(class_name)
 
         # ── Sample pool: correctly classified by BOTH models ─────────────
-        mask = y_test == class_idx
-        X_pool = X_test[mask][: N_ATTACK_SAMPLES * OVERSAMPLE_FACTOR]
+        mask = y_eval == class_idx
+        if use_shared_eval:
+            X_pool = X_eval[mask][:N_ATTACK_SAMPLES]
+        else:
+            X_pool = X_eval[mask][: N_ATTACK_SAMPLES * OVERSAMPLE_FACTOR]
         n_pool = len(X_pool)
 
-        lgbm_preds = lgbm.predict(X_pool)
-        cnnlstm_preds = get_cnnlstm_preds(X_pool, cnnlstm)
+        if use_shared_eval:
+            X_correct = X_pool
+            n_correct = len(X_correct)
+            X_cls = X_correct[:N_ATTACK_SAMPLES]
+        else:
+            lgbm_preds = lgbm.predict(X_pool)
+            cnnlstm_preds = get_cnnlstm_preds(X_pool, cnnlstm)
 
-        correct_mask = (lgbm_preds == class_idx) & (cnnlstm_preds == class_idx)
-        X_correct = X_pool[correct_mask]
-        n_correct = len(X_correct)
+            correct_mask = (lgbm_preds == class_idx) & (cnnlstm_preds == class_idx)
+            X_correct = X_pool[correct_mask]
+            n_correct = len(X_correct)
 
-        X_cls = X_correct[:N_ATTACK_SAMPLES]
+            X_cls = X_correct[:N_ATTACK_SAMPLES]
         n_samples = len(X_cls)
 
         print(f"\n{'=' * 60}")

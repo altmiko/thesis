@@ -1,0 +1,43 @@
+{
+  "dataset": "CICIoT2023 (processed split from data/processed)",
+  "n_samples": 10,
+  "device": "cuda",
+  "classes": [
+    "Benign",
+    "DDoS",
+    "DoS",
+    "Mirai",
+    "Recon"
+  ],
+  "config": {
+    "seed": 42,
+    "batch_size": 10,
+    "pgd": {
+      "eps": 0.08,
+      "alpha": 0.01,
+      "steps": 40
+    },
+    "cw": {
+      "c": 1.0,
+      "kappa": 0.0,
+      "steps": 100,
+      "lr": 0.01
+    }
+  },
+  "metrics": {
+    "pgd": {
+      "clean_acc": 0.6,
+      "asr_all": 0.8,
+      "asr_clean_correct": 0.6666666666666666,
+      "l2_mean": 0.3353029787540436,
+      "linf_mean": 0.07999999821186066
+    },
+    "cw": {
+      "clean_acc": 0.6,
+      "asr_all": 0.7,
+      "asr_clean_correct": 0.5,
+      "l2_mean": 0.03246595710515976,
+      "linf_mean": 0.01992691680788994
+    }
+  }
+}
