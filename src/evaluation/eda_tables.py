@@ -6,7 +6,7 @@ import os
 
 np.random.seed(42)
 sys.path.insert(0, 'D:/thesis_final/src')
-from src.preprocessing.feature_groups import FEATURE_NAMES, BINARY_FEATURES, INTEGER_FEATURES, CATEGORY_MAP
+from src.preprocessing.schema import FEATURE_NAMES, BINARY_FEATURES, INTEGER_FEATURES, CATEGORY_MAP
 
 df = pd.read_parquet('D:/thesis_final/data/processed/raw_loaded.parquet')
 print(f"Loaded: {df.shape}")

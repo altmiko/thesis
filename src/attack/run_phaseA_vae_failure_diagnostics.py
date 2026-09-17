@@ -25,7 +25,7 @@ from attack.latent_infra import (  # noqa: E402
     load_split,
     set_global_seed,
 )
-from preprocessing.feature_groups import FEATURE_NAMES  # noqa: E402
+from preprocessing.schema import FEATURE_NAMES  # noqa: E402
 from vae.config import CLASS_TO_ID  # noqa: E402
 
 TARGET_CLASSES = ("BruteForce", "DoS")

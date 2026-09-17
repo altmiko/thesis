@@ -107,7 +107,7 @@ def plot_vertical(df: pd.DataFrame, output_dir: Path) -> None:
     ax.text(
         0.5,
         1.01,
-        "Macro-average across MLP, CNN, LSTM, and CNN-LSTM; DualPath excluded",
+        "Macro-average across MLP, CNN, LSTM, and CNN-LSTM",
         transform=ax.transAxes,
         ha="center",
         va="bottom",
@@ -162,7 +162,7 @@ def plot_horizontal(df: pd.DataFrame, output_dir: Path) -> None:
     ax.text(
         0.5,
         1.01,
-        "Macro-average across MLP, CNN, LSTM, and CNN-LSTM; DualPath excluded",
+        "Macro-average across MLP, CNN, LSTM, and CNN-LSTM",
         transform=ax.transAxes,
         ha="center",
         va="bottom",
@@ -198,7 +198,7 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     data = _load_data(args.input)
     data.to_csv(
-        args.output_dir / "target_benign_asr_valid_average_excluding_dualpath.csv",
+        args.output_dir / "target_benign_asr_valid_average.csv",
         index=False,
     )
     plot_vertical(data, args.output_dir)
@@ -206,7 +206,7 @@ def main() -> None:
 
     print(
         args.output_dir
-        / "target_benign_asr_valid_average_excluding_dualpath.csv"
+        / "target_benign_asr_valid_average.csv"
     )
     print(args.output_dir / "target_benign_asr_valid_vertical.png")
     print(args.output_dir / "target_benign_asr_valid_vertical.pdf")

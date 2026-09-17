@@ -34,9 +34,9 @@ RULE_GROUP_PREFIXES: dict[str, tuple[str, ...]] = {
 }
 
 # Canonical 39-dim CICIoT2023 feature order. Imported from the single source of
-# truth (preprocessing.feature_groups) so this module, the validator, and
+# truth (preprocessing.schema) so this module, the validator, and
 # preprocessing can never drift out of sync.
-from preprocessing.feature_groups import FEATURE_NAMES  # noqa: E402
+from preprocessing.schema import FEATURE_NAMES  # noqa: E402
 
 assert len(FEATURE_NAMES) == 39, f"Expected 39 feature names, got {len(FEATURE_NAMES)}"
 

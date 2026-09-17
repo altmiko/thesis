@@ -25,7 +25,7 @@ from attack.latent_infra import (  # noqa: E402
     set_global_seed,
 )
 from attack.validator import validate_batch  # noqa: E402
-from preprocessing.feature_groups import FEATURE_NAMES  # noqa: E402
+from preprocessing.schema import FEATURE_NAMES  # noqa: E402
 from vae.config import CLASS_TO_ID, CLASSES  # noqa: E402
 from vae.schema import raw_protocol_to_scaled  # noqa: E402
 

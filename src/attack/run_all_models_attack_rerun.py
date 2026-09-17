@@ -49,7 +49,7 @@ from attack.latent_restarts import (  # noqa: E402
     strategy_uses_gmm,
 )
 from attack.validator import validate_batch  # noqa: E402
-from preprocessing.feature_groups import FEATURE_NAMES  # noqa: E402
+from preprocessing.schema import FEATURE_NAMES  # noqa: E402
 from vae.config import CLASS_TO_ID, CLASSES  # noqa: E402
 
 DEFAULT_VAE_RUN_TAG = "gaussian_anticollapse_beta05_freebits01_20260529_173512"
@@ -61,7 +61,6 @@ MODEL_SPECS = [
     {"tag": "cnn", "label": "CNN", "checkpoint": "cnn_8class.pt"},
     {"tag": "lstm", "label": "LSTM", "checkpoint": "lstm_8class.pt"},
     {"tag": "serial", "label": "CNN-LSTM", "checkpoint": "serial_8class.pt"},
-    {"tag": "dualpath", "label": "DualPath", "checkpoint": "dualpath_8class.pt"},
 ]
 ATTACK_ORDER = ["latent-pgd", "latent-cw", "input-pgd", "input-cw"]
 SUMMARY_COLUMNS = [

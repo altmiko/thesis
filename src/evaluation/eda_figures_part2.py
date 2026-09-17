@@ -9,7 +9,7 @@ import os
 
 np.random.seed(42)
 sys.path.insert(0, 'D:/thesis_final/src')
-from src.preprocessing.feature_groups import FEATURE_NAMES, CATEGORY_MAP
+from src.preprocessing.schema import FEATURE_NAMES, CATEGORY_MAP
 
 FIGURES_DIR = 'D:/thesis_final/figures'
 TABLES_DIR = 'D:/thesis_final/tables'
@@ -191,84 +191,6 @@ fig.savefig(f'{FIGURES_DIR}/F6b_umap_mirai_vs_benign.pdf', dpi=150, bbox_inches=
 plt.close()
 print("F6 saved.")
 
-# ── F7: NetDiffuser feature categorization ───────────────────────────
-print("Generating F7 (NetDiffuser)...")
-from src.preprocessing.netdiffuser_categorization import categorize_features
-from scipy.cluster.hierarchy import dendrogram
-
-nd_sample = df.sample(n=min(50000, len(df)), random_state=42)
-result = categorize_features(nd_sample, FEATURE_NAMES)
-
-print(f"  Discrete: {len(result['discrete'])} features")
-print(f"  Relative: {len(result['relative'])} features")
-print(f"  Best cut height: {result['best_cut']:.4f}")
-
-with open(f'{PROC_DIR}/netdiffuser_categorization.json', 'w') as f:
-    serializable = {k: v for k, v in result.items() if k != 'linkage_matrix'}
-    serializable['discrete'] = result['discrete']
-    serializable['relative'] = result['relative']
-    json.dump(serializable, f, indent=2)
-
-# F7a: Dendrogram
-fig, ax = plt.subplots(figsize=(14, 8))
-from scipy.cluster.hierarchy import fcluster
-labels_nd = fcluster(result['linkage_matrix'], t=result['best_cut'], criterion='distance')
-label_sizes = pd.Series(labels_nd).value_counts().to_dict()
-leaf_colors = {}
-for i, feat in enumerate(FEATURE_NAMES):
-    if label_sizes[labels_nd[i]] == 1:
-        leaf_colors[feat] = '#2ecc71'
-    else:
-        leaf_colors[feat] = '#e74c3c'
-
-dend = dendrogram(result['linkage_matrix'], labels=FEATURE_NAMES,
-                  leaf_rotation=90, leaf_font_size=7, ax=ax)
-ax.axhline(y=result['best_cut'], color='blue', linestyle='--',
-           linewidth=1.5, label=f"Cut height = {result['best_cut']:.3f}")
-ax.set_title('NetDiffuser Feature Categorization (Hierarchical Clustering)')
-ax.set_ylabel('Distance')
-ax.legend(fontsize=9)
-plt.tight_layout()
-fig.savefig(f'{FIGURES_DIR}/F7a_dendrogram.pdf', dpi=150, bbox_inches='tight')
-plt.close()
-
-# F7b: CH scores vs cut height
-fig, ax = plt.subplots(figsize=(10, 6))
-h_grid = result['h_grid']
-ch_scores = result['ch_scores']
-ax.plot(h_grid, ch_scores, 'b-o', markersize=4)
-ax.axvline(x=result['best_cut'], color='red', linestyle='--',
-           label=f"Best cut = {result['best_cut']:.3f}")
-ax.set_xlabel('Cut Height')
-ax.set_ylabel('Calinski-Harabasz Score')
-ax.set_title('CH Score vs Cut Height')
-ax.legend()
-plt.tight_layout()
-fig.savefig(f'{FIGURES_DIR}/F7b_ch_scores.pdf', dpi=150, bbox_inches='tight')
-plt.close()
-
-# T6: Feature categorization table
-with open(f'{TABLES_DIR}/T6_feature_categorization.md', 'w') as f:
-    f.write("# T6 - NetDiffuser Feature Categorization\n\n")
-    f.write("| Discrete Features | Relative Features |\n")
-    f.write("|---|---|\n")
-    max_len = max(len(result['discrete']), len(result['relative']))
-    for i in range(max_len):
-        d = result['discrete'][i] if i < len(result['discrete']) else ''
-        r = result['relative'][i] if i < len(result['relative']) else ''
-        f.write(f"| {d} | {r} |\n")
-
-# Also save as CSV
-t6_data = {'discrete': result['discrete'], 'relative': result['relative']}
-max_len = max(len(t6_data['discrete']), len(t6_data['relative']))
-t6_rows = []
-for i in range(max_len):
-    t6_rows.append({
-        'discrete': result['discrete'][i] if i < len(result['discrete']) else '',
-        'relative': result['relative'][i] if i < len(result['relative']) else '',
-    })
-pd.DataFrame(t6_rows).to_csv(f'{TABLES_DIR}/T6_feature_categorization.csv', index=False)
-print("F7 saved.")
 
 # ── Final EDA sanity print ───────────────────────────────────────────
 with open(f'{PROC_DIR}/clean_data_validity_report.json') as f:
@@ -279,9 +201,8 @@ print("         EDA COMPLETE")
 print("=" * 50)
 print(f"Schema:       Modified Schema A (39 features)")
 print(f"Rows used:    {len(df):,}  (Mode: SAMPLE)")
-print(f"Figures generated: 7 (F1, F2, F3, F4a/b, F5, F6a/b, F7a/b)")
-print(f"Tables generated:  6 (T1, T2a/b, T3, T4, T5, T6)")
+print(f"Figures generated: F4a/b, F5, F6b")
+print(f"Tables generated:  T1, T2a/b, T3, T4, T5")
 print(f"Clean data validity: {validity['validity_rate']:.4%} overall (see T4)")
-print(f"NetDiffuser: {len(result['discrete'])} Discrete, {len(result['relative'])} Relative features")
 print(f"t-SNE sample: {len(tsne_idx)} points | UMAP sample: {len(umap_idx)} points")
 print("=" * 50)

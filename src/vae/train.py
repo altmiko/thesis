@@ -16,7 +16,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
-from preprocessing.feature_groups import FEATURE_NAMES
+from preprocessing.schema import FEATURE_NAMES
 from vae.dataset import PerClassDataset
 from vae.losses import BetaScheduler, compute_elbo
 from vae.model import MixedInputBetaVAE
@@ -145,7 +145,7 @@ def _load_8class_labels(
     if src_path not in sys.path:
         sys.path.insert(0, src_path)
 
-    from preprocessing.feature_groups import CATEGORY_MAP  # type: ignore
+    from preprocessing.schema import CATEGORY_MAP  # type: ignore
 
     # Load 34-class encoder to get string label names
     encoder_path = root / "data" / "processed" / "label_encoder.pkl"

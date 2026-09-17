@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from src.preprocessing.feature_groups import FEATURE_NAMES
+from src.preprocessing.schema import FEATURE_NAMES
 from src.evaluation.validity_analysis import compute_asr_valid
 from src.evaluation.validity_analysis import generate_impossible_traffic_exhibit
 from src.evaluation.validity_analysis import inverse_transform_results

@@ -48,11 +48,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-# Schema constants come from the archived feature_groups module — it is a
-# leaf module (no cross-package imports) and remains the single source of
-# truth for the 39-column FEATURE_NAMES and the 34→8 CATEGORY_MAP that
-# every downstream stage indexes into.
-from src.preprocessing.feature_groups import (  # noqa: E402
+# Schema constants come from the canonical preprocessing.schema module — a
+# leaf module (no cross-package imports) holding the 39-column FEATURE_NAMES
+# and the 34→8 CATEGORY_MAP that every downstream stage indexes into.
+from src.preprocessing.schema import (  # noqa: E402
     CATEGORY_MAP,
     EXPECTED_COLUMNS,
     FEATURE_NAMES,

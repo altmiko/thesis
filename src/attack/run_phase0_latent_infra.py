@@ -25,7 +25,7 @@ from vae.config import CLASSES  # noqa: E402
 
 
 def _feature_listing(indices: list[int]) -> list[str]:
-    from preprocessing.feature_groups import FEATURE_NAMES
+    from preprocessing.schema import FEATURE_NAMES
 
     return [f"{idx}:{FEATURE_NAMES[idx]}" for idx in indices]
 

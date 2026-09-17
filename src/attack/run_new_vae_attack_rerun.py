@@ -59,7 +59,7 @@ from attack.run_all_models_attack_rerun import (  # noqa: E402
     _fmt_pct,
     _write_csv,
 )
-from preprocessing.feature_groups import FEATURE_NAMES  # noqa: E402
+from preprocessing.schema import FEATURE_NAMES  # noqa: E402
 from vae.config import CLASS_TO_ID, CLASSES  # noqa: E402
 
 DEFAULT_VAE_RUN_TAG = "gaussian_anticollapse_beta05_freebits01_20260529_173512"

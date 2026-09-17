@@ -40,18 +40,11 @@ from sklearn.preprocessing import LabelEncoder, RobustScaler  # noqa: E402
 from sklearn.utils.class_weight import compute_class_weight  # noqa: E402
 
 from config import paths  # noqa: E402
-from src.preprocessing import netdiffuser_categorization as ndc  # noqa: E402
-from src.preprocessing.feature_groups import (  # noqa: E402
+from src.preprocessing.schema import (  # noqa: E402
     BINARY_FEATURES,
     CATEGORY_MAP,
     FEATURE_NAMES,
-    FULL_PERTURBABLE_OVERRIDE_FEATURES,
     INTEGER_FEATURES,
-    MANUAL_CONCENTRATED_DECISIONS,
-    MUTABLE_FEATURES,
-    NEAR_ZERO_FREEZE_POLICY,
-    NEAR_ZERO_IQR_THRESHOLD,
-    RARE_SIGNAL_NONZERO_THRESHOLD,
 )
 from src.preprocessing.ciciot2023.sampler import cluster_proportional_floor_sample, random_floor_sample
 from src.preprocessing.ciciot2023.splitter import (  # noqa: E402
@@ -223,113 +216,6 @@ def sample_train(
     return train_idx.astype(np.int64), record
 
 
-def build_near_zero_report(X: np.ndarray, train_mask: np.ndarray, scaler: RobustScaler) -> dict:
-    """Near-zero-IQR governance report (spec §4.7 dependency), from TRAIN."""
-    train_iqr = np.percentile(X[train_mask], 75, axis=0) - np.percentile(X[train_mask], 25, axis=0)
-    Xtr = X[train_mask]
-    features = []
-    for i, feat in enumerate(FEATURE_NAMES):
-        iqr = float(train_iqr[i])
-        if iqr >= NEAR_ZERO_IQR_THRESHOLD:
-            continue
-        col = Xtr[:, i]
-        n_unique = int(np.unique(col).size)
-        non_zero_fraction = float((col != 0).mean())
-        if n_unique == 1:
-            kind = "constant"
-        elif non_zero_fraction < RARE_SIGNAL_NONZERO_THRESHOLD:
-            kind = "rare_signal"
-        else:
-            kind = "concentrated"
-        features.append({
-            "feature": feat,
-            "train_iqr": iqr,
-            "scaler_scale": float(scaler.scale_[i]),
-            "n_unique_train": n_unique,
-            "max_value_train": float(col.max()),
-            "non_zero_fraction": non_zero_fraction,
-            "kind": kind,
-            "policy_action": NEAR_ZERO_FREEZE_POLICY[kind],
-        })
-    return {
-        "threshold": NEAR_ZERO_IQR_THRESHOLD,
-        "rare_signal_non_zero_threshold": RARE_SIGNAL_NONZERO_THRESHOLD,
-        "freeze_policy": NEAR_ZERO_FREEZE_POLICY,
-        "n_features": len(features),
-        "counts_by_kind": {
-            k: sum(1 for x in features if x["kind"] == k)
-            for k in ("constant", "rare_signal", "concentrated")
-        },
-        "features": features,
-    }
-
-
-def build_netdiffuser(X: np.ndarray, train_idx: np.ndarray) -> dict:
-    """NetDiffuser discrete/relative partition (spec §4.7 dependency), from the
-    subsampled train set — the natural, leakage-safe input."""
-    rng = np.random.default_rng(paths.SEED)
-    idx = train_idx if train_idx.size <= NETDIFFUSER_SAMPLE else rng.choice(
-        train_idx, NETDIFFUSER_SAMPLE, replace=False
-    )
-    df = pd.DataFrame(X[idx], columns=FEATURE_NAMES)
-    # Drop columns that are constant in the sample: a zero-variance column makes
-    # the Spearman correlation undefined and cannot belong to a "relative" group.
-    nunique = df.nunique()
-    usable = [c for c in FEATURE_NAMES if nunique[c] > 1]
-    res = ndc.categorize_features(df, usable)
-    constant_cols = [c for c in FEATURE_NAMES if c not in usable]
-    return {
-        "discrete": res["discrete"] + constant_cols,  # constants -> discrete
-        "relative": res["relative"],
-        "best_cut": res["best_cut"],
-        "constant_in_sample": constant_cols,
-    }
-
-
-def build_perturbation_mask(near_zero: dict, netdiffuser: dict) -> tuple[np.ndarray, dict]:
-    """Perturbation mask (spec §4.7), ported verbatim from the archived pipeline.
-    1.0 = fully perturbable, 0.3 = capped-partial, 0.0 = frozen."""
-    discrete_set = set(netdiffuser["discrete"])
-    relative_set = set(netdiffuser["relative"])
-    by_feature = {x["feature"]: x for x in near_zero.get("features", [])}
-    auto_freeze = {x["feature"] for x in near_zero["features"] if x["policy_action"] == "auto_freeze"}
-
-    manual_mutable = [
-        x["feature"] for x in near_zero["features"]
-        if x["policy_action"] == "manual" and x["feature"] in set(MUTABLE_FEATURES)
-    ]
-    unresolved = [f for f in manual_mutable if f not in MANUAL_CONCENTRATED_DECISIONS]
-    if unresolved:
-        raise RuntimeError(f"near-zero-IQR features need manual decisions: {unresolved}")
-    for feat in manual_mutable:
-        if MANUAL_CONCENTRATED_DECISIONS[feat] == "force_freeze":
-            auto_freeze.add(feat)
-
-    mutable_set = set(MUTABLE_FEATURES)
-    full_override = set(FULL_PERTURBABLE_OVERRIDE_FEATURES)
-    cap_partial = {
-        feat for feat, item in by_feature.items()
-        if feat in mutable_set and item["kind"] in ("rare_signal", "concentrated")
-        and feat not in auto_freeze
-    }
-
-    mask = np.zeros(len(FEATURE_NAMES), dtype=np.float32)
-    n_full = n_partial = n_frozen = 0
-    for i, feat in enumerate(FEATURE_NAMES):
-        if feat in auto_freeze:
-            n_frozen += 1
-        elif feat in mutable_set and feat in full_override:
-            mask[i] = 1.0; n_full += 1
-        elif feat in cap_partial:
-            mask[i] = 0.3; n_partial += 1
-        elif feat in mutable_set and feat in discrete_set:
-            mask[i] = 1.0; n_full += 1
-        elif feat in mutable_set and feat in relative_set:
-            mask[i] = 0.3; n_partial += 1
-        else:
-            n_frozen += 1
-    return mask, {"n_full": n_full, "n_partial": n_partial, "n_frozen": n_frozen}
-
 
 def main() -> None:
     t0 = time.time()
@@ -364,9 +250,6 @@ def main() -> None:
     scaler = RobustScaler()
     scaler.fit(X[train_mask])
 
-    near_zero = build_near_zero_report(X, train_mask, scaler)
-    (P / "near_zero_iqr_features.json").write_text(json.dumps(near_zero, indent=2))
-    log("  near-zero-IQR features: %d", near_zero["n_features"])
 
     # ── Sample (train only) ───────────────────────────────────────────────────
     train_idx, sample_record = sample_train(X, scaler, split, category_str)
@@ -420,14 +303,6 @@ def main() -> None:
     (P / "category_names.json").write_text(json.dumps(list(le_cat.classes_), indent=2))
     (P / "class_to_category.json").write_text(json.dumps(CATEGORY_MAP, indent=2))
 
-    # ── NetDiffuser + perturbation mask (spec §4.7) ───────────────────────────
-    log("=== NetDiffuser categorization + perturbation mask ===")
-    netdiffuser = build_netdiffuser(X, train_idx)
-    (P / "netdiffuser_categorization.json").write_text(json.dumps(netdiffuser, indent=2))
-    mask, mask_counts = build_perturbation_mask(near_zero, netdiffuser)
-    np.save(P / "perturbation_mask.npy", mask)
-    log("  mask: full=%d partial=%d frozen=%d",
-        mask_counts["n_full"], mask_counts["n_partial"], mask_counts["n_frozen"])
 
     # ── Run manifest (spec §7.3 / §9 tracked items) ───────────────────────────
     try:
@@ -476,9 +351,6 @@ def main() -> None:
         "train_before_sampling": int(train_mask.sum()),
         "train_after_sampling": int(train_idx.size),
         "sampling_per_category": sample_record,
-        "near_zero_iqr_counts": near_zero["counts_by_kind"],
-        "netdiffuser": {"discrete": netdiffuser["discrete"], "relative": netdiffuser["relative"]},
-        "perturbation_mask_counts": mask_counts,
         "class_weight_ranges": {
             "34class": [float(w34.min()), float(w34.max())],
             "8class": [float(w8.min()), float(w8.max())],

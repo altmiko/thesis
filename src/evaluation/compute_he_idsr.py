@@ -37,7 +37,7 @@ from attack.latent_restarts import (  # noqa: E402
     parse_class_float_map,
     strategy_uses_gmm,
 )
-from preprocessing.feature_groups import FEATURE_NAMES  # noqa: E402
+from preprocessing.schema import FEATURE_NAMES  # noqa: E402
 from vae.config import CLASS_TO_ID, CLASSES  # noqa: E402
 
 
@@ -829,7 +829,6 @@ def _write_report(
     target_average = (
         by_classifier.loc[
             (by_classifier["attack_goal"] == "target-benign")
-            & (by_classifier["classifier"] != "DualPath")
             & by_classifier["attack_method"].isin(target_labels),
             ["attack_method", "ASR_valid"],
         ]
@@ -859,7 +858,7 @@ def _write_report(
         "",
         "## Scope",
         "",
-        "- Five classifiers: MLP, CNN, LSTM, CNN-LSTM, and DualPath.",
+        "- Four classifiers: MLP, CNN, LSTM, and CNN-LSTM.",
         "- Seven malicious source classes. Benign is a target class, not an attack source class.",
         "- Ten attack configurations: latent PGD/CW, unconstrained input PGD/CW, targeted latent PGD/CW, constrained input PGD/CW, and their target-to-Benign variants.",
         "- Cells without any correctly classified source samples are omitted, matching the original runs.",
@@ -895,7 +894,7 @@ def _write_report(
             "",
             "## Target-to-Benign Average ASR Valid",
             "",
-            "These are unweighted macro-averages across MLP, CNN, LSTM, and CNN-LSTM. DualPath is excluded.",
+            "These are unweighted macro-averages across MLP, CNN, LSTM, and CNN-LSTM.",
             "",
         ]
     )

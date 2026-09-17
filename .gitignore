@@ -21,3 +21,6 @@ outputs/*
 .gitignore
 .worktrees/
 .trash_p2
+.pytest_cache/
+.claude/
+.vscode

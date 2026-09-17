@@ -16,7 +16,7 @@ import pandas as pd
 import scipy
 import sklearn
 
-from src.preprocessing.feature_groups import FEATURE_NAMES
+from src.preprocessing.schema import FEATURE_NAMES
 from src.thesis_eval.metrics import fidelity
 
 

@@ -22,7 +22,7 @@ from sklearn.model_selection import train_test_split
 from src.attack.adversarial_attacks import compute_attack_metrics
 from src.attack.adversarial_attacks import load_model
 from src.attack.adversarial_attacks import run_attack
-from src.preprocessing.feature_groups import FEATURE_NAMES
+from src.preprocessing.schema import FEATURE_NAMES
 
 
 ROOT = Path(__file__).resolve().parents[1]

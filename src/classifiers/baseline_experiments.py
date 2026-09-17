@@ -461,7 +461,7 @@ def main() -> None:
             num_classes=34,
         ),
     ]
-    model_types = ["mlp", "cnn", "lstm", "serial", "dualpath"]
+    model_types = ["mlp", "cnn", "lstm", "serial"]
 
     summary = {}
 

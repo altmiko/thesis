@@ -36,7 +36,7 @@ from attack.latent_infra import (  # noqa: E402
 )
 from attack.latent_pgd import classifier_logits  # noqa: E402
 from attack.validator import validate_batch  # noqa: E402
-from preprocessing.feature_groups import FEATURE_NAMES  # noqa: E402
+from preprocessing.schema import FEATURE_NAMES  # noqa: E402
 from vae.config import CLASS_TO_ID, CLASSES  # noqa: E402
 
 
@@ -50,7 +50,6 @@ MODEL_SPECS = [
     {"tag": "cnn", "label": "CNN", "checkpoint": "cnn_8class.pt"},
     {"tag": "lstm", "label": "LSTM", "checkpoint": "lstm_8class.pt"},
     {"tag": "serial", "label": "CNN-LSTM", "checkpoint": "serial_8class.pt"},
-    {"tag": "dualpath", "label": "DualPath", "checkpoint": "dualpath_8class.pt"},
 ]
 ATTACK_ORDER = [
     "cinput-pgd",

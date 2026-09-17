@@ -145,10 +145,6 @@ def _infer_model_type(model_path: str) -> str:
     name = Path(model_path).name.lower()
     if "mlp" in name:
         return "mlp"
-    if "dualpath" in name:
-        return "dualpath"
-    if "attn_serial" in name:
-        return "attn_serial"
     if "serial" in name:
         return "serial"
     if "lstm" in name:
@@ -157,7 +153,7 @@ def _infer_model_type(model_path: str) -> str:
         return "cnn"
     raise ValueError(
         f"Could not infer model type from filename '{name}'. "
-        "Expected one of: mlp, cnn, lstm, serial, dualpath, attn_serial."
+        "Expected one of: mlp, cnn, lstm, serial."
     )
 
 

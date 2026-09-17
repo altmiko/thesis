@@ -210,7 +210,7 @@ def raw_postprocess(x_raw: np.ndarray) -> np.ndarray:
       G8  - Number rounded to nearest positive integer (≥ 1)
       G3  - All binary columns rounded and clipped to {0, 1}
     """
-    from preprocessing.feature_groups import FEATURE_NAMES
+    from preprocessing.schema import FEATURE_NAMES
 
     x = x_raw.copy()
 

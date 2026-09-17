@@ -16,7 +16,7 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
-from src.preprocessing.feature_groups import FEATURE_NAMES
+from src.preprocessing.schema import FEATURE_NAMES
 
 
 ROOT = Path(__file__).resolve().parents[1]

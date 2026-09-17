@@ -1,5 +1,5 @@
 """
-Evaluate saved baseline classifiers on the processed CICIoT2023 test split.
+Evaluate saved neural baseline classifiers on the processed CICIoT2023 test split.
 
 The script loads the checkpoint files produced by the baseline training
 pipeline, computes per-model metrics, and writes ROC-AUC plots for each
@@ -21,7 +21,6 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -41,25 +40,18 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.classifiers.models import get_model
-from src.classifiers.tree_baselines import TREE_MODEL_TYPES
-from src.classifiers.tree_baselines import align_proba_columns
 
 
-NN_MODEL_TYPES: Tuple[str, ...] = ("mlp", "cnn", "lstm", "serial", "dualpath")
-MODEL_TYPES: Tuple[str, ...] = NN_MODEL_TYPES + TREE_MODEL_TYPES
+NN_MODEL_TYPES: Tuple[str, ...] = ("mlp", "cnn", "lstm", "serial")
+MODEL_TYPES: Tuple[str, ...] = NN_MODEL_TYPES
 MODEL_DISPLAY_NAMES: Dict[str, str] = {
     "mlp": "MLP",
     "cnn": "CNN",
     "lstm": "LSTM",
     "serial": "CNN-LSTM",
-    "dualpath": "DualPath",
-    "rf": "RandomForest",
-    "xgb": "XGBoost",
 }
 
 
-def is_tree_model(model_type: str) -> bool:
-    return model_type in TREE_MODEL_TYPES
 
 
 @dataclass(frozen=True)
@@ -130,11 +122,6 @@ def load_model(
     models_dir: Path,
     device: torch.device,
 ):
-    if is_tree_model(model_type):
-        model_path = models_dir / f"{model_type}_{task.name}.pkl"
-        if not model_path.exists():
-            raise FileNotFoundError(f"Missing checkpoint: {model_path.resolve()}")
-        return joblib.load(model_path)
 
     model_path = models_dir / f"{model_type}_{task.name}.pt"
     if not model_path.exists():
@@ -160,20 +147,6 @@ def predict_probabilities(
     device: torch.device,
     num_classes: int | None = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    # Tree estimators (RandomForest / XGBoost) expose predict_proba and run on
-    # NumPy directly; align their class columns to the full 0..K-1 label range.
-    if hasattr(model, "predict_proba"):
-        if num_classes is None:
-            num_classes = int(np.max(np.asarray(model.classes_)) + 1)
-        n_items = int(x_test.shape[0])
-        probs = np.empty((n_items, num_classes), dtype=np.float32)
-        preds = np.empty(n_items, dtype=np.int64)
-        for start, end in iter_batches(n_items, batch_size):
-            xb_np = np.asarray(x_test[start:end], dtype=np.float32)
-            batch_probs = align_proba_columns(model.predict_proba(xb_np), model.classes_, num_classes)
-            probs[start:end] = batch_probs.astype(np.float32)
-            preds[start:end] = np.argmax(batch_probs, axis=1)
-        return probs, preds
 
     n_items = int(x_test.shape[0])
     logits_probe = None

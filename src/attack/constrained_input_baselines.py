@@ -8,7 +8,7 @@ import torch.nn.functional as F
 
 from attack.latent_infra import PerturbationMask, reimpose_protocol_features
 from attack.latent_pgd import classifier_logits
-from preprocessing.feature_groups import FEATURE_NAMES
+from preprocessing.schema import FEATURE_NAMES
 from vae.schema import get_partition
 
 

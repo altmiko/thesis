@@ -15,12 +15,7 @@ from scipy.stats import chi2
 from torch.utils.data import DataLoader
 
 from attack.adversarial_attacks import load_model
-from preprocessing.feature_groups import (
-    FEATURE_NAMES,
-    FULL_PERTURBABLE_OVERRIDE_FEATURES,
-    MANUAL_CONCENTRATED_DECISIONS,
-    MUTABLE_FEATURES,
-)
+from preprocessing.schema import FEATURE_NAMES
 from vae.config import CLASS_TO_ID, CLASSES, ID_TO_CLASS
 from vae.dataset import PerClassDataset
 from vae.model import PROTOCOL_REFERENCE_BUFFERS, MixedInputBetaVAE
@@ -29,6 +24,30 @@ from vae.train import _load_8class_labels
 from vae.train_all import _resolve_model_hparams
 
 LOGGER = logging.getLogger(__name__)
+
+# ── LEGACY perturbation taxonomy (pending structural rebuild) ───────────────
+# Relocated verbatim from the removed preprocessing/feature_groups.py so the
+# PerturbationMask consumer below keeps working against existing artifacts.
+# This is the 3-month-old experiment slated for a rebuild; do not extend here.
+_BASE_MUTABLE = [
+    'Rate', 'Header_Length', 'Variance',
+    'fin_flag_number', 'syn_flag_number', 'rst_flag_number',
+    'psh_flag_number', 'ack_flag_number', 'ece_flag_number', 'cwr_flag_number',
+    'Tot sum', 'Min', 'Max', 'AVG', 'Std', 'Tot size', 'IAT',
+]
+MUTABLE_FEATURES = _BASE_MUTABLE + [
+    'ack_count', 'syn_count', 'fin_count', 'rst_count', 'Number',
+]
+FULL_PERTURBABLE_OVERRIDE_FEATURES = [
+    'Header_Length', 'Rate', 'Tot sum', 'Min', 'Max', 'AVG', 'Std',
+    'Tot size', 'IAT', 'Number', 'Variance',
+]
+MANUAL_CONCENTRATED_DECISIONS = {
+    'fin_flag_number': 'allow_mutable', 'syn_flag_number': 'allow_mutable',
+    'rst_flag_number': 'allow_mutable', 'psh_flag_number': 'allow_mutable',
+    'ack_flag_number': 'allow_mutable', 'fin_count': 'allow_mutable',
+    'rst_count': 'allow_mutable', 'Min': 'allow_mutable', 'Number': 'allow_mutable',
+}
 
 DEFAULT_PARTIAL_DELTA = 0.3
 PROTOCOL_FEATURES = ["Protocol Type", "TCP", "UDP", "ICMP", "IGMP"]
@@ -312,7 +331,6 @@ class AttackRouter:
         self.classifier_paths = classifier_paths or {
             "mlp": self.repo_root / "models" / "mlp_8class.pt",
             "cnn": self.repo_root / "models" / "cnn_8class.pt",
-            "lightgbm": self.repo_root / "models" / "lightgbm_8class.pkl",
         }
 
     def _normalise_classifier_name(self, classifier_name: str) -> str:
@@ -322,8 +340,6 @@ class AttackRouter:
             "mlp": "mlp",
             "cnn-1d": "cnn",
             "cnn": "cnn",
-            "lightgbm": "lightgbm",
-            "lgbm": "lightgbm",
         }
         if key not in alias_map:
             raise KeyError(f"Unknown classifier alias: {classifier_name}")
@@ -393,17 +409,14 @@ class AttackRouter:
                 f"Classifier checkpoint for '{classifier_name}' not found at {path}"
             )
 
-        if key in {"mlp", "cnn"}:
-            model = load_model(
-                model_path=str(path),
-                num_features=len(FEATURE_NAMES),
-                num_classes=len(CLASSES),
-                device=self.device,
-            )
-        elif key == "lightgbm":
-            model = _load_pickle(path)
-        else:
+        if key not in {"mlp", "cnn"}:
             raise KeyError(f"Unsupported classifier key: {key}")
+        model = load_model(
+            model_path=str(path),
+            num_features=len(FEATURE_NAMES),
+            num_classes=len(CLASSES),
+            device=self.device,
+        )
 
         self._classifier_cache[key] = model
         return model

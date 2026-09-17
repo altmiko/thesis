@@ -17,11 +17,10 @@ from typing import Dict, Iterable, List, Tuple
 
 import numpy as np
 
-from src.preprocessing.feature_groups import (
+from src.preprocessing.schema import (
     BINARY_FEATURES,
     CATEGORY_MAP,
     FEATURE_NAMES,
-    IMMUTABLE_FEATURES,
     INTEGER_FEATURES,
 )
 from src.attack.validator import VALID_PROTOCOLS

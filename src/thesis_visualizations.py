@@ -742,7 +742,7 @@ def section_f(data, out, checklist, stats_rows, device: str = "cpu"):
             import torch
             from attack.latent_infra import AttackRouter
             from attack.validator import validate_batch
-            from preprocessing.feature_groups import FEATURE_NAMES
+            from preprocessing.schema import FEATURE_NAMES
             from vae.config import CLASS_TO_ID
         except Exception as exc:
             print(f"  [SKIP F1] decoder/validator imports unavailable: {exc}")

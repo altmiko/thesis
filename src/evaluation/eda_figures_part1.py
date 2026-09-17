@@ -10,7 +10,7 @@ import os
 
 np.random.seed(42)
 sys.path.insert(0, 'D:/thesis_final/src')
-from src.preprocessing.feature_groups import FEATURE_NAMES, BINARY_FEATURES, INTEGER_FEATURES, CATEGORY_MAP
+from src.preprocessing.schema import FEATURE_NAMES, BINARY_FEATURES, INTEGER_FEATURES, CATEGORY_MAP
 
 plt.rcParams.update({'font.size': 9, 'figure.dpi': 150})
 

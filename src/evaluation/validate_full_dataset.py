@@ -18,7 +18,7 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 
-from src.preprocessing.feature_groups import BINARY_FEATURES, CATEGORY_MAP, FEATURE_NAMES, INTEGER_FEATURES
+from src.preprocessing.schema import BINARY_FEATURES, CATEGORY_MAP, FEATURE_NAMES, INTEGER_FEATURES
 from src.attack.validator import VALID_PROTOCOLS, validate_batch
 
 

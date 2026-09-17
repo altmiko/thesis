@@ -19,7 +19,7 @@ import torch
 
 from src.attack.adversarial_attacks import load_model
 from src.attack.adversarial_attacks import run_attack
-from src.preprocessing.feature_groups import BINARY_FEATURES, FEATURE_NAMES
+from src.preprocessing.schema import BINARY_FEATURES, FEATURE_NAMES
 from src.attack.validator import VALID_PROTOCOLS
 from src.attack.validator import validate_batch
 
@@ -54,7 +54,6 @@ MODEL_LABEL = {
     "serial_binary": "CNN-LSTM",
     "cnn_binary": "CNN",
     "lstm_binary": "LSTM",
-    "dualpath_binary": "DUALPATH",
 }
 
 
@@ -107,17 +106,17 @@ def select_three_models() -> List[str]:
                 return tag
         return None
 
-    first = pick(["mlp_binary", "serial_binary", "cnn_binary", "lstm_binary", "dualpath_binary"])
+    first = pick(["mlp_binary", "serial_binary", "cnn_binary", "lstm_binary"])
     if first is None:
         raise RuntimeError("Could not choose first model")
     selected.append(first)
 
-    second = pick(["serial_binary", "cnn_binary", "dualpath_binary", "lstm_binary", "mlp_binary"])
+    second = pick(["serial_binary", "cnn_binary", "lstm_binary", "mlp_binary"])
     if second is None:
         raise RuntimeError("Could not choose second model")
     selected.append(second)
 
-    third = pick(["lstm_binary", "dualpath_binary", "cnn_binary", "serial_binary", "mlp_binary"])
+    third = pick(["lstm_binary", "cnn_binary", "serial_binary", "mlp_binary"])
     if third is None:
         for cand in sorted(existing):
             if cand not in selected:

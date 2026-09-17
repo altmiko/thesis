@@ -20,7 +20,7 @@ _SRC = str(_REPO_ROOT / "src")
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
-from preprocessing.feature_groups import FEATURE_NAMES  # noqa: E402
+from preprocessing.schema import FEATURE_NAMES  # noqa: E402
 from vae.config import CLASSES  # noqa: E402
 
 
