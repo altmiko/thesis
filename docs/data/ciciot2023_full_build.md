@@ -686,7 +686,7 @@ Therefore the weights describe the distribution actually seen by training, not t
 
 ## 11. Stage G — generated model-ready artifacts
 
-The current `pipeline.py` writes into `config.paths.PROCESSED_DIR`, which resolves to `data/processed/`.
+By default, `pipeline.py` writes into `config.paths.PROCESSED_DIR`, which resolves to `data/processed/`. Pass `--output-dir <path>` to keep a complete regenerated artifact set in an isolated directory; the canonical labelled-Parquet input remains unchanged.
 
 ### 11.1 Split arrays
 
@@ -893,7 +893,13 @@ This recomputes evidence for the hardcoded current `k` values and writes diagnos
 python -m src.preprocessing.ciciot2023.pipeline
 ```
 
-The pipeline reads the full Parquet, computes the split, cleans, fits the train-only scaler, samples only train, encodes all targets, and writes arrays and metadata to `data/processed/`.
+To place all generated arrays and metadata in an isolated output bundle:
+
+```bash
+python -m src.preprocessing.ciciot2023.pipeline --output-dir outputs/ciciot2023
+```
+
+The pipeline reads the full Parquet, computes the split, cleans, fits the train-only scaler, samples only train, encodes all targets, and writes arrays and metadata to the selected output directory.
 
 ### Step 4 — run leakage/contract verification
 
@@ -901,7 +907,13 @@ The pipeline reads the full Parquet, computes the split, cleans, fits the train-
 python -m src.preprocessing.ciciot2023.reports verify
 ```
 
-Run this only after Step 3 has produced a current top-level `run_manifest.json` and arrays.
+For a redirected artifact bundle, verify that same directory explicitly:
+
+```bash
+python -m src.preprocessing.ciciot2023.reports verify --processed-dir outputs/ciciot2023
+```
+
+Run this only after Step 3 has produced `run_manifest.json` and arrays in the default or explicitly selected artifact directory.
 
 ### Step 5 — optionally generate fidelity evidence
 

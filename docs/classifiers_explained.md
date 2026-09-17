@@ -10,11 +10,11 @@ This guide documents the neural-network classifiers currently implemented in
 - `LSTMOnly` (`lstm`)
 - `SerialCNNLSTM` (`serial`)
 
-The models classify preprocessed CICIoT2023 feature vectors. They are
-multi-class discriminative models: each model produces one unnormalized logit
-per class. They do not generate traffic, enforce domain constraints, or
-perform adversarial perturbations themselves. Those responsibilities belong to
-the preprocessing, VAE, attack, and validation modules.
+The models classify preprocessed CICIoT2023 and CICIDS2017-DistriNet feature
+vectors. They are discriminative models: each instance produces one
+unnormalized logit per configured class. They do not generate traffic, enforce
+domain constraints, or perform adversarial perturbations themselves. Those
+responsibilities belong to preprocessing, VAE, attack, and validation modules.
 
 This document describes the source as it exists now, including the input and
 output contracts, tensor shapes, training wiring, checkpoint requirements,
@@ -25,9 +25,11 @@ correctness-sensitive details, and extension rules.
 | Concern | Source |
 |---|---|
 | Feature names, order, and feature roles | `src/preprocessing/schema.py` |
-| Processed train/validation/test arrays | `data/processed/X_*.npy`, `y_*.npy` |
+| CICIoT2023 processed arrays | `data/processed/X_*.npy`, `y_*.npy` |
+| CICIDS2017-DistriNet processed arrays | `data/processed/CICIDS_2017_Distrinet/` |
 | Neural architectures and factory | `src/classifiers/models.py` |
-| Baseline training | `src/classifiers/baseline_experiments.py` |
+| CICIoT2023 baseline training | `src/classifiers/baseline_experiments.py` |
+| CICIDS2017-DistriNet training | `src/classifiers/cicids2017d_experiments.py` |
 | Saved-model review and probability inference | `src/classifiers/review_baselines.py` |
 | Input-space attack model loading | `src/attack/adversarial_attacks.py` |
 
@@ -591,9 +593,9 @@ caller reconstructs a default architecture.
 
 ## 9. Training and evaluation integration
 
-### 9.1 Current baseline tasks
+### 9.1 CICIoT2023 baseline tasks
 
-`baseline_experiments.py` trains each neural model for three label framings:
+`baseline_experiments.py` trains each neural model for three CICIoT2023 label framings:
 
 | Task | Labels | Number of outputs |
 |---|---:|---:|
@@ -605,9 +607,9 @@ The runner derives `num_features` from `X_train.shape[1]` and
 `num_classes` from the task configuration. It uses the same model class for all
 three tasks; only the final classifier width changes.
 
-### 9.2 Current optimization path
+### 9.2 CICIoT2023 optimization path
 
-The baseline runner currently uses:
+The CICIoT2023 baseline runner currently uses:
 
 ```text
 loss       = CrossEntropyLoss()
@@ -625,6 +627,25 @@ The training script intentionally does not apply the supplied class weights;
 its recorded decision is that the training sample is already balanced. This is
 a training-policy decision, not a behavior implemented by the model classes.
 
+The runner accepts explicit input/output directories and model/task selections. The
+completed binary and eight-category CICIoT2023 run used:
+
+```bash
+python -m src.classifiers.baseline_experiments \
+  --processed-dir outputs/ciciot2023 \
+  --output-dir data/classifier_results/ciciot2023 \
+  --models all \
+  --tasks binary,8class \
+  --epochs 10 \
+  --batch-size 2048 \
+  --device cuda
+```
+
+Checkpoints are written under `<output-dir>/models/`; JSON and text
+classification reports under `<output-dir>/metrics/`; the combined run manifest,
+CSV summary, and Markdown results report remain at the output root. The completed
+run intentionally contains no 34-class checkpoint.
+
 ### 9.3 Tuple-safe inference
 
 `CNNOnly`, `LSTMOnly`, and `SerialCNNLSTM` can return either logits or
@@ -638,6 +659,171 @@ logits = output[0] if isinstance(output, tuple) else output
 Normal classification calls return a tensor because `return_features` defaults
 to `False`. New consumers should keep this tuple-safe pattern if they accept
 models with feature extraction enabled.
+
+### 9.4 CICIDS2017-DistriNet two-head experiment
+
+#### Dataset and output contract
+
+`cicids2017d_experiments.py` consumes the fixed 79-feature DistriNet arrays and
+trains exactly two task-specific classifiers per architecture:
+
+| Head | Label IDs | Output width |
+|---|---|---:|
+| Binary | `Benign=0`, `Attack=1` | 2 |
+| Category | `Benign=0`, `DoS=1`, `DDoS=2`, `Recon=3`, `BruteForce=4` | 5 |
+
+This is eight independent checkpoints, not one network with two simultaneous
+output tensors. Each architecture is instantiated once with `num_classes=2` and
+once with `num_classes=5`. There is no fine-grained DistriNet head.
+
+The production split is unchanged by classifier training:
+
+| Split | Rows |
+|---|---:|
+| Train | 1,456,264 |
+| Validation | 312,058 |
+| Test | 312,057 |
+
+#### Architecture configurations
+
+All four architectures use the implementations in `src/classifiers/models.py`. The
+DistriNet runner changes only the input and output widths:
+
+| Model | DistriNet-specific configuration | Binary parameters | Category parameters |
+|---|---|---:|---:|
+| `SimpleMLP` | `num_features=79`, `hidden_dims=(256,128,64)` | 61,762 | 61,957 |
+| `CNNOnly` | `num_features=79`, constructor defaults | 10,626 | 10,821 |
+| `LSTMOnly` | `num_features=79`, constructor defaults | 82,626 | 82,821 |
+| `SerialCNNLSTM` | `num_features=79`, constructor defaults | 81,282 | 81,477 |
+
+The output-layer parameter difference is caused solely by changing the final
+width from 2 to 5. Convolutional, recurrent, dense-feature, and dropout
+settings are otherwise identical between heads.
+
+#### Effective-number class-balanced loss
+
+Both heads use weighted softmax cross-entropy. The weight for class \(k\) is
+computed only from its training count \(n_k\):
+
+\[
+w_k = \frac{1-\beta}{1-\beta^{n_k}}, \qquad \beta=0.999.
+\]
+
+This is the class-balanced weighting proposed by Cui et al. in
+[*Class-Balanced Loss Based on Effective Number of Samples* (CVPR 2019)](https://openaccess.thecvf.com/content_CVPR_2019/html/Cui_Class-Balanced_Loss_Based_on_Effective_Number_of_Samples_CVPR_2019_paper.html).
+The runner uses the formula directly, without an extra sum-to-class-count
+normalization, and passes the resulting vector to:
+
+```python
+criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
+```
+
+The production training counts and float32 weights are:
+
+| Head | Class | Training rows | Weight |
+|---|---|---:|---:|
+| Binary | Benign | 1,153,431 | 0.0010000000474974513 |
+| Binary | Attack | 302,833 | 0.0010000000474974513 |
+| Category | Benign | 1,153,431 | 0.0010000000474974513 |
+| Category | DoS | 120,091 | 0.0010000000474974513 |
+| Category | DDoS | 66,568 | 0.0010000000474974513 |
+| Category | Recon | 111,311 | 0.0010000000474974513 |
+| Category | BruteForce | 4,863 | 0.0010077683255076408 |
+
+Why the weights are nearly equal: the effective sample count is
+
+\[
+E_n = \frac{1-\beta^n}{1-\beta},
+\]
+
+whose upper limit is \(1/(1-\beta)\). At \(\beta=0.999\), that limit is
+1,000. Every DistriNet class has more than 4,800 training rows, so every class
+is already near the saturation region. BruteForce therefore receives only
+about \(1.0078\times\) the weight of the other categories even though its raw
+count is much smaller.
+
+This is correct for the configured beta; it is not equivalent to the former
+inverse-frequency weighting. Larger beta values shift the saturation scale:
+
+| Beta | Approximate saturation scale \(1/(1-\beta)\) |
+|---:|---:|
+| 0.999 | 1,000 |
+| 0.9999 | 10,000 |
+| 0.99999 | 100,000 |
+| 0.999999 | 1,000,000 |
+
+Beta is a loss hyperparameter. Any alternative must be selected with training
+and validation data only; test performance must not choose it.
+
+#### Optimization and checkpoint selection
+
+The production run uses:
+
+```text
+seed                    = 42
+epochs                  = 5
+batch_size               = 2048
+optimizer                = Adam
+learning_rate            = 1e-3
+scheduler                = ReduceLROnPlateau(mode="max", patience=1, factor=0.5)
+gradient_clip_norm       = 5.0
+early_stopping_patience  = 2
+selection_metric         = validation macro-F1
+selection_tie_break      = validation loss
+device                   = CUDA
+```
+
+The test split is evaluated only after validation-based checkpoint selection.
+Each saved checkpoint is reloaded into its source architecture and exercised
+on held-out rows before the run is accepted.
+
+#### Current effective-number run
+
+Aggregate held-out results:
+
+| Head | Model | Accuracy | Balanced accuracy | Macro F1 | Weighted F1 |
+|---|---|---:|---:|---:|---:|
+| Binary | `SerialCNNLSTM` | 98.188% | 97.692% | 97.274% | 98.196% |
+| Binary | `LSTMOnly` | 92.671% | 89.165% | 88.939% | 92.692% |
+| Binary | `SimpleMLP` | 89.284% | 76.765% | 80.892% | 88.288% |
+| Binary | `CNNOnly` | 89.251% | 76.610% | 80.779% | 88.233% |
+| Category | `SerialCNNLSTM` | 98.773% | 97.407% | 97.832% | 98.772% |
+| Category | `LSTMOnly` | 91.864% | 83.587% | 84.438% | 91.677% |
+| Category | `CNNOnly` | 89.284% | 70.502% | 74.732% | 86.989% |
+| Category | `SimpleMLP` | 89.260% | 70.604% | 74.624% | 86.944% |
+
+Per-class results for the strongest model, `SerialCNNLSTM`:
+
+| Head | Class | Support | Precision | Recall | F1 |
+|---|---|---:|---:|---:|---:|
+| Binary | Benign | 247,164 | 0.991653 | 0.985423 | 0.988528 |
+| Binary | Attack | 64,893 | 0.945776 | 0.968410 | 0.956959 |
+| Category | Benign | 247,164 | 0.991900 | 0.992839 | 0.992369 |
+| Category | DoS | 25,734 | 0.999121 | 0.928033 | 0.962266 |
+| Category | DDoS | 14,265 | 0.996154 | 0.998528 | 0.997339 |
+| Category | Recon | 23,852 | 0.931343 | 0.994130 | 0.961713 |
+| Category | BruteForce | 1,042 | 1.000000 | 0.956814 | 0.977930 |
+
+`SerialCNNLSTM` test confusion matrices, with true classes in rows and predicted
+classes in columns:
+
+| Binary | Benign | Attack |
+|---|---:|---:|
+| Benign | 243,561 | 3,603 |
+| Attack | 2,050 | 62,843 |
+
+| Category | Benign | DoS | DDoS | Recon | BruteForce |
+|---|---:|---:|---:|---:|---:|
+| Benign | 245,394 | 21 | 1 | 1,748 | 0 |
+| DoS | 1,852 | 23,882 | 0 | 0 | 0 |
+| DDoS | 21 | 0 | 14,244 | 0 | 0 |
+| Recon | 86 | 0 | 54 | 23,712 | 0 |
+| BruteForce | 45 | 0 | 0 | 0 | 997 |
+
+The complete per-model classification reports, numeric confusion matrices,
+plots, predictions, histories, checkpoints, and effective-number weights are
+under `outputs/cicids2017distrinet/`. The consolidated human-readable report is
+`outputs/cicids2017distrinet/cicids2017_classifier_results.md`.
 
 ## 10. Checkpoints and reconstruction
 

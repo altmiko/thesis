@@ -15,10 +15,12 @@ test), split before sampling (sampling reads class counts), cluster on TRAIN
 only, and val/test are **never** sampled so headline metrics face a realistic
 class mix.
 
-Run: ``python -m src.preprocessing.ciciot2023.pipeline``  (all paths from config/paths.py)
+Run: ``python -m src.preprocessing.ciciot2023.pipeline``. Use ``--output-dir``
+to redirect generated artifacts; the labelled Parquet input remains canonical.
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import logging
@@ -217,10 +219,11 @@ def sample_train(
 
 
 
-def main() -> None:
+def main(output_dir: Path | None = None) -> None:
     t0 = time.time()
     paths.ensure_dirs()
-    P = paths.PROCESSED_DIR
+    P = output_dir or paths.PROCESSED_DIR
+    P.mkdir(parents=True, exist_ok=True)
 
     # ── Load ────────────────────────────────────────────────────────────────
     log("=== Load labelled parquet (%s) ===", paths.LABELED_PARQUET.name)
@@ -359,12 +362,20 @@ def main() -> None:
         "artifact_hashes": hashes,
         "runtime_seconds": round(time.time() - t0, 1),
     }
-    paths.RUN_MANIFEST.write_text(json.dumps(manifest, indent=2))
-    log("=== DONE in %.1fs. Manifest: %s ===", time.time() - t0, paths.RUN_MANIFEST)
+    run_manifest = P / "run_manifest.json"
+    run_manifest.write_text(json.dumps(manifest, indent=2))
+    log("=== DONE in %.1fs. Manifest: %s ===", time.time() - t0, run_manifest)
     log("  train %d->%d (sampled), val %d, test %d",
         manifest["train_before_sampling"], manifest["train_after_sampling"],
         split_counts["val"], split_counts["test"])
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Directory for generated arrays and metadata (default: data/processed)",
+    )
+    main(parser.parse_args().output_dir)

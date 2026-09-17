@@ -195,7 +195,8 @@ def run_diagnostics() -> dict:
 
 
 # ── §6.5 leakage guards ───────────────────────────────────────────────────
-def run_verify() -> None:
+def run_verify(processed_dir: Path | None = None) -> None:
+    output_dir = processed_dir or paths.PROCESSED_DIR
     meta = pl.load_metadata()
     split, plans, runs = pl.compute_split(meta, ds_val := 0.10, ds_test := 0.20)
     labels = meta["Label"].astype(str).to_numpy()
@@ -231,7 +232,7 @@ def run_verify() -> None:
     checks.append("no test row precedes a train row within a class")
 
     # 4. val/test untouched by the sampler — counts equal the plan totals
-    man = json.loads(paths.RUN_MANIFEST.read_text())
+    man = json.loads((output_dir / "run_manifest.json").read_text())
     plan_val = sum(p.n_val for p in plans.values())
     plan_test = sum(p.n_test for p in plans.values())
     assert man["split_row_counts"]["val"] == plan_val, (man["split_row_counts"]["val"], plan_val)
@@ -239,7 +240,7 @@ def run_verify() -> None:
     checks.append(f"val/test untouched by sampler (val={plan_val:,} test={plan_test:,})")
 
     # 5. train post-sampling total matches manifest and array on disk
-    y_train = np.load(paths.processed("y_train.npy"), mmap_mode="r")
+    y_train = np.load(output_dir / "y_train.npy", mmap_mode="r")
     assert y_train.shape[0] == man["train_after_sampling"], (
         y_train.shape[0], man["train_after_sampling"]
     )
@@ -534,11 +535,17 @@ def main() -> None:
     ap.add_argument("mode", choices=["diagnostics", "verify", "evidence", "sensitivity"])
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--epochs", type=int, default=4)
+    ap.add_argument(
+        "--processed-dir",
+        type=Path,
+        default=None,
+        help="Directory containing pipeline artifacts for verify mode",
+    )
     args = ap.parse_args()
     if args.mode == "diagnostics":
         run_diagnostics()
     elif args.mode == "verify":
-        run_verify()
+        run_verify(args.processed_dir)
     elif args.mode == "evidence":
         run_evidence()
     elif args.mode == "sensitivity":

@@ -17,9 +17,11 @@ Requirements implemented from thesis pipeline checklist:
 
 from __future__ import annotations
 
+import argparse
 import json
 import random
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -250,6 +252,7 @@ def train_single_task(
     y_test: np.ndarray,
     class_weights: np.ndarray,
     device: torch.device,
+    output_dir: Path,
     epochs: int = 5,
     batch_size: int = 2048,
     lr: float = 1e-3,
@@ -381,8 +384,8 @@ def train_single_task(
         zero_division=0,
     )
 
-    models_dir = Path("models")
-    results_dir = Path("results")
+    models_dir = output_dir / "models"
+    results_dir = output_dir / "metrics"
     models_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
 
@@ -420,11 +423,59 @@ def train_single_task(
     }
 
 
-def main() -> None:
-    set_seed(42)
+def _parse_selection(value: str, valid: Tuple[str, ...], label: str) -> List[str]:
+    if value.lower() == "all":
+        return list(valid)
+    selected = [item.strip() for item in value.split(",") if item.strip()]
+    unknown = sorted(set(selected) - set(valid))
+    if unknown:
+        raise ValueError(f"Unknown {label}: {unknown}; valid values are {list(valid)}")
+    if not selected:
+        raise ValueError(f"At least one {label} is required")
+    return selected
 
-    processed_dir = Path("data") / "processed"
-    device = resolve_device()
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--processed-dir", type=Path, default=Path("data") / "processed")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("data") / "classifier_results" / "ciciot2023",
+    )
+    parser.add_argument("--models", default="all", help="all or comma-separated: mlp,cnn,lstm,serial")
+    parser.add_argument("--tasks", default="all", help="all or comma-separated: binary,8class,34class")
+    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--batch-size", type=int, default=2048)
+    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--early-stop-patience", type=int, default=5)
+    parser.add_argument("--device", default="auto", help="auto, cpu, cuda, or another torch device")
+    parser.add_argument("--seed", type=int, default=42)
+    args = parser.parse_args()
+
+    if args.epochs < 1 or args.batch_size < 1 or args.early_stop_patience < 1:
+        parser.error("epochs, batch-size, and early-stop-patience must be positive")
+    if args.lr <= 0:
+        parser.error("lr must be positive")
+
+    valid_models = ("mlp", "cnn", "lstm", "serial")
+    valid_tasks = ("binary", "8class", "34class")
+    try:
+        model_types = _parse_selection(args.models, valid_models, "models")
+        selected_task_names = _parse_selection(args.tasks, valid_tasks, "tasks")
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    set_seed(args.seed)
+    processed_dir = args.processed_dir
+    output_dir = args.output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if args.device == "auto":
+        device = resolve_device()
+    else:
+        device = torch.device(args.device)
+        if device.type == "cuda" and not torch.cuda.is_available():
+            raise RuntimeError("CUDA was requested but is not available")
 
     if not processed_dir.exists():
         raise FileNotFoundError(f"Processed data directory not found: {processed_dir.resolve()}")
@@ -435,7 +486,7 @@ def main() -> None:
     x_val = load_array(processed_dir / "X_val.npy", mmap=True)
     x_test = load_array(processed_dir / "X_test.npy", mmap=True)
 
-    tasks = [
+    all_tasks = [
         TaskConfig(
             name="binary",
             y_train_file="y_train_bin.npy",
@@ -461,9 +512,9 @@ def main() -> None:
             num_classes=34,
         ),
     ]
-    model_types = ["mlp", "cnn", "lstm", "serial"]
-
-    summary = {}
+    tasks = [task for task in all_tasks if task.name in selected_task_names]
+    started_at = datetime.now(timezone.utc)
+    summary: Dict[str, Dict[str, Dict[str, float]]] = {}
 
     for task in tasks:
         y_train = load_array(processed_dir / task.y_train_file, mmap=True)
@@ -490,26 +541,36 @@ def main() -> None:
                 y_test=y_test,
                 class_weights=class_weights,
                 device=device,
-                epochs=5,
-                batch_size=2048,
-                lr=1e-3,
-                early_stop_patience=5,
+                output_dir=output_dir,
+                epochs=args.epochs,
+                batch_size=args.batch_size,
+                lr=args.lr,
+                early_stop_patience=args.early_stop_patience,
             )
             summary[task.name][model_type] = metrics
 
-    results_dir = Path("results")
-    results_dir.mkdir(parents=True, exist_ok=True)
-    with (results_dir / "all_models_all_tasks_summary.json").open("w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "loss_weighting": "excluded",
-                "loss_weighting_decision": CLASS_WEIGHT_DECISION,
-                "models": model_types,
-                "tasks": summary,
-            },
-            f,
-            indent=2,
-        )
+    finished_at = datetime.now(timezone.utc)
+    payload = {
+        "started_at_utc": started_at.isoformat(),
+        "finished_at_utc": finished_at.isoformat(),
+        "processed_dir": str(processed_dir.resolve()),
+        "output_dir": str(output_dir.resolve()),
+        "seed": args.seed,
+        "device": str(device),
+        "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else None,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "learning_rate": args.lr,
+        "early_stop_patience": args.early_stop_patience,
+        "loss_weighting": "excluded",
+        "loss_weighting_decision": CLASS_WEIGHT_DECISION,
+        "models": model_types,
+        "tasks": summary,
+    }
+    with (output_dir / "all_models_all_tasks_summary.json").open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+    with (output_dir / "neural_run_manifest.json").open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
 
     print("\nAll tasks complete. Summary:")
     for task_name, task_metrics in summary.items():
