@@ -29,11 +29,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from sklearn.decomposition import PCA  # noqa: E402
 
 from config import paths  # noqa: E402
-from src.preprocessing.schema import (  # noqa: E402
-    BINARY_FEATURES,
-    FEATURE_NAMES,
-    INTEGER_FEATURES,
-)
+from src.preprocessing.schema import FEATURE_METADATA, FEATURE_NAMES
 
 SELECTED_FEATURES = (
     "Header_Length",
@@ -135,13 +131,7 @@ def _stratified_indices(labels: np.ndarray, per_class: int, seed: int) -> np.nda
 
 
 def _feature_type(feature: str) -> str:
-    if feature == "Protocol Type":
-        return "protocol"
-    if feature in BINARY_FEATURES:
-        return "binary"
-    if feature in INTEGER_FEATURES:
-        return "integer"
-    return "continuous"
+    return FEATURE_METADATA[feature].representation_type
 
 
 def _feature_summary(
@@ -154,8 +144,7 @@ def _feature_summary(
 
     rows: list[dict[str, Any]] = []
     protocol_values: tuple[np.ndarray, np.ndarray] | None = None
-    invalid_binary: dict[str, int] = {}
-    invalid_integer: dict[str, int] = {}
+    bounded_violations: dict[str, int] = {}
 
     for column, feature in enumerate(FEATURE_NAMES):
         raw = np.asarray(x_train[:, column], dtype=np.float64) * scale[column] + center[column]
@@ -180,11 +169,14 @@ def _feature_summary(
                 "zero_share": float(np.isclose(values, 0.0, atol=1e-6).mean()),
             }
         )
-        if feature in BINARY_FEATURES:
-            valid = np.isclose(values, 0.0, atol=1e-5) | np.isclose(values, 1.0, atol=1e-5)
-            invalid_binary[feature] = int((~valid).sum())
-        if feature in INTEGER_FEATURES:
-            invalid_integer[feature] = int((np.abs(values - np.rint(values)) > 1e-5).sum())
+        spec = FEATURE_METADATA[feature]
+        if spec.expected_min is not None or spec.expected_max is not None:
+            invalid = np.zeros(values.size, dtype=bool)
+            if spec.expected_min is not None:
+                invalid |= values < spec.expected_min - 1e-5
+            if spec.expected_max is not None:
+                invalid |= values > spec.expected_max + 1e-5
+            bounded_violations[feature] = int(invalid.sum())
         if feature == "Protocol Type":
             protocol_values = np.unique(values, return_counts=True)
 
@@ -200,8 +192,7 @@ def _feature_summary(
     ).sort_values("protocol_value", ignore_index=True)
     checks = {
         "nonfinite_train_values": int(sum(row["nonfinite_count"] for row in rows)),
-        "invalid_binary_train_values": int(sum(invalid_binary.values())),
-        "invalid_integer_train_values": int(sum(invalid_integer.values())),
+        "structural_bound_violations": int(sum(bounded_violations.values())),
     }
     return pd.DataFrame(rows), protocol_table, checks
 

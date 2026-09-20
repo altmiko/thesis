@@ -5,7 +5,7 @@ Consolidates what used to be four scripts into `--mode` subcommands:
     python -m src.preprocessing.ciciot2023.reports diagnostics    # §6.2 multi-modality + §6.3 crosstab
     python -m src.preprocessing.ciciot2023.reports verify         # §6.5 leakage guards
     python -m src.preprocessing.ciciot2023.reports evidence       # §7.4 fidelity / support figures
-    python -m src.preprocessing.ciciot2023.reports sensitivity    # §7.5 temporal-leakage bound [--device --epochs]
+    python -m src.preprocessing.ciciot2023.reports sensitivity    # §7.5 source-order sensitivity [--device --epochs]
 
 Pure logic + IO helpers live in `pipeline.py` (imported as `pl`); split primitives
 in `splitter.py`; the sampler in `sampler.py`.
@@ -283,15 +283,17 @@ def fidelity_figures() -> None:
     kept indices, then show full-class vs kept overlap per majority category."""
     log("loading metadata + split + full features …")
     man = json.loads(paths.RUN_MANIFEST.read_text())
-    upper = np.array([man["clip_upper_train"][f] for f in pl.FEATURE_NAMES], dtype=np.float32)
+    clip_upper = man.get("model_clip_upper_train")
 
     meta = pl.load_metadata()
     split, _, _ = pl.compute_split(meta, pl.VAL_FRAC, pl.TEST_FRAC)
     category = meta["category"].astype(str).to_numpy()
     train_mask = split == 0
 
-    X = pl.load_features()                      # full 39 features
-    pl.clip_round(X, upper)                      # identical cleaning to the pipeline
+    X = pl.load_features()
+    if clip_upper is not None:
+        upper = np.array([clip_upper[f] for f in pl.FEATURE_NAMES], dtype=np.float32)
+        pl.clip_round(X, upper)
     scaler = pickle.load(open(paths.processed("scaler.pkl"), "rb"))
     center = scaler.center_[pl.CONTINUOUS_IDX]
     scale = scaler.scale_[pl.CONTINUOUS_IDX]
@@ -401,7 +403,7 @@ def run_evidence() -> None:
 
 def _shuffled_split(labels: np.ndarray, rows: np.ndarray, seed: int) -> np.ndarray:
     """Row-level shuffled split over ``rows`` at the same 70/10/20 per-class
-    proportions the temporal split uses — the leakage-blind counterfactual."""
+    proportions used by the ordered-source split."""
     split = np.full(labels.shape[0], -1, dtype=np.int8)
     rng = np.random.default_rng(seed)
     for lbl in np.unique(labels[rows]):
@@ -525,7 +527,7 @@ def run_sensitivity(device: str = "cuda", epochs: int = 4) -> dict:
     out = paths.DIAGNOSTICS_DIR / "sensitivity_study.json"
     paths.ensure_dirs()
     out.write_text(json.dumps(results, indent=2))
-    log("=== mean temporal-leakage inflation: %+.4f accuracy (shuffled - forward_chain) ===",
+    log("=== mean source-order sensitivity: %+.4f accuracy (shuffled - forward_chain) ===",
         results["mean_leakage_inflation"])
     log("wrote %s", out)
     return results

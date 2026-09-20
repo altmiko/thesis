@@ -510,13 +510,18 @@ The source build enumerates filenames with lexical `sorted(...)`, while the spli
 
 ### 7.1 Train-only percentile bounds
 
-For each of the 39 features, it computes the 99.99th percentile from `X[train_mask]` only:
+For each feature, the pipeline computes the 99.99th percentile from
+`X[train_mask]` only. Continuous/count fields use that bound directly.
+Protocol/service/flag presence fields floor the effective upper bound at `1`
+so a rare positive state cannot be clipped below its canonical domain value:
 
 ```python
 q = np.percentile(X[train_mask], 99.99, axis=0).astype(np.float32)
+upper = effective_clip_upper(q)
 ```
 
-Computing these bounds on all rows would leak validation/test extremes into the training transformation. The bounds are saved in the run manifest under `clip_upper_train`.
+Computing these bounds on all rows would leak validation/test extremes into the
+training transformation. Effective bounds are saved under `clip_upper_train`.
 
 ### 7.2 Lower/upper clipping
 
@@ -526,15 +531,21 @@ Every split is then transformed in place:
 np.clip(X, 0.0, upper, out=X)
 ```
 
-This applies a zero lower bound and the train-derived feature-specific upper bound to train, validation, and test.
+This applies a zero lower bound and the effective feature-specific upper bound
+to train, validation, and test.
 
-### 7.3 Integer and binary canonicalization
+### 7.3 Integer and presence canonicalization
 
 After clipping:
 
-* all `INTEGER_FEATURES` are rounded and clipped to be non-negative;
-* all `BINARY_FEATURES` are rounded and clipped to `[0, 1]`;
-* `Protocol Type` is not in either list, so it is clipped but not rounded by this function.
+* integer count fields are rounded and constrained to non-negative values;
+* binary protocol/service fields and `*_flag_number` fields map any positive
+  vendor value to `1`, otherwise `0`;
+* `Protocol Type` is clipped but not canonicalized by this routine.
+
+The positive-presence rule is required because the vendor CSV stores fractional
+positive values in nominal indicator columns. Ordinary rounding previously
+collapsed nine nonconstant source features to zero.
 
 No row is imputed at this stage. NaN/inf rows were already removed during Parquet construction.
 

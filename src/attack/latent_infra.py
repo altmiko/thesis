@@ -14,14 +14,14 @@ import torch
 from scipy.stats import chi2
 from torch.utils.data import DataLoader
 
-from attack.adversarial_attacks import load_model
-from preprocessing.schema import FEATURE_NAMES
-from vae.config import CLASS_TO_ID, CLASSES, ID_TO_CLASS
-from vae.dataset import PerClassDataset
-from vae.model import PROTOCOL_REFERENCE_BUFFERS, MixedInputBetaVAE
-from vae.schema import PROTOCOL_ALLOWLIST, get_partition, scaled_to_raw_protocol
-from vae.train import _load_8class_labels
-from vae.train_all import _resolve_model_hparams
+from src.attack.adversarial_attacks import load_model
+from src.preprocessing.schema import FEATURE_METADATA, FEATURE_NAMES
+from src.vae.config import CLASS_TO_ID, CLASSES, ID_TO_CLASS
+from src.vae.dataset import PerClassDataset
+from src.vae.model import PROTOCOL_REFERENCE_BUFFERS, MixedInputBetaVAE
+from src.vae.schema import get_partition, scaled_to_raw_protocol
+from src.vae.train import _load_8class_labels
+from src.vae.train_all import _resolve_model_hparams
 
 LOGGER = logging.getLogger(__name__)
 
@@ -306,9 +306,14 @@ class ProtocolValidator:
         if already_scaled:
             proto_raw = scaled_to_raw_protocol(x_np, self.scaler, self.protocol_feature_index)
         else:
-            proto_raw = np.round(x_np[:, self.protocol_feature_index]).astype(np.int64)
+            proto_raw = np.asarray(x_np[:, self.protocol_feature_index], dtype=np.float64)
 
-        valid = np.isin(proto_raw, np.array(PROTOCOL_ALLOWLIST, dtype=np.int64))
+        spec = FEATURE_METADATA["Protocol Type"]
+        valid = np.isfinite(proto_raw)
+        if spec.expected_min is not None:
+            valid &= proto_raw >= spec.expected_min
+        if spec.expected_max is not None:
+            valid &= proto_raw <= spec.expected_max
         valid_t = torch.from_numpy(valid.astype(np.bool_))
         return valid_t.to(device) if device is not None else valid_t
 

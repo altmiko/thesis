@@ -18,10 +18,11 @@ from typing import Dict, Iterable, List, Tuple
 import numpy as np
 
 from src.preprocessing.schema import (
-    BINARY_FEATURES,
+    BOUNDED_AGGREGATED_FEATURES,
     CATEGORY_MAP,
+    COUNT_AGGREGATES,
+    FEATURE_METADATA,
     FEATURE_NAMES,
-    INTEGER_FEATURES,
 )
 from src.attack.validator import VALID_PROTOCOLS
 from src.attack.validator import validate_batch
@@ -71,14 +72,8 @@ NONNEG_FEATURES = {
 }
 
 MANUAL_CHECK_TARGETS = {
-    "Protocol Type",
-    "Min",
-    "AVG",
-    "Max",
-    "Std",
-    "Variance",
-    "Number",
-} | set(BINARY_FEATURES) | set(INTEGER_FEATURES) | NONNEG_FEATURES
+    "Min", "AVG", "Max", "Std", "Variance",
+} | set(BOUNDED_AGGREGATED_FEATURES) | set(COUNT_AGGREGATES) | NONNEG_FEATURES
 
 
 @dataclass
@@ -137,12 +132,7 @@ def decode_label(task_name: str, label: int, label_encoder, category_encoder) ->
 
 
 def protocol_status(value: float, treat_adv: bool) -> str:
-    nearest = int(np.round(value))
-    if treat_adv and abs(value - nearest) > 0.01:
-        return f"INVALID (non-integer: {value:.4f})"
-    if nearest not in VALID_PROTOCOLS:
-        return f"INVALID (not in allowlist: {nearest})"
-    return str(nearest)
+    return f"{value:.4f} (window-aggregated code-like field)"
 
 
 def build_manual_feature_violations(row_adv: np.ndarray) -> Tuple[Dict[str, List[str]], List[str]]:
@@ -153,22 +143,11 @@ def build_manual_feature_violations(row_adv: np.ndarray) -> Tuple[Dict[str, List
     def add(feat: str, msg: str) -> None:
         out.setdefault(feat, []).append(msg)
 
-    proto = float(row_adv[idx["Protocol Type"]])
-    proto_nearest = int(np.round(proto))
-    if abs(proto - proto_nearest) > 0.01:
-        add("Protocol Type", "Protocol invalid: non-integer")
-    elif proto_nearest not in VALID_PROTOCOLS:
-        add("Protocol Type", "Protocol invalid: not in allowlist")
-
-    for feat in BINARY_FEATURES:
-        val = float(row_adv[idx[feat]])
-        if abs(val - round(val)) > 0.01 or int(round(val)) not in (0, 1):
-            add(feat, "Binary constraint violated (must be 0/1)")
-
-    for feat in INTEGER_FEATURES:
-        val = float(row_adv[idx[feat]])
-        if abs(val - round(val)) > 0.01:
-            add(feat, "Integer constraint violated")
+    # Protocol Type, indicators, and counts are continuous window aggregates.
+    for feat in BOUNDED_AGGREGATED_FEATURES:
+        value = float(row_adv[idx[feat]])
+        if value < -0.01 or value > 1.01:
+            add(feat, "Bounded aggregate outside [0,1]")
 
     for feat in NONNEG_FEATURES:
         val = float(row_adv[idx[feat]])
@@ -337,25 +316,19 @@ def print_feature_reference_table(pr: TeePrinter, mask: np.ndarray) -> None:
     pr.println("Idx | Feature           | Mask   | Type      | Constraint summary")
     pr.println("-" * 120)
     for i, feat in enumerate(FEATURE_NAMES):
-        if feat in BINARY_FEATURES:
-            ftype = "binary"
-            constraint = "must be 0/1"
-        elif feat in INTEGER_FEATURES:
-            ftype = "integer"
-            constraint = "integer and non-negative"
+        spec = FEATURE_METADATA[feat]
+        ftype = spec.representation_type
+        if spec.expected_min is not None and spec.expected_max is not None:
+            constraint = f"range [{spec.expected_min:g},{spec.expected_max:g}]"
+        elif spec.expected_min is not None:
+            constraint = f">= {spec.expected_min:g}"
         else:
-            ftype = "continuous"
-            if feat in NONNEG_FEATURES:
-                constraint = "non-negative"
-            else:
-                constraint = "domain-specific"
+            constraint = "empirical/relational checks separate"
 
         if feat == "Protocol Type":
-            constraint = "allowed protocol in {0,1,2,6,17,47}"
-        if feat == "Time_To_Live":
-            constraint = "range [0,255]"
+            constraint = "continuous averaged code; empirical support separate"
         if feat == "Number":
-            constraint = "packet count >=1 and integer-like"
+            constraint = "non-negative continuous window aggregate"
         if feat == "AVG":
             constraint = "must lie within [Min, Max]"
         if feat == "Variance":

@@ -16,11 +16,11 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
-from preprocessing.schema import FEATURE_NAMES
-from vae.dataset import PerClassDataset
-from vae.losses import BetaScheduler, compute_elbo
-from vae.model import MixedInputBetaVAE
-from vae.schema import PROTOCOL_ALLOWLIST, get_partition
+from src.preprocessing.schema import FEATURE_NAMES
+from src.vae.dataset import PerClassDataset
+from src.vae.losses import BetaScheduler, compute_elbo
+from src.vae.model import MixedInputBetaVAE
+from src.vae.schema import PROTOCOL_ALLOWLIST, get_partition
 
 logger = logging.getLogger(__name__)
 
@@ -290,36 +290,19 @@ def train_one_vae(
         pin_memory=(device == "cuda"),
     )
 
+    # All 39 columns use continuous reconstruction. Historical binary feature
+    # weights are merged into the continuous map so experiment configs retain
+    # their intended emphasis without reintroducing BCE targets.
     protocol_class_weights_t: torch.Tensor | None = None
-    if config.get("use_protocol_class_weights", True):
-        proto_counts = torch.bincount(
-            train_ds.target_protocol_index,
-            minlength=len(PROTOCOL_ALLOWLIST),
-        ).float()
-        power = float(config.get("protocol_class_weight_power", 0.5))
-        proto_counts = proto_counts.clamp_min(1.0)
-        protocol_class_weights_t = proto_counts.pow(-power)
-        protocol_class_weights_t = protocol_class_weights_t / protocol_class_weights_t.mean()
-        protocol_class_weights_t = protocol_class_weights_t.to(device)
-        logger.info(
-            "[Class %d/%s] Protocol class weights: %s",
-            class_id,
-            class_name,
-            [round(float(x), 4) for x in protocol_class_weights_t.detach().cpu()],
-        )
-
+    continuous_weight_map = dict(config.get("continuous_feature_loss_weights", {}))
+    continuous_weight_map.update(config.get("binary_feature_loss_weights", {}))
     continuous_feature_weights_t = _build_feature_weight_tensor(
         partition["continuous_idx"],
-        config.get("continuous_feature_loss_weights"),
+        continuous_weight_map,
         device,
         normalize=bool(config.get("normalize_feature_loss_weights", True)),
     )
-    binary_feature_weights_t = _build_feature_weight_tensor(
-        partition["independent_binary_idx"],
-        config.get("binary_feature_loss_weights"),
-        device,
-        normalize=bool(config.get("normalize_feature_loss_weights", True)),
-    )
+    binary_feature_weights_t = None
     raw_relative_feature_weights_t = _build_feature_weight_tensor(
         partition["continuous_idx"],
         config.get("raw_relative_feature_loss_weights"),

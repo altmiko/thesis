@@ -6,15 +6,15 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from attack.latent_infra import PerturbationMask, reimpose_protocol_features
-from attack.latent_pgd import classifier_logits
-from preprocessing.schema import FEATURE_NAMES
-from vae.schema import get_partition
+from src.attack.latent_infra import PerturbationMask, reimpose_protocol_features
+from src.attack.latent_pgd import classifier_logits
+from src.preprocessing.schema import BOUNDED_AGGREGATED_IDX, FEATURE_NAMES
+from src.vae.schema import get_partition
 
 
 _PARTITION = get_partition()
 _CONTINUOUS_IDX = _PARTITION["continuous_idx"]
-_BINARY_IDX = _PARTITION["independent_binary_idx"] + _PARTITION["derived_binary_idx"]
+_BOUNDED_IDX = list(BOUNDED_AGGREGATED_IDX)
 
 
 def _target_tensor(y_true: torch.Tensor, target_class: int) -> torch.Tensor:
@@ -85,7 +85,7 @@ class VAEConstraintProjection:
         self.center = torch.tensor(center, dtype=torch.float32, device=device)
         self.scale = torch.tensor(scale, dtype=torch.float32, device=device)
         self.continuous_idx = torch.tensor(_CONTINUOUS_IDX, dtype=torch.long, device=device)
-        self.binary_idx = torch.tensor(_BINARY_IDX, dtype=torch.long, device=device)
+        self.bounded_idx = torch.tensor(_BOUNDED_IDX, dtype=torch.long, device=device)
 
         self.ttl_idx = FEATURE_NAMES.index("Time_To_Live")
         self.tot_sum_idx = FEATURE_NAMES.index("Tot sum")
@@ -102,7 +102,7 @@ class VAEConstraintProjection:
         self.center = self.center.to(device)
         self.scale = self.scale.to(device)
         self.continuous_idx = self.continuous_idx.to(device)
-        self.binary_idx = self.binary_idx.to(device)
+        self.bounded_idx = self.bounded_idx.to(device)
         return self
 
     def _unscale(self, x_scaled: torch.Tensor) -> torch.Tensor:
@@ -127,8 +127,7 @@ class VAEConstraintProjection:
         avg_val = min_base + avg_gap
         max_val = avg_val + max_gap
 
-        number_pos = 1.0 + F.softplus(x_raw[:, self.number_idx])
-        number_val = number_pos + (torch.round(number_pos) - number_pos).detach()
+        number_val = F.softplus(x_raw[:, self.number_idx])
         ttl_val = torch.sigmoid(x_raw[:, self.ttl_idx] / 32.0) * 255.0
 
         std_candidate = self.structured_std_floor + F.softplus(x_raw[:, self.std_idx])
@@ -165,15 +164,8 @@ class VAEConstraintProjection:
         structured[:, self.variance_idx] = variance_val
         structured[:, self.number_idx] = number_val
 
-        binary_raw = x_raw[:, self.binary_idx.to(x_raw.device)]
-        binary_soft = torch.sigmoid(binary_raw)
-        if mode == "hard":
-            binary_hard = torch.round(binary_soft)
-            structured[:, self.binary_idx.to(x_raw.device)] = (
-                binary_soft + (binary_hard - binary_soft).detach()
-            )
-        else:
-            structured[:, self.binary_idx.to(x_raw.device)] = binary_soft
+        bounded_raw = x_raw[:, self.bounded_idx.to(x_raw.device)]
+        structured[:, self.bounded_idx.to(x_raw.device)] = torch.sigmoid(bounded_raw)
         return structured
 
     def project(

@@ -21,10 +21,11 @@ Five stages, in this order. The order is the point — it prevents data leakage.
    *Why:* the model must never see "future" traffic; and every statistic fitted later
    must be fitted on train only, so the split has to exist before anything is fitted.
 
-2. **Clean (per-row + train-fitted bounds).** Drop NaN/Inf and blank rows; clip extreme
-   values at the train 99.99th percentile; round integer/binary columns to their valid
-   domain. *Why:* flow features have Inf/overflow (e.g. rate when duration=0) and heavy
-   tails that wreck scaling and training.
+2. **Clean (per-row + train-fitted bounds).** Drop NaN/Inf and blank rows; clip
+   continuous/count extremes at the train 99.99th percentile; round integer
+   counts; map positive protocol/service/flag presence values to `1`.
+   *Why:* flow features have Inf/overflow and heavy tails, while ordinary
+   rounding of sparse fractional indicators silently erases valid positives.
 
 3. **Scale (fit on TRAIN only).** `RobustScaler`, fit on train, then *transform* val/test
    with those same parameters. *Why:* comparability across the two datasets, robustness

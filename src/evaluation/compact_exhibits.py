@@ -19,8 +19,7 @@ import torch
 
 from src.attack.adversarial_attacks import load_model
 from src.attack.adversarial_attacks import run_attack
-from src.preprocessing.schema import BINARY_FEATURES, FEATURE_NAMES
-from src.attack.validator import VALID_PROTOCOLS
+from src.preprocessing.schema import BOUNDED_AGGREGATED_FEATURES, FEATURE_NAMES
 from src.attack.validator import validate_batch
 
 
@@ -320,14 +319,10 @@ def feature_violation_tags(
     for rule in violated_rules:
         feats = map_rule_to_features(rule)
         for feat in feats:
-            if rule.startswith("R_nonneg_"):
-                add_tag(tags, feat, "NEGATIVE")
-            elif rule.startswith("R_binary_"):
-                add_tag(tags, feat, "FRACTIONAL BINARY")
-            elif rule == "R_protocol_valid":
-                add_tag(tags, feat, "NOT VALID IANA PROTOCOL")
-            elif rule in {"R_proto_tcp", "R_proto_udp", "R_proto_icmp", "R_proto_igmp"}:
-                add_tag(tags, feat, "PROTO MISMATCH")
+            if rule.startswith("R_structural_min_"):
+                add_tag(tags, feat, "BELOW STRUCTURAL MINIMUM")
+            elif rule.startswith("R_structural_max_"):
+                add_tag(tags, feat, "ABOVE STRUCTURAL MAXIMUM")
             elif rule == "R_min_leq_max":
                 add_tag(tags, "Min", "MIN>MAX")
                 add_tag(tags, "Max", "MIN>MAX")
@@ -340,23 +335,14 @@ def feature_violation_tags(
                 add_tag(tags, feat, "TTL OUT OF RANGE")
             elif rule == "R_pkts_positive":
                 add_tag(tags, "Number", "NEGATIVE")
-            elif rule == "R_pkts_integer":
-                add_tag(tags, "Number", "NON-INTEGER")
 
-    for feat in BINARY_FEATURES:
+    for feat in BOUNDED_AGGREGATED_FEATURES:
         j = idx_map[feat]
-        v = float(adv_row[j])
-        if abs(v - round(v)) > 0.01:
-            add_tag(tags, feat, "FRACTIONAL BINARY")
-        elif int(round(v)) not in (0, 1):
-            add_tag(tags, feat, "NOT IN {0,1}")
+        value = float(adv_row[j])
+        if value < -0.01 or value > 1.01:
+            add_tag(tags, feat, "OUTSIDE [0,1]")
 
-    proto = float(adv_row[idx_map["Protocol Type"]])
-    p_round = int(round(proto))
-    if abs(proto - p_round) > 0.01:
-        add_tag(tags, "Protocol Type", "NOT VALID IANA PROTOCOL")
-    elif p_round not in VALID_PROTOCOLS:
-        add_tag(tags, "Protocol Type", "NOT VALID IANA PROTOCOL")
+    # Protocol Type is an averaged code-like field; fractional values are valid.
 
     for feat in [
         "fin_flag_number",

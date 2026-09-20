@@ -23,7 +23,8 @@ DEFAULT_CONFIG: dict = {
     # min KL ≈ 0.057) is correctly counted as non-collapsed.
     'beta_target': {cls: 0.5 for cls in CLASSES},
     'free_bits_lambda': 0.1,
-    'protocol_embed_dim': 4,
+    # Kept for constructor compatibility; Protocol Type is no longer embedded.
+    'protocol_embed_dim': 0,
     'encoder_hidden': [128, 64],
     'decoder_hidden': [64, 128],
     'max_epochs': 200,
@@ -42,12 +43,14 @@ DEFAULT_CONFIG: dict = {
     'continuous_likelihood': 'gaussian',
     'early_stop_patience': 10,
     'grad_clip': 5.0,
-    'use_protocol_class_weights': True,
-    'protocol_class_weight_power': 0.5,
-    'protocol_loss_weight': 2.0,
+    'use_protocol_class_weights': False,
+    'protocol_class_weight_power': 0.0,
+    'protocol_loss_weight': 0.0,
     'constraint_loss_weight': 0.1,
     'physics_constraint_loss_weight': 0.0,
     'continuous_feature_loss_weights': {},
+    # Historical experiment configs may still populate this key; train.py
+    # merges it into continuous weights rather than constructing BCE targets.
     'binary_feature_loss_weights': {},
     'normalize_feature_loss_weights': True,
     'use_structured_continuous_decoder': True,

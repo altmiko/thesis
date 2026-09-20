@@ -14,52 +14,11 @@ from pathlib import Path
 
 import numpy as np
 
-from vae.physics_validator import PhysicsValidator
-
+from src.preprocessing.schema import FEATURE_NAMES
+from src.vae.physics_validator import PhysicsValidator
 
 SEED = 42
 MAX_SAMPLES_PER_CLASS = 5000
-FEATURE_NAMES = [
-    "Header_Length",
-    "Protocol Type",
-    "Time_To_Live",
-    "Rate",
-    "fin_flag_number",
-    "syn_flag_number",
-    "rst_flag_number",
-    "psh_flag_number",
-    "ack_flag_number",
-    "ece_flag_number",
-    "cwr_flag_number",
-    "ack_count",
-    "syn_count",
-    "fin_count",
-    "rst_count",
-    "HTTP",
-    "HTTPS",
-    "DNS",
-    "Telnet",
-    "SMTP",
-    "SSH",
-    "IRC",
-    "TCP",
-    "UDP",
-    "DHCP",
-    "ARP",
-    "ICMP",
-    "IGMP",
-    "IPv",
-    "LLC",
-    "Tot sum",
-    "Min",
-    "Max",
-    "AVG",
-    "Std",
-    "Tot size",
-    "IAT",
-    "Number",
-    "Variance",
-]
 
 
 def _repo_root() -> Path:

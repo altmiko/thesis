@@ -612,32 +612,35 @@ three tasks; only the final classifier width changes.
 The CICIoT2023 baseline runner currently uses:
 
 ```text
-loss       = CrossEntropyLoss()
+loss       = CrossEntropyLoss(train-derived balanced weights)
 optimizer  = Adam(lr=1e-3)
 scheduler  = ReduceLROnPlateau(mode="min", patience=3, factor=0.5)
 batch_size = 2048
+selection  = highest validation macro F1
 ```
 
 It calls `model.train()` for optimization and `model.eval()` for validation and
-test evaluation. The best state is selected by validation loss and restored
-before test metrics are calculated. The test split is not used for model
-selection.
+test evaluation. The best state is selected by validation macro F1 (validation
+loss breaks exact ties) and restored before test metrics are calculated. The
+test split is not used for model selection.
 
-The training script intentionally does not apply the supplied class weights;
-its recorded decision is that the training sample is already balanced. This is
-a training-policy decision, not a behavior implemented by the model classes.
+Loss weights come from the persisted training-label class weights. Validation
+and test labels never influence them. `--no-class-weights` and
+`--selection-metric val_loss` remain explicit ablation options.
 
 The runner accepts explicit input/output directories and model/task selections. The
 completed binary and eight-category CICIoT2023 run used:
 
 ```bash
 python -m src.classifiers.baseline_experiments \
-  --processed-dir outputs/ciciot2023 \
-  --output-dir data/classifier_results/ciciot2023 \
+  --processed-dir outputs/ciciot2023_fixed \
+  --output-dir outputs/ciciot2023_fixed/classifier_results \
   --models all \
   --tasks binary,8class \
   --epochs 10 \
   --batch-size 2048 \
+  --early-stop-patience 11 \
+  --selection-metric macro_f1 \
   --device cuda
 ```
 
@@ -660,7 +663,57 @@ Normal classification calls return a tensor because `return_features` defaults
 to `False`. New consumers should keep this tuple-safe pattern if they accept
 models with feature extraction enabled.
 
-### 9.4 CICIDS2017-DistriNet two-head experiment
+### 9.4 CICIoT2023 post-hoc prior correction
+
+`prior_corrected_evaluation.py` evaluates the existing binary and eight-category
+checkpoints without retraining or modifying model/scaler artifacts. It computes
+the sampled-training prior directly from `y_train_bin.npy` or `y_train_cat.npy`
+and the natural prior directly from the complete `y_test_bin.npy` or
+`y_test_cat.npy`. For class \(k\), it applies:
+
+\[
+\ell'_k = \ell_k - \log \pi_{\mathrm{train},k}
+          + \log \pi_{\mathrm{natural},k}
+\]
+
+to logits immediately before prediction. Raw and adjusted confusion matrices
+are accumulated over all 8,248,312 test rows in the same inference pass.
+```bash
+python -m src.classifiers.prior_corrected_evaluation \
+  --processed-dir outputs/ciciot2023_fixed \
+  --classifier-dir outputs/ciciot2023_fixed/classifier_results \
+  --output-dir outputs/ciciot2023_fixed/classifier_results/prior_correction \
+  --batch-size 2048 \
+  --device cuda
+```
+
+The output directory contains direct-array prior counts, a side-by-side metric
+CSV, raw/corrected confusion matrices for every model/head pair, a complete JSON
+result, and a Markdown report. The evaluator verifies that raw metrics reproduce
+the saved reports and that checkpoint hashes remain unchanged.
+
+### 9.5 CICIoT2023 eight-class accuracy audit
+
+`audit_ciciot2023_8class.py` is a no-training audit of the complete
+eight-category evaluation path. It verifies exact fine/category/binary label
+alignment, preprocessing hashes, and full-holdout counts; measures category,
+fine-subtype, and per-feature distribution shift; reevaluates all checkpoints
+on full validation; and decomposes full-test errors by class pair.
+```bash
+python -m src.classifiers.audit_ciciot2023_8class \
+  --processed-dir outputs/ciciot2023_fixed \
+  --classifier-dir outputs/ciciot2023_fixed/classifier_results \
+  --output-dir outputs/ciciot2023_fixed/classifier_results/audit_8class \
+  --feature-sample-per-category 20000 \
+  --device cuda
+```
+
+The audit’s machine-readable JSON and CSV outputs are supplemented by
+`ciciot2023_8class_accuracy_audit.md`. Raw-Parquet checks in that report also
+show whether train-derived clipping and rounding collapsed source features in
+the saved arrays.
+
+### 9.6 CICIDS2017-DistriNet two-head experiment
 
 #### Dataset and output contract
 

@@ -9,9 +9,9 @@ sequentially for:
 
 Requirements implemented from thesis pipeline checklist:
 - Uses preprocessed arrays directly (no extra scaling, no augmentation)
-- Uses plain CrossEntropyLoss (no class weights) for each framing
-- Uses Adam + ReduceLROnPlateau + early stopping on validation loss
-- Prints per-epoch train loss, val loss, val accuracy
+- Applies train-derived balanced CrossEntropyLoss weights by default
+- Uses Adam + ReduceLROnPlateau and configurable checkpoint selection
+- Prints per-epoch train/validation loss, accuracy, and validation macro F1
 - Saves trained models and classification reports
 """
 
@@ -23,7 +23,7 @@ import random
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import torch
@@ -38,8 +38,8 @@ from src.classifiers.models import get_model
 
 
 CLASS_WEIGHT_DECISION = (
-    "Class weights excluded because stratified sampling already balances the training set; "
-    "applying original-distribution weights would over-penalize majority classes in the balanced sample."
+    "Train-derived balanced class weights are applied to sampled-training labels; "
+    "validation and test labels do not influence loss weights."
 )
 
 
@@ -257,7 +257,9 @@ def train_single_task(
     batch_size: int = 2048,
     lr: float = 1e-3,
     early_stop_patience: int = 5,
-) -> Dict[str, float]:
+    use_class_weights: bool = True,
+    selection_metric: str = "macro_f1",
+) -> Dict[str, Any]:
     num_features = int(x_train.shape[1])
 
     print("\n" + "-" * 90)
@@ -273,7 +275,12 @@ def train_single_task(
         model_kwargs["hidden_dims"] = (256, 128, 64)
     model = get_model(model_type, num_features=num_features, num_classes=task.num_classes, **model_kwargs).to(device)
 
-    criterion = nn.CrossEntropyLoss()
+    weight_tensor = (
+        torch.as_tensor(class_weights, dtype=torch.float32, device=device)
+        if use_class_weights
+        else None
+    )
+    criterion = nn.CrossEntropyLoss(weight=weight_tensor)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
@@ -288,6 +295,9 @@ def train_single_task(
 
     best_state = None
     best_val_loss = float("inf")
+    best_val_macro_f1 = float("-inf")
+    best_epoch = 0
+    history: list[dict[str, float | int]] = []
     wait = 0
 
     for epoch in range(1, epochs + 1):
@@ -333,16 +343,40 @@ def train_single_task(
             f"val_macro_f1={val_macro_f1:.4f} | "
             f"lr={current_lr:.6g}"
         )
+        history.append(
+            {
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "train_accuracy": train_acc,
+                "validation_loss": val_loss,
+                "validation_accuracy": val_acc,
+                "validation_macro_f1": val_macro_f1,
+                "validation_weighted_f1": val_weighted_f1,
+                "learning_rate": float(current_lr),
+            }
+        )
 
-        if task.name == "binary" and epoch == 3 and train_acc < 0.80:
+        if task.name == "binary" and not use_class_weights and epoch == 3 and train_acc < 0.80:
             print(
                 "DIAGNOSTIC STOP: Binary training accuracy did not exceed 80% by epoch 3. "
                 "This suggests a pipeline issue (labels, loss wiring, or dataloader mismatch)."
             )
             break
 
-        if val_loss < best_val_loss:
+        if selection_metric == "macro_f1":
+            improved = (
+                val_macro_f1 > best_val_macro_f1 + 1e-12
+                or (
+                    abs(val_macro_f1 - best_val_macro_f1) <= 1e-12
+                    and val_loss < best_val_loss
+                )
+            )
+        else:
+            improved = val_loss < best_val_loss
+        if improved:
             best_val_loss = val_loss
+            best_val_macro_f1 = val_macro_f1
+            best_epoch = epoch
             best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
             wait = 0
         else:
@@ -350,7 +384,7 @@ def train_single_task(
             if wait >= early_stop_patience:
                 print(
                     f"[{task.name}:{model_type}] Early stopping at epoch {epoch} "
-                    f"(patience={early_stop_patience})."
+                    f"(patience={early_stop_patience}, selection={selection_metric})."
                 )
                 break
 
@@ -396,9 +430,15 @@ def train_single_task(
         "model": model_type,
         "task": task.name,
         "num_classes": task.num_classes,
-        "loss_weighting": "excluded",
-        "loss_weighting_decision": CLASS_WEIGHT_DECISION,
-        "provided_class_weights_for_reference": class_weights.tolist(),
+        "loss_weighting": "train_balanced" if use_class_weights else "excluded",
+        "loss_weighting_decision": CLASS_WEIGHT_DECISION if use_class_weights else "Disabled by CLI.",
+        "class_weights": class_weights.tolist() if use_class_weights else None,
+        "selection_metric": selection_metric,
+        "best_epoch": best_epoch,
+        "completed_epochs": len(history),
+        "best_validation_loss": best_val_loss,
+        "best_validation_macro_f1": best_val_macro_f1,
+        "history": history,
         "test_loss": test_loss,
         "accuracy": test_acc,
         "macro_f1": macro_f1,
@@ -420,6 +460,9 @@ def train_single_task(
         "accuracy": test_acc,
         "macro_f1": macro_f1,
         "weighted_f1": weighted_f1,
+        "best_epoch": best_epoch,
+        "completed_epochs": len(history),
+        "best_validation_macro_f1": best_val_macro_f1,
     }
 
 
@@ -437,11 +480,11 @@ def _parse_selection(value: str, valid: Tuple[str, ...], label: str) -> List[str
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--processed-dir", type=Path, default=Path("data") / "processed")
+    parser.add_argument("--processed-dir", type=Path, default=Path("outputs") / "ciciot2023_fixed")
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("data") / "classifier_results" / "ciciot2023",
+        default=Path("outputs") / "ciciot2023_fixed" / "classifier_results",
     )
     parser.add_argument("--models", default="all", help="all or comma-separated: mlp,cnn,lstm,serial")
     parser.add_argument("--tasks", default="all", help="all or comma-separated: binary,8class,34class")
@@ -449,6 +492,16 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=2048)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--early-stop-patience", type=int, default=5)
+    parser.add_argument(
+        "--selection-metric",
+        choices=("macro_f1", "val_loss"),
+        default="macro_f1",
+    )
+    parser.add_argument(
+        "--no-class-weights",
+        action="store_true",
+        help="Disable train-derived balanced loss weights",
+    )
     parser.add_argument("--device", default="auto", help="auto, cpu, cuda, or another torch device")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
@@ -546,6 +599,8 @@ def main() -> None:
                 batch_size=args.batch_size,
                 lr=args.lr,
                 early_stop_patience=args.early_stop_patience,
+                use_class_weights=not args.no_class_weights,
+                selection_metric=args.selection_metric,
             )
             summary[task.name][model_type] = metrics
 
@@ -562,8 +617,11 @@ def main() -> None:
         "batch_size": args.batch_size,
         "learning_rate": args.lr,
         "early_stop_patience": args.early_stop_patience,
-        "loss_weighting": "excluded",
-        "loss_weighting_decision": CLASS_WEIGHT_DECISION,
+        "loss_weighting": "excluded" if args.no_class_weights else "train_balanced",
+        "loss_weighting_decision": (
+            "Disabled by CLI." if args.no_class_weights else CLASS_WEIGHT_DECISION
+        ),
+        "selection_metric": args.selection_metric,
         "models": model_types,
         "tasks": summary,
     }

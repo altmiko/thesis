@@ -1,23 +1,14 @@
-"""Leakage-critical split protocol for CICIoT2023 (downsampling_strategy.md §4).
+"""Leakage-resistant ordered-source split primitives for CICIoT2023.
 
-The 309 CSV shards are **not** independent capture sessions. CIC's pipeline
-(``mergecap`` → ``tcpdump -C <size>`` → ``DPKT``) merges each attack's PCAPs
-into one continuous stream, splits that stream *by byte budget*, then extracts
-flow features. Therefore:
+The labelled Parquet is a pure concatenation of source CSV shards. Natural
+numeric filename order and contiguous row order are preserved, so this module
+can hold out later *source-order* blocks without random intermixing.
 
-* ``source_csv_filename`` indexes a **contiguous temporal segment** of one
-  capture, not an independent run (doc §1).
-* the numeric suffix (``...Flood2.pcap.csv``) is a ``tcpdump`` sequence number,
-  so **natural-numeric shard order == wall-clock order**.
-
-We split forward in time — the latest segments go to test — so no training flow
-post-dates a test flow (no data snooping, cf. Arp et al. P3). This module
-implements the two primitives and the per-class dispatch of doc §4.2/§4.3.
-
-It knows nothing about features or sampling: given, for one class, the list of
-its shards (and their row counts, in file order), it returns which rows land in
-train / val / test. All logic is deterministic and order-preserving; validity
-depends on the parquet build being a pure concatenator (doc §4.3).
+The repository does not contain timestamps or primary capture metadata proving
+that filename suffixes or within-shard rows are chronological. The distributed
+README also describes the CSV collection as combined/shuffled. Therefore this
+module deliberately makes no temporal or wall-clock claim: its guarantee is
+ordered-source separation, not a verified temporal split.
 """
 from __future__ import annotations
 
@@ -31,17 +22,9 @@ import numpy as np
 def natkey(path: str) -> list:
     """Natural-numeric sort key: ``'Flood2'`` sorts before ``'Flood10'``.
 
-    Splitting a string on digit runs and casting the digit runs to ``int``
-    yields a mixed list that sorts numerically on the numeric fields and
-    lexically on the rest — recovering ``tcpdump`` sequence (== wall-clock)
-    order, which plain lexicographic order would interleave.
-
-    The trailing alphabetic file extension (``.pcap.csv``) is stripped first so
-    that the suffix-less **base** shard — ``tcpdump`` sequence 0, the earliest
-    segment (e.g. ``DDoS-ICMP_Flood.pcap.csv``) — sorts *before* ``...Flood1``.
-    Without stripping, the glued extension makes the base's first token longer
-    than the numbered stem and it would wrongly sort after sequence 1. (This is
-    a corrected, strictly-more-faithful form of the key sketched in doc §4.2.)
+    The trailing alphabetic file extension is stripped so the suffix-less base
+    shard sorts before numbered shards. This recovers deterministic source-file
+    sequence only; it does not establish capture chronology.
     """
     stem = re.sub(r"(\.[A-Za-z]+)+$", "", path)
     return [int(tok) if tok.isdigit() else tok for tok in re.split(r"(\d+)", stem)]
@@ -53,12 +36,10 @@ def forward_chain_shards(
     val_frac: float = 0.10,
     test_frac: float = 0.20,
 ) -> tuple[list[str], list[str], list[str]]:
-    """Assign whole shards of ONE class to (train, val, test) forward in time.
+    """Assign whole shards of one class to ordered train/validation/test sets.
 
-    ``shards`` is the list of ``source_csv_filename`` for the class. The latest
-    ``test_frac`` of shards (natural-numeric order) become test, the next
-    ``val_frac`` become val, the earliest remainder is train. Requires ≥3
-    shards so all three splits are non-empty.
+    The highest natural-numeric source suffixes become test, then validation;
+    the lowest suffixes become training. Requires at least three shards.
     """
     if not 0 < test_frac < 1 or not 0 < val_frac < 1 or val_frac + test_frac >= 1:
         raise ValueError("val_frac/test_frac must be in (0,1) and sum < 1")
@@ -83,13 +64,10 @@ def block_split_single_shard(
     val_frac: float = 0.10,
     test_frac: float = 0.20,
 ) -> tuple[slice, slice, slice]:
-    """Contiguous, order-preserving temporal cut of one shard's rows.
+    """Contiguous, order-preserving source-row cut of one shard.
 
-    Returns (train, val, test) as index ``slice`` objects over ``[0, n_rows)``.
-    This performs, at row granularity, the same operation ``tcpdump`` already
-    performed at folder granularity (doc §4.3) — a proxy for temporal
-    separation, weaker than a true shard boundary. Only valid because row
-    order was preserved by the parquet build.
+    Returns train/validation/test index slices without shuffling. Row order is
+    source order; chronology is not asserted.
     """
     if n_rows < 3:
         raise ValueError(f"need ≥3 rows for a 3-way block split, got {n_rows}")
@@ -153,7 +131,7 @@ def plan_class_split(
     Parameters
     ----------
     label:        34-class label of this class.
-    shard_order:  the class's shards in natural-numeric (wall-clock) order.
+    shard_order:  the class's shards in natural-numeric source order.
     shard_rows:   rows per shard.
 
     Dispatch (doc §4.3 rule table)::
@@ -218,11 +196,10 @@ def plan_class_split(
 
 
 def assert_forward_chaining(plan: ClassSplitPlan) -> None:
-    """Leakage guard (doc §6.5): no test row precedes any train row within a class.
+    """Guard that ordered-source train blocks precede validation/test blocks.
 
-    For shard-split classes, the max natkey of any train shard must be < the
-    min natkey of any test shard. For block/hybrid classes, contiguous ordering
-    is guaranteed by construction (train range precedes val precedes test).
+    This verifies the implemented ordering and disjointness, not wall-clock
+    chronology.
     """
     if plan.protocol == "forward_chain":
         train_keys = [natkey(x) for x in plan.train_shards]
@@ -288,8 +265,8 @@ def build_shard_runs(shard_col: np.ndarray, label_col: np.ndarray) -> list[Shard
         shard = str(shard_col[s])
         if shard in seen:
             raise ValueError(
-                f"shard {shard!r} appears in >1 contiguous run — parquet is not a "
-                "pure concatenator; block/temporal splits would be invalid (doc §4.3)"
+                f"shard {shard!r} appears in more than one contiguous run; "
+                "block/source-order splits require a pure concatenation"
             )
         seen.add(shard)
         runs.append(ShardRun(shard=shard, label=str(label_col[s]), start=int(s), n_rows=int(e - s)))

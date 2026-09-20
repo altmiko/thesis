@@ -1,8 +1,8 @@
 """Build one labelled parquet from the raw CICIoT2023 CSV folders.
 
-Scope — labelling stage of the pipeline described in `downsampling_strategy.md` §4:
+Scope — source-labelling stage:
 
-    RAW CSV → *this step* → clean → group-disjoint split → scaler fit → sample
+    RAW CSV → *this step* → ordered-source split → optional model clip → scale → sample
 
 The raw distribution ships 34 class folders under `data/raw/CICIoT2023_CSV_DOWNLOADED/`,
 each with one or more `part-*.pcap.csv` shards whose header exactly matches
@@ -16,9 +16,9 @@ script attaches:
                             for group-disjoint splitting per doc §4.1
     source_folder        — original folder name, kept for auditability
 
-Cleaning done here is deliberately minimal — NaN/inf drop only. Percentile
-clipping and integer/binary rounding stay in `pipeline.py` so cleaning is
-never done twice with inconsistent thresholds.
+Cleaning here is deliberately minimal: rows containing NaN or infinity are
+dropped. Fractional window aggregates are preserved; optional model clipping is
+performed later with training-only bounds.
 
 Outputs (default):
 
@@ -235,9 +235,9 @@ def process_shard(
         raw_len = len(chunk)
         counter.total_rows += raw_len
 
-        # Minimum cleaning: NaN/inf → drop. Anything else (percentile clip,
-        # integer/binary rounding) is deferred to pipeline.py so cleaning
-        # is never applied with two different thresholds.
+        # Minimum cleaning: NaN/inf → drop. Fractional values are preserved.
+        # Optional model clipping is deferred to pipeline.py so it can be fitted
+        # exclusively on the natural training partition.
         chunk = chunk.replace([np.inf, -np.inf], np.nan).dropna()
         dropped = raw_len - len(chunk)
         counter.dropped_nan_inf += dropped

@@ -24,3 +24,4 @@ outputs/*
 .pytest_cache/
 .claude/
 .vscode
+data.zip

@@ -1,8 +1,14 @@
 # CICIoT2023 Preprocessing Report
 
+> **Current corrected run.** This report describes the presence-preserving
+> preprocessing under `outputs/ciciot2023_fixed/`. The original
+> `outputs/ciciot2023/` bundle remains available as the before side of the
+> audit. End-to-end classifier effects are recorded in
+> `outputs/ciciot2023_fixed/fixes_report.md`.
+
 ## 1. Purpose
 
-This document records the preprocessing run that produced the model-ready CICIoT2023 artifacts in `outputs/ciciot2023/`. It describes the source build, leakage-safe split, train-derived cleaning and scaling, train-only downsampling, saved array contract, verification evidence, and the decision to retain the complete validation and test partitions.
+This document records the preprocessing run that produced the corrected model-ready CICIoT2023 artifacts in `outputs/ciciot2023_fixed/`. It describes the source build, leakage-safe split, presence-preserving cleaning, train-only scaling and downsampling, saved array contract, and full-holdout verification.
 
 Run identity:
 
@@ -11,11 +17,11 @@ Run identity:
 | Dataset | CICIoT2023 |
 | Schema | Modified Schema A, 39 ordered features |
 | Seed | 42 |
-| Run timestamp | `2026-09-17T16:02:50.124928+00:00` |
-| Git commit | `db65d87a3161b4c37f12608c55cfe7429a108a61` |
-| Runtime | 158.5 seconds |
-| Output root | `outputs/ciciot2023/` |
-| Run manifest | `outputs/ciciot2023/run_manifest.json` |
+| Run timestamp | `2026-09-18T12:52:53.449176+00:00` |
+| Git commit | `9bb60e3e99f5feafd349a15b138d9f8f4dcb1349` |
+| Runtime | 175.4 seconds |
+| Output root | `outputs/ciciot2023_fixed/` |
+| Run manifest | `outputs/ciciot2023_fixed/run_manifest.json` |
 
 ## 2. Holdout decision
 
@@ -45,7 +51,7 @@ The run consumes:
 | `src/preprocessing/ciciot2023/sampler.py` | Cluster-proportional-floor training sampler |
 | `src/preprocessing/ciciot2023/pipeline.py` | End-to-end preprocessing implementation |
 
-The canonical labelled Parquet remains under `data/processed/` because it is an input. Generated model-ready artifacts are redirected to `outputs/ciciot2023/`.
+The canonical labelled Parquet remains under `data/processed/` because it is an input. Corrected model-ready artifacts are under `outputs/ciciot2023_fixed/`.
 
 ## 4. Source build accounting
 
@@ -139,8 +145,10 @@ Reordering these features would invalidate saved arrays, the scaler, trained mod
 
 Feature roles used by cleaning:
 
-- 15 binary indicators: `HTTP`, `HTTPS`, `DNS`, `Telnet`, `SMTP`, `SSH`, `IRC`, `TCP`, `UDP`, `DHCP`, `ARP`, `ICMP`, `IGMP`, `IPv`, `LLC`;
-- 12 integer-valued fields: the seven flag-number fields, four count fields, and `Number`;
+- 22 presence-valued fields: the 15 protocol/service indicators plus the seven
+  `*_flag_number` fields;
+- five integer count fields: `ack_count`, `syn_count`, `fin_count`, `rst_count`,
+  and `Number`;
 - `Protocol Type` is retained as its numeric protocol value;
 - all remaining fields are continuous.
 
@@ -183,9 +191,14 @@ The counts reconcile exactly with the retained labelled source.
 
 Cleaning occurs only after split assignment.
 
-For each feature, the pipeline computes the 99.99th percentile from the natural training partition only. It then applies the resulting upper bound and a zero lower bound to train, validation, and test. Validation and test influence none of the bounds.
+For every feature, the pipeline computes the 99.99th percentile from the
+natural training partition only. Continuous and integer-count features use that
+bound directly. Presence-valued protocol/service/flag features floor the
+effective upper bound at `1`, preventing rare positive values from being
+clipped below their canonical positive state. Validation and test influence
+none of the bounds.
 
-### 7.1 Train-derived upper clipping bounds
+### 7.1 Effective train-derived upper clipping bounds
 
 | Feature | Upper bound | Feature | Upper bound |
 |---|---:|---|---:|
@@ -193,16 +206,16 @@ For each feature, the pipeline computes the 99.99th percentile from the natural 
 | Time_To_Live | 248 | Rate | 626,015.5 |
 | fin_flag_number | 1 | syn_flag_number | 1 |
 | rst_flag_number | 1 | psh_flag_number | 1 |
-| ack_flag_number | 1 | ece_flag_number | 0.1 |
-| cwr_flag_number | 0.03 | ack_count | 100 |
+| ack_flag_number | 1 | ece_flag_number | 1 |
+| cwr_flag_number | 1 | ack_count | 100 |
 | syn_count | 100 | fin_count | 100 |
 | rst_count | 100 | HTTP | 1 |
-| HTTPS | 1 | DNS | 0.6 |
-| Telnet | 0.01 | SMTP | 0.01 |
-| SSH | 0.3 | IRC | 0.01 |
+| HTTPS | 1 | DNS | 1 |
+| Telnet | 1 | SMTP | 1 |
+| SSH | 1 | IRC | 1 |
 | TCP | 1 | UDP | 1 |
-| DHCP | 0.2 | ARP | 0.5 |
-| ICMP | 1 | IGMP | 0.1 |
+| DHCP | 1 | ARP | 1 |
+| ICMP | 1 | IGMP | 1 |
 | IPv | 1 | LLC | 1 |
 | Tot sum | 132,694.78125 | Min | 1,514 |
 | Max | 13,098 | AVG | 3,117.35596 |
@@ -212,12 +225,26 @@ For each feature, the pipeline computes the 99.99th percentile from the natural 
 
 After clipping:
 
-- integer fields are rounded and constrained to non-negative values;
-- binary fields are rounded and constrained to `{0, 1}`;
+- integer count fields are rounded and constrained to non-negative values;
+- any positive protocol/service/flag presence value maps to `1`, otherwise `0`;
 - continuous fields retain floating-point values;
-- `Protocol Type` is clipped but not rounded by the integer/binary routine.
+- `Protocol Type` is clipped but not canonicalized by this routine.
 
-The EDA validation found zero non-finite values, zero invalid binary values, and zero invalid integer values in the inverse-transformed saved training matrix.
+### 7.2 Why presence canonicalization changed
+
+The vendor CSV contains fractional positive values in nominal indicator and flag
+columns. Ordinary rounding, combined with sub-one percentile bounds, previously
+collapsed nine nonconstant source features to zero:
+`ece_flag_number`, `cwr_flag_number`, `Telnet`, `SMTP`, `SSH`, `IRC`, `DHCP`,
+`ARP`, and `IGMP`.
+
+The corrected rule preserves occurrence information. For example, raw `ARP` is
+positive in 3,297,486 natural training rows and 775,049 test rows; the corrected
+validation/test arrays retain every positive occurrence as `1`.
+
+Corrected EDA checks found zero non-finite, invalid binary, or invalid integer
+training values. Constant training features fell from 9 to 0, and undefined
+Spearman cells fell from 621 to 0.
 
 ## 8. Train-only scaling
 
@@ -282,13 +309,13 @@ Observed class-weight ranges:
 
 | Target | Minimum | Maximum |
 |---|---:|---:|
-| 34-class | 0.18037 | 166.24193 |
+| 34-class | 0.18037 | 152.21307 |
 | 8-class | 0.76658 | 16.76324 |
 | Binary | 0.59742 | 3.06633 |
 
 ## 11. Generated artifacts
 
-All generated preprocessing artifacts are under `outputs/ciciot2023/`.
+All corrected preprocessing artifacts are under `outputs/ciciot2023_fixed/`.
 
 ### 11.1 Model arrays
 
@@ -317,7 +344,6 @@ All generated preprocessing artifacts are under `outputs/ciciot2023/`.
 - `class_to_category.json`
 - `run_manifest.json`
 - `ciciot2023_labeled_full_manifest.json`
-- `preprocessing_run.txt`
 - `preprocessing_verification.txt`
 - `bundle_manifest.json`
 
@@ -327,12 +353,14 @@ The output bundle also contains the EDA report and EDA artifacts, but those are 
 
 | Artifact | SHA-256 |
 |---|---|
-| `X_train.npy` | `c6c7ebaef0b461374458648c2233d8a8c06a291aa68400af2286a03f2ad68ace` |
-| `X_val.npy` | `1ce0d9175cf422f7aea4a19a28e6cada674b92f85ffc119807329a06f0fead76` |
-| `X_test.npy` | `dca73c859bc35c0bc749f6ac56b514538eb93973ba20bc2ee0b882cd9d364e58` |
+| `X_train.npy` | `3c44a81a882ca2d6a78a7ad030d2f8a6f376fdf667e79cd89f84c3b05d801bc7` |
+| `X_val.npy` | `60fcd73f501852b8e6d24fde5971ddba8ba28e41bce985d0798d3b8697fd194f` |
+| `X_test.npy` | `f646ab0b0b7a675131fa87a253ce1079b490cfd22b307d513fb6237fc71782d3` |
 | Scaler center + scale | `dbd8dc3680cdf2bfbcb9194b1461c99167766bb45fdeb27a462299cbd7cc46a0` |
 
-These hashes match the canonical preprocessing run, confirming deterministic regeneration.
+The changed matrix hashes distinguish the corrected presence-preserving arrays
+from the original preprocessing run. The scaler hash is unchanged because
+`RobustScaler` medians and IQRs for these sparse columns remain the same.
 
 ## 12. Verification results
 
@@ -355,14 +383,16 @@ validation: 5,555,150 full rows
 test: 8,248,312 full rows
 ```
 
-Additional EDA checks passed:
+Additional corrected-run checks passed:
 
 - manifest feature order matches the frozen schema;
-- every fine class occurs in train, validation, and test;
-- every category occurs in train, validation, and test;
+- every fine class and category occurs in all splits;
 - no non-finite training values;
-- no invalid binary training values;
-- no invalid integer training values.
+- no invalid binary or integer training values;
+- all 22 presence-valued columns remain exactly in `{0, 1}`;
+- all audited validation/test positive-occurrence counts match the raw source;
+- constant processed training features: 0;
+- preprocessing regression suite: 17 passed.
 
 ## 13. Reproduction commands
 
@@ -371,7 +401,7 @@ Run preprocessing into the isolated output directory:
 ```bash
 C:/Users/user6/.local/share/mamba/envs/thesis/python.exe \
   -m src.preprocessing.ciciot2023.pipeline \
-  --output-dir outputs/ciciot2023
+  --output-dir outputs/ciciot2023_fixed
 ```
 
 Verify the redirected arrays and manifest:
@@ -379,7 +409,7 @@ Verify the redirected arrays and manifest:
 ```bash
 C:/Users/user6/.local/share/mamba/envs/thesis/python.exe \
   -m src.preprocessing.ciciot2023.reports verify \
-  --processed-dir outputs/ciciot2023
+  --processed-dir outputs/ciciot2023_fixed
 ```
 
 Regenerate EDA against the redirected preprocessing artifacts:
@@ -387,8 +417,8 @@ Regenerate EDA against the redirected preprocessing artifacts:
 ```bash
 C:/Users/user6/.local/share/mamba/envs/thesis/python.exe \
   -m src.evaluation.ciciot2023_eda \
-  --processed-dir outputs/ciciot2023 \
-  --output-dir outputs/ciciot2023/eda
+  --processed-dir outputs/ciciot2023_fixed \
+  --output-dir outputs/ciciot2023_fixed/eda
 ```
 
 ## 14. Interpretation requirements
@@ -407,3 +437,4 @@ C:/Users/user6/.local/share/mamba/envs/thesis/python.exe \
 - Downsampling implementation log: `docs/data/ciciot2023_downsampling_implementation.md`
 - Raw labelling and provenance: `docs/data/ciciot2023_building_from_download.md`
 - General preprocessing handoff: `docs/preprocessing_handoff.md`
+- Corrected end-to-end fixes report: `outputs/ciciot2023_fixed/fixes_report.md`

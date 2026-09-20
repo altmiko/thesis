@@ -315,7 +315,42 @@ def write_report(
     else:
         lines.append("No corrected model fell below the user-specified majority-class baseline.")
 
-    lines.extend(["", "## 5. Confusion matrices", ""])
+    binary_macro_decreased = all(
+        results["binary"][model]["corrected"]["macro_f1"]
+        < results["binary"][model]["raw"]["macro_f1"]
+        for model in MODEL_NAMES
+    )
+    category_accuracy_increased = all(
+        results["8class"][model]["corrected"]["accuracy"]
+        > results["8class"][model]["raw"]["accuracy"]
+        for model in MODEL_NAMES
+    )
+    category_macro_decreased = all(
+        results["8class"][model]["corrected"]["macro_f1"]
+        < results["8class"][model]["raw"]["macro_f1"]
+        for model in MODEL_NAMES
+    )
+    lines.extend(
+        [
+            "",
+            "## 5. Interpretation",
+            "",
+            f"- Binary macro F1 decreased for every architecture: **{binary_macro_decreased}**. "
+            "The correction strongly suppresses the already-rare Benign prediction and moves "
+            "accuracy toward the empirical full-test Attack-majority baseline.",
+            f"- Eight-category accuracy increased for every architecture: **{category_accuracy_increased}**.",
+            f"- Eight-category macro F1 decreased for every architecture: **{category_macro_decreased}**. "
+            "The accuracy gain is prevalence-driven—mainly stronger DDoS prediction—not a balanced "
+            "improvement across categories.",
+            "- BruteForce and Web remain unrecovered by the evaluated eight-category models after correction.",
+            "",
+            "The user-specified overshoot rule is not triggered, but the binary confusion matrices show "
+            "near-majority-class collapse. Macro F1 and per-class confusion must therefore accompany accuracy.",
+            "",
+            "## 6. Confusion matrices",
+            "",
+        ]
+    )
     for task in ("binary", "8class"):
         names = priors[task]["class_names"]
         for model_name in MODEL_NAMES:
@@ -328,7 +363,7 @@ def write_report(
 
     lines.extend(
         [
-            "## 6. Integrity checks",
+            "## 7. Integrity checks",
             "",
             "- Priors were computed from `.npy` labels, not reports or hardcoded counts.",
             "- Raw inference was rerun on the complete unsampled test matrix.",
@@ -343,11 +378,11 @@ def write_report(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--processed-dir", type=Path, default=Path("outputs") / "ciciot2023")
+    parser.add_argument("--processed-dir", type=Path, default=Path("outputs") / "ciciot2023_fixed")
     parser.add_argument(
         "--classifier-dir",
         type=Path,
-        default=Path("data") / "classifier_results" / "ciciot2023",
+        default=Path("outputs") / "ciciot2023_fixed" / "classifier_results",
     )
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--batch-size", type=int, default=8192)
