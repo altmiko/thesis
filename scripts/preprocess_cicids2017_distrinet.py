@@ -2,8 +2,8 @@
 """Preprocess the corrected DistriNet CIC-IDS-2017 release for two targets.
 
 Only rows mapping to Benign, DoS, DDoS, Recon, or BruteForce are retained.
-Filtering and category mapping happen before the chronological 70/15/15 split.
-All fitted statistics use training rows only.
+Filtering and category mapping happen before chronological 70/15/15 splits
+within each source attack label. All fitted statistics use training rows only.
 
 Run from the repository root:
     python scripts/preprocess_cicids2017_distrinet.py
@@ -370,33 +370,38 @@ def allocate_class_counts(n_rows: int) -> np.ndarray:
     return counts
 
 
-def chronological_within_category_split(
+def chronological_within_source_label_split(
     dataset: CleanedDataset,
     warning_floor: int,
-) -> tuple[dict[str, np.ndarray], pd.DataFrame, list[str]]:
-    labels = dataset.category_labels
-    observed = set(labels)
-    if observed != set(CATEGORY_NAMES):
-        raise ValueError(f"expected categories {list(CATEGORY_NAMES)}, found {sorted(observed)}")
-    label_order = list(CATEGORY_NAMES)
+) -> tuple[dict[str, np.ndarray], pd.DataFrame, pd.DataFrame, list[str]]:
+    source_labels = dataset.metadata["source_label"].to_numpy(dtype=str)
+    observed = set(source_labels)
+    expected = set(SOURCE_TO_CATEGORY)
+    if observed != expected:
+        raise ValueError(f"expected source labels {sorted(expected)}, found {sorted(observed)}")
+
     split_indices: dict[str, list[np.ndarray]] = {name: [] for name in SPLIT_NAMES}
-    report_rows: list[dict[str, Any]] = []
+    source_rows: list[dict[str, Any]] = []
     warnings_list: list[str] = []
 
-    for label in label_order:
-        indices = np.flatnonzero(labels == label)
+    for source_label, category_label in SOURCE_TO_CATEGORY.items():
+        indices = np.flatnonzero(source_labels == source_label)
         # The merged dataset is globally ordered by timestamp/day/source row, so
-        # filtering retains deterministic chronological order for this class.
+        # filtering retains deterministic chronology for this attack subtype.
         counts = allocate_class_counts(len(indices))
         boundaries = np.cumsum(counts)
-        class_slices = np.split(indices, boundaries[:-1])
-        for name, selected in zip(SPLIT_NAMES, class_slices):
+        source_slices = np.split(indices, boundaries[:-1])
+        for name, selected in zip(SPLIT_NAMES, source_slices):
             split_indices[name].append(selected)
 
-        row: dict[str, Any] = {"category_label": label, "total": len(indices)}
+        row: dict[str, Any] = {
+            "source_label": source_label,
+            "category_label": category_label,
+            "total": len(indices),
+        }
         for name, count in zip(SPLIT_NAMES, counts):
             row[name] = int(count)
-            row[f"{name}_pct_of_class"] = 100.0 * int(count) / len(indices)
+            row[f"{name}_pct_of_source"] = 100.0 * int(count) / len(indices)
         too_small = [
             f"{name}={int(count)}"
             for name, count in zip(SPLIT_NAMES, counts)
@@ -405,28 +410,40 @@ def chronological_within_category_split(
         row["small_partition_warning"] = "; ".join(too_small)
         if too_small:
             warning = (
-                f"{label}: small partition(s) {', '.join(too_small)}; estimates for this "
-                "class will be unstable and exclusion requires an explicit thesis decision"
+                f"{source_label}: small partition(s) {', '.join(too_small)}; estimates for "
+                "this source label will be unstable"
             )
             warnings_list.append(warning)
             warnings.warn(warning, RuntimeWarning, stacklevel=2)
-        report_rows.append(row)
+        source_rows.append(row)
 
     final_indices: dict[str, np.ndarray] = {}
     for name in SPLIT_NAMES:
         combined = np.concatenate(split_indices[name]).astype(np.int64)
-        # Preserve deterministic global time/source order after class subsets are concatenated.
         final_indices[name] = np.sort(combined)
 
     all_indices = np.concatenate([final_indices[name] for name in SPLIT_NAMES])
     if len(np.unique(all_indices)) != len(dataset.features) or len(all_indices) != len(dataset.features):
         raise AssertionError("split membership is not a disjoint exhaustive partition")
 
-    report = pd.DataFrame(report_rows)
-    for name in SPLIT_NAMES:
-        split_total = int(report[name].sum())
-        report[f"{name}_pct_of_split"] = 100.0 * report[name] / split_total
-    return final_indices, report, warnings_list
+    source_report = pd.DataFrame(source_rows)
+    category_rows: list[dict[str, Any]] = []
+    for category_label in CATEGORY_NAMES:
+        category_mask = dataset.category_labels == category_label
+        row = {"category_label": category_label, "total": int(category_mask.sum())}
+        for name in SPLIT_NAMES:
+            count = int(category_mask[final_indices[name]].sum())
+            row[name] = count
+            row[f"{name}_pct_of_class"] = 100.0 * count / row["total"]
+        row["small_partition_warning"] = ""
+        category_rows.append(row)
+    category_report = pd.DataFrame(category_rows)
+
+    for report in (category_report, source_report):
+        for name in SPLIT_NAMES:
+            split_total = int(report[name].sum())
+            report[f"{name}_pct_of_split"] = 100.0 * report[name] / split_total
+    return final_indices, category_report, source_report, warnings_list
 
 
 def fingerprint(values: pd.DataFrame) -> np.ndarray:
@@ -504,38 +521,43 @@ def build_leakage_audit(
             raise AssertionError(f"{key}: exact feature+label duplicates survived deduplication")
 
     coverage: dict[str, dict[str, int]] = {}
-    class_chronology: dict[str, dict[str, dict[str, int]]] = {}
+    source_chronology: dict[str, dict[str, dict[str, int]]] = {}
+    source_labels = dataset.metadata["source_label"].to_numpy(dtype=str)
     timestamps = dataset.metadata["timestamp_epoch_seconds"].to_numpy(dtype=np.int64)
-    for label in CATEGORY_NAMES:
+    for source_label in SOURCE_TO_CATEGORY:
         label_indices = {
-            name: indices[dataset.category_labels[indices] == label]
+            name: indices[source_labels[indices] == source_label]
             for name, indices in split_indices.items()
         }
-        coverage[label] = {name: int(len(indices)) for name, indices in label_indices.items()}
-        if any(count == 0 for count in coverage[label].values()):
-            raise AssertionError(f"class coverage failure for {label}: {coverage[label]}")
-        class_chronology[label] = {
+        coverage[source_label] = {name: int(len(indices)) for name, indices in label_indices.items()}
+        if any(count == 0 for count in coverage[source_label].values()):
+            raise AssertionError(
+                f"source-label coverage failure for {source_label}: {coverage[source_label]}"
+            )
+        source_chronology[source_label] = {
             name: {
                 "min_epoch_seconds": int(timestamps[indices].min()),
                 "max_epoch_seconds": int(timestamps[indices].max()),
             }
             for name, indices in label_indices.items()
         }
-        boundaries = class_chronology[label]
+        boundaries = source_chronology[source_label]
         if not (
             boundaries["train"]["max_epoch_seconds"]
             <= boundaries["val"]["min_epoch_seconds"]
             <= boundaries["test"]["min_epoch_seconds"]
         ):
-            raise AssertionError(f"within-class chronology failure for {label}: {boundaries}")
+            raise AssertionError(
+                f"within-source chronology failure for {source_label}: {boundaries}"
+            )
 
     return {
         "membership_is_disjoint_and_exhaustive": True,
-        "class_coverage_asserted_all_splits": True,
+        "source_label_coverage_asserted_all_splits": True,
         "pairwise": pairwise,
-        "class_coverage": coverage,
-        "class_chronology_asserted": True,
-        "class_chronology_epoch_seconds": class_chronology,
+        "source_label_coverage": coverage,
+        "source_label_chronology_asserted": True,
+        "source_label_chronology_epoch_seconds": source_chronology,
         "feature_only_overlap_note": (
             "Feature-only overlap can remain when an identical numeric vector has different "
             "category labels. Feature+category duplicates were removed globally before splitting."
@@ -625,11 +647,12 @@ def save_split(
 def print_reports(
     duplicate_audit: dict[str, Any],
     class_report: pd.DataFrame,
+    source_report: pd.DataFrame,
     leakage_audit: dict[str, Any],
 ) -> None:
     print("\nDuplicate audit (modelling features + category label)")
     print(json.dumps(duplicate_audit, indent=2))
-    columns = [
+    class_columns = [
         "category_label",
         "total",
         "train",
@@ -638,10 +661,20 @@ def print_reports(
         "val_pct_of_class",
         "test",
         "test_pct_of_class",
+    ]
+    print("\nPer-category split")
+    print(class_report[class_columns].to_string(index=False))
+    source_columns = [
+        "source_label",
+        "category_label",
+        "total",
+        "train",
+        "val",
+        "test",
         "small_partition_warning",
     ]
-    print("\nPer-class chronological split")
-    print(class_report[columns].to_string(index=False))
+    print("\nChronological split within each source attack label")
+    print(source_report[source_columns].to_string(index=False))
     print("\nPairwise leakage audit")
     for pair, record in leakage_audit["pairwise"].items():
         print(
@@ -686,9 +719,11 @@ def main() -> None:
         )
 
     dataset = merge_clean_and_deduplicate(parts, modelling_columns)
-    split_indices, class_report, small_class_warnings = chronological_within_category_split(
-        dataset,
-        warning_floor=args.min_per_split_warning,
+    split_indices, class_report, source_report, small_class_warnings = (
+        chronological_within_source_label_split(
+            dataset,
+            warning_floor=args.min_per_split_warning,
+        )
     )
 
     # All fitted preprocessing begins here, after immutable split membership exists.
@@ -738,6 +773,7 @@ def main() -> None:
         handle.write("\n")
 
     class_report.to_csv(output_dir / "class_distribution.csv", index=False)
+    source_report.to_csv(output_dir / "source_label_distribution.csv", index=False)
     with (output_dir / "duplicate_audit.json").open("w", encoding="utf-8") as handle:
         json.dump(dataset.duplicate_audit, handle, indent=2, sort_keys=True)
         handle.write("\n")
@@ -752,11 +788,12 @@ def main() -> None:
     manifest = {
         "dataset": "corrected/relabelled DistriNet CIC-IDS-2017 five-file release",
         "methodological_description": (
-            "Rows are mapped to five supported categories and filtered before a "
-            "leakage-controlled chronological split within category. Exact duplicates "
-            "are removed before splitting; preprocessing statistics are train-fitted."
+            "Rows are mapped to five supported categories and filtered before leakage-controlled "
+            "chronological splits within each retained source attack label. This preserves source-"
+            "label coverage in train, validation, and test while exact duplicates are removed "
+            "before splitting and preprocessing statistics are train-fitted."
         ),
-        "not_claimed": "independent attack-campaign generalization or complete leakage freedom",
+        "not_claimed": "global forward-time or independent attack-campaign generalization",
         "research_target": "binary and five-category closed-set classification",
         "seed": SEED,
         "non_production": args.max_rows_per_file is not None,
@@ -812,16 +849,23 @@ def main() -> None:
         },
         "duplicate_audit": dataset.duplicate_audit,
         "split_policy": {
-            "protocol": "chronological within each mapped category",
+            "protocol": "chronological within each retained source attack label",
+            "rationale": (
+                "Closed-set category classification requires every retained source attack label "
+                "to be represented in training; splitting only after category aggregation placed "
+                "DoS GoldenEye exclusively in test."
+            ),
             "ratios": dict(zip(SPLIT_NAMES, SPLIT_RATIOS.tolist())),
             "allocation": "largest remainder with at least one row per split",
             "shuffle_before_assignment": False,
             "retained_classes": list(CATEGORY_NAMES),
+            "retained_source_labels": list(SOURCE_TO_CATEGORY),
             "small_partition_warning_floor": args.min_per_split_warning,
-            "small_class_warnings": small_class_warnings,
+            "small_source_label_warnings": small_class_warnings,
         },
         "file_reports": dataset.file_reports,
         "class_distribution": class_report.to_dict(orient="records"),
+        "source_label_distribution": source_report.to_dict(orient="records"),
         "leakage_audit": leakage_audit,
         "train_only_preprocessing": {
             "scaler": "sklearn.preprocessing.RobustScaler",
@@ -844,7 +888,7 @@ def main() -> None:
         json.dump(manifest, handle, indent=2, sort_keys=True)
         handle.write("\n")
 
-    print_reports(dataset.duplicate_audit, class_report, leakage_audit)
+    print_reports(dataset.duplicate_audit, class_report, source_report, leakage_audit)
     print(f"\nWrote reproducible artifacts to {output_dir}")
     for name in SPLIT_NAMES:
         print(f"  {name}: {split_reports[name]['shape']}")

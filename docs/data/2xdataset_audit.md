@@ -14,6 +14,12 @@ The detailed reports and machine-readable results are stored at:
 - `outputs/ciciot2023/feature_audit/feature_audit_report.md`
 - `outputs/cicids2017distrinet/feature_audit/feature_audit_report.md`
 
+The CICIDS2017 feature-audit bundle is historical: it was generated against the
+former category-only split and its corresponding checkpoints. The corrected
+source-label split now has 1,456,265 training rows and new checkpoints. Do not
+interpret the CICIDS checkpoint-permutation results below as measurements of the
+corrected bundle until that separate audit pipeline is regenerated.
+
 Each output directory contains:
 
 - `audit_manifest.json`
@@ -303,6 +309,9 @@ The following 21 features participate in structural formulas, identities, logica
 ## CICIDS2017-DistriNet audit
 
 ### Provenance and 77-feature scope
+
+The counts and checkpoint results in this section identify the pre-correction
+category-only split; they are retained for provenance rather than relabelled.
 
 - Processed training rows: 1,456,264
 - Checkpoint input width: 79

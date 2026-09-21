@@ -176,14 +176,23 @@ def load_model(
     """Load a trained baseline checkpoint and return eval-ready model."""
     model_type = _infer_model_type(model_path)
 
-    checkpoint = torch.load(model_path, map_location="cpu")
+    try:
+        checkpoint = torch.load(model_path, map_location="cpu", weights_only=True)
+    except TypeError:
+        checkpoint = torch.load(model_path, map_location="cpu")
     if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
         state_dict = checkpoint["state_dict"]
+        saved_model_type = checkpoint.get("model_type")
+        if saved_model_type is not None and saved_model_type != model_type:
+            raise ValueError(
+                f"checkpoint model type {saved_model_type!r} conflicts with path type {model_type!r}"
+            )
+        model_kwargs = dict(checkpoint.get("model_kwargs", {}))
     else:
         state_dict = checkpoint
+        model_kwargs = {}
 
-    model_kwargs: Dict[str, Any] = {}
-    if model_type == "mlp":
+    if model_type == "mlp" and "hidden_dims" not in model_kwargs:
         hidden_dims = []
         layer_idx = 0
         while f"features.{layer_idx}.weight" in state_dict:

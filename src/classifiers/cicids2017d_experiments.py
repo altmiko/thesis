@@ -32,6 +32,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import sklearn
+import pandas as pd
 import torch
 import torch.nn as nn
 from sklearn.metrics import (
@@ -82,6 +83,7 @@ class RunConfig:
     batch_size: int
     learning_rate: float
     early_stopping_patience: int
+    class_weighting: str
 
 
 def parse_args() -> argparse.Namespace:
@@ -102,6 +104,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=2048)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--patience", type=int, default=2)
+    parser.add_argument(
+        "--class-weighting",
+        choices=("balanced", "effective", "none"),
+        default="balanced",
+        help="Train-only loss weighting. Balanced is inverse-frequency weighting.",
+    )
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--limit-train", type=int, default=None, help="Category-stratified smoke cap.")
@@ -153,8 +161,9 @@ def prepare_output_dir(output_dir: Path) -> None:
         "classifier_metrics_summary.csv",
         "per_class_metrics.csv",
         "confusion_matrices.json",
+        "dos_ddos_error_audit.csv",
         "fine_label_detection_rates.csv",
-        "label_encoders.json",
+        "class_weights.json",
         "effective_number_weights.json",
     ):
         path = output_dir / name
@@ -215,7 +224,9 @@ def stratified_limit_indices(y: np.ndarray, limit: int | None, num_classes: int)
 def load_data(processed_dir: Path, args: argparse.Namespace) -> dict[str, Any]:
     required = ["preprocessing_manifest.json", "label_encoders.json"]
     for split in ("train", "val", "test"):
-        required.extend((f"X_{split}.npy", f"y_{split}_bin.npy", f"y_{split}_cat.npy"))
+        required.extend(
+            (f"X_{split}.npy", f"y_{split}_bin.npy", f"y_{split}_cat.npy", f"{split}.parquet")
+        )
     missing = [name for name in required if not (processed_dir / name).exists()]
     if missing:
         raise FileNotFoundError(f"missing processed artifacts: {missing}")
@@ -239,14 +250,24 @@ def load_data(processed_dir: Path, args: argparse.Namespace) -> dict[str, Any]:
             raise ValueError(
                 f"misaligned {split} arrays: X={x.shape}, category={y_category.shape}, binary={y_binary.shape}"
             )
-        indices = stratified_limit_indices(y_category, limits[split], TASK_BY_NAME["category"].num_classes)
+        metadata = pd.read_parquet(processed_dir / f"{split}.parquet", columns=["source_label"])
+        source_labels = metadata["source_label"].to_numpy(dtype=str)
+        if len(source_labels) != len(x):
+            raise ValueError(
+                f"misaligned {split} source labels: metadata={len(source_labels)}, X={len(x)}"
+            )
+        indices = stratified_limit_indices(
+            y_category, limits[split], TASK_BY_NAME["category"].num_classes
+        )
         if indices is not None:
             x = np.ascontiguousarray(x[indices])
             y_category = np.ascontiguousarray(y_category[indices])
             y_binary = np.ascontiguousarray(y_binary[indices])
+            source_labels = source_labels[indices]
         data[f"x_{split}"] = x
         data[f"y_category_{split}"] = np.asarray(y_category, dtype=np.int64)
         data[f"y_binary_{split}"] = np.asarray(y_binary, dtype=np.int64)
+        data[f"source_label_{split}"] = source_labels
 
     if data["x_train"].shape[1] != 79:
         raise ValueError(f"expected 79 DistriNet features, got {data['x_train'].shape[1]}")
@@ -280,6 +301,31 @@ def effective_number_class_weights(
     denominator = -np.expm1(counts * np.log(beta))
     weights = ((1.0 - beta) / denominator).astype(np.float32)
     return weights, {str(index): float(value) for index, value in enumerate(weights)}
+
+def balanced_class_weights(
+    labels: np.ndarray,
+    num_classes: int,
+) -> tuple[np.ndarray, dict[str, float]]:
+    counts = np.bincount(labels, minlength=num_classes).astype(np.float64)
+    if np.any(counts == 0):
+        raise ValueError(f"cannot weight empty classes: {counts.tolist()}")
+    weights = (len(labels) / (num_classes * counts)).astype(np.float32)
+    return weights, {str(index): float(value) for index, value in enumerate(weights)}
+
+
+def class_weights_for_labels(
+    labels: np.ndarray,
+    num_classes: int,
+    method: str,
+) -> tuple[np.ndarray, dict[str, float]]:
+    if method == "balanced":
+        return balanced_class_weights(labels, num_classes)
+    if method == "effective":
+        return effective_number_class_weights(labels, num_classes)
+    if method == "none":
+        weights = np.ones(num_classes, dtype=np.float32)
+        return weights, {str(index): 1.0 for index in range(num_classes)}
+    raise ValueError(f"unknown class-weighting method: {method}")
 
 
 def make_tensor_data(data: dict[str, Any]) -> dict[str, torch.Tensor]:
@@ -317,11 +363,28 @@ def make_loader(
     )
 
 
-def build_nn(model_type: str, num_features: int, num_classes: int) -> nn.Module:
-    kwargs: dict[str, Any] = {}
+def model_kwargs(model_type: str) -> dict[str, Any]:
+    common: dict[str, Any] = {"input_transform": "asinh"}
     if model_type == "mlp":
-        kwargs["hidden_dims"] = (256, 128, 64)
-    return get_model(model_type, num_features=num_features, num_classes=num_classes, **kwargs)
+        return {**common, "hidden_dims": (256, 128, 64)}
+    if model_type == "cnn":
+        return {**common, "pool_size": 8}
+    if model_type == "lstm":
+        return {
+            **common,
+            "feature_sequence": True,
+            "feature_embedding_dim": 16,
+        }
+    return common
+
+
+def build_nn(model_type: str, num_features: int, num_classes: int) -> nn.Module:
+    return get_model(
+        model_type,
+        num_features=num_features,
+        num_classes=num_classes,
+        **model_kwargs(model_type),
+    )
 
 
 def predict_probabilities(
@@ -518,12 +581,20 @@ def train_nn(
 
     stem = f"{model_type}_{task.name}"
     model_path = output_dir / "models" / f"{stem}.pt"
-    torch.save(best_state, model_path)
+    checkpoint = {
+        "state_dict": best_state,
+        "model_type": model_type,
+        "model_kwargs": model_kwargs(model_type),
+        "num_features": num_features,
+        "num_classes": task.num_classes,
+    }
+    torch.save(checkpoint, model_path)
     history_path = output_dir / "histories" / f"{stem}_history.json"
     history_path.write_text(json.dumps(history, indent=2), encoding="utf-8")
 
     reloaded = build_nn(model_type, num_features, task.num_classes).to(device)
-    reloaded.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+    saved = torch.load(model_path, map_location=device, weights_only=True)
+    reloaded.load_state_dict(saved["state_dict"])
     reloaded.eval()
     with torch.inference_mode():
         probe = tensors["x_test"][: min(32, len(tensors["x_test"]))].to(device)
@@ -548,12 +619,10 @@ def train_nn(
             "learning_rate": config.learning_rate,
             "early_stopping_patience": config.early_stopping_patience,
             "optimizer": "Adam",
-            "loss": (
-                "class-balanced effective-number weighted CrossEntropyLoss "
-                f"(beta={EFFECTIVE_NUMBER_BETA})"
-            ),
+            "loss": f"{config.class_weighting} weighted CrossEntropyLoss",
             "checkpoint_selection": "validation macro-F1; validation loss tie-break",
             "parameters": int(sum(parameter.numel() for parameter in model.parameters())),
+            "model_kwargs": model_kwargs(model_type),
             "gradient_clip_norm": 5.0,
         },
         "validation": validation,
@@ -681,6 +750,44 @@ def per_class_rows(results: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
                 )
     return rows
 
+def dos_ddos_audit_rows(
+    results: Sequence[dict[str, Any]],
+    data: dict[str, Any],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    category_results = [result for result in results if result["task"] == "category"]
+    source_labels = np.asarray(data["source_label_test"], dtype=str)
+    y_true = np.asarray(data["y_category_test"], dtype=np.int64)
+    for result in category_results:
+        y_pred = np.asarray(result["test_probability"]).argmax(axis=1)
+        for true_id, true_name, other_id in ((1, "DoS", 2), (2, "DDoS", 1)):
+            mask = y_true == true_id
+            rows.append(
+                {
+                    "model": result["model"],
+                    "display_name": result["display_name"],
+                    "scope": true_name,
+                    "support": int(mask.sum()),
+                    "recall": float((y_pred[mask] == true_id).mean()),
+                    "predicted_as_other_rate": float((y_pred[mask] == other_id).mean()),
+                    "predicted_as_benign_rate": float((y_pred[mask] == 0).mean()),
+                }
+            )
+        for source_label in sorted(np.unique(source_labels[y_true == 1])):
+            mask = (y_true == 1) & (source_labels == source_label)
+            rows.append(
+                {
+                    "model": result["model"],
+                    "display_name": result["display_name"],
+                    "scope": source_label,
+                    "support": int(mask.sum()),
+                    "recall": float((y_pred[mask] == 1).mean()),
+                    "predicted_as_other_rate": float((y_pred[mask] == 2).mean()),
+                    "predicted_as_benign_rate": float((y_pred[mask] == 0).mean()),
+                }
+            )
+    return rows
+
 
 def format_percent(value: float) -> str:
     return f"{100.0 * value:.3f}%"
@@ -695,6 +802,7 @@ def write_markdown_report(
     device: torch.device,
     started_at: str,
     finished_at: str,
+    dos_ddos_rows: Sequence[dict[str, Any]],
 ) -> Path:
     lines = [
         "# CIC-IDS-2017 DistriNet classifier results",
@@ -710,7 +818,7 @@ def write_markdown_report(
         f"- Rows: train **{len(data['x_train']):,}**, validation **{len(data['x_val']):,}**, test **{len(data['x_test']):,}**",
         "- Category mapping/encoding: `Benign=0, DoS=1, DDoS=2, Recon=3, BruteForce=4`.",
         "- Binary encoding: `Benign=0, Attack=1`.",
-        f"- Every loss uses Cui et al. effective-number class weights with beta={EFFECTIVE_NUMBER_BETA}, computed only from training labels.",
+        f"- Loss class weighting: `{run_config.class_weighting}` using training labels only.",
         "- Checkpoint selection uses validation macro-F1 with validation loss as tie-break; test is held out until selection.",
         "",
     ]
@@ -735,7 +843,7 @@ def write_markdown_report(
                 f"- Train counts: `{counts['train']}`",
                 f"- Validation counts: `{counts['val']}`",
                 f"- Test counts: `{counts['test']}`",
-                f"- Effective-number weights (beta={EFFECTIVE_NUMBER_BETA}): `{named_weights}`",
+                f"- Training-only `{run_config.class_weighting}` weights: `{named_weights}`",
                 "",
                 "### Test summary",
                 "",
@@ -788,11 +896,28 @@ def write_markdown_report(
                 )
             lines.append("")
 
+    lines.extend(["## DoS/DDoS error audit", ""])
+    lines.extend(
+        [
+            "Rates are row-normalized within each true class/source label.",
+            "",
+            "| Model | Scope | Support | Recall | Predicted as paired class | Predicted as Benign |",
+            "|---|---|---:|---:|---:|---:|",
+        ]
+    )
+    for row in dos_ddos_rows:
+        lines.append(
+            f"| {row['display_name']} | {row['scope']} | {row['support']:,} | "
+            f"{row['recall']:.6f} | {row['predicted_as_other_rate']:.6f} | "
+            f"{row['predicted_as_benign_rate']:.6f} |"
+        )
+    lines.append("")
+
     lines.extend(
         [
             "## Output artifacts",
             "",
-            "- `models/`: one state dictionary per architecture/head (eight total).",
+            "- `models/`: packaged state, architecture kwargs, and dimensions per architecture/head.",
             "- `metrics/`: JSON metrics and validation/test text classification reports.",
             "- `predictions/`: aligned labels, hard predictions, full probability matrices, and class names.",
             "- `plots/`: test confusion-matrix images for both heads.",
@@ -800,8 +925,9 @@ def write_markdown_report(
             "- `classifier_metrics_summary.csv`: aggregate validation/test metrics.",
             "- `per_class_metrics.csv`: precision, recall, F1, and support for both heads.",
             "- `confusion_matrices.json`: numeric validation/test matrices for both heads.",
+            "- `dos_ddos_error_audit.csv`: normalized DoS/DDoS and DoS-subtype error rates.",
             "- `label_encoders.json`: exact label-to-ID mappings used by training.",
-            "- `effective_number_weights.json`: training counts, beta, formula, and exact weights used.",
+            "- `class_weights.json`: training counts, method, formula, and exact weights used.",
             "- `classifier_run_manifest.json`: configuration and provenance.",
             "- `logs/training.log`: timestamped training log.",
             "",
@@ -838,6 +964,7 @@ def main() -> None:
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
         early_stopping_patience=args.patience,
+        class_weighting=args.class_weighting,
     )
 
     data = load_data(processed_dir, args)
@@ -849,8 +976,8 @@ def main() -> None:
     weight_counts: dict[str, dict[str, int]] = {}
     for task in TASKS:
         labels = data[f"y_{task.name}_train"]
-        weights[task.name], weight_maps[task.name] = effective_number_class_weights(
-            labels, task.num_classes
+        weights[task.name], weight_maps[task.name] = class_weights_for_labels(
+            labels, task.num_classes, args.class_weighting
         )
         counts = np.bincount(labels, minlength=task.num_classes)
         weight_counts[task.name] = {
@@ -858,10 +985,14 @@ def main() -> None:
             for index, count in enumerate(counts)
         }
 
-    effective_weight_payload = {
-        "method": "class-balanced loss based on effective number of samples",
-        "beta": EFFECTIVE_NUMBER_BETA,
-        "formula": "(1 - beta) / (1 - beta ** class_count)",
+    class_weight_payload = {
+        "method": args.class_weighting,
+        "beta": EFFECTIVE_NUMBER_BETA if args.class_weighting == "effective" else None,
+        "formula": {
+            "balanced": "n_samples / (n_classes * class_count)",
+            "effective": "(1 - beta) / (1 - beta ** class_count)",
+            "none": "1",
+        }[args.class_weighting],
         "normalization": None,
         "heads": {
             task.name: {
@@ -874,8 +1005,8 @@ def main() -> None:
             for task in TASKS
         },
     }
-    (output_dir / "effective_number_weights.json").write_text(
-        json.dumps(effective_weight_payload, indent=2) + "\n",
+    (output_dir / "class_weights.json").write_text(
+        json.dumps(class_weight_payload, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -889,8 +1020,8 @@ def main() -> None:
         data["x_test"].shape,
     )
     logger.info(
-        "Training-only effective-number weights (beta=%s): %s",
-        EFFECTIVE_NUMBER_BETA,
+        "Training-only %s class weights: %s",
+        args.class_weighting,
         weight_maps,
     )
 
@@ -920,6 +1051,8 @@ def main() -> None:
 
     write_csv(output_dir / "classifier_metrics_summary.csv", summary_rows(results))
     write_csv(output_dir / "per_class_metrics.csv", per_class_rows(results))
+    dos_ddos_rows = dos_ddos_audit_rows(results, data)
+    write_csv(output_dir / "dos_ddos_error_audit.csv", dos_ddos_rows)
     confusion_payload = {
         f"{result['model']}_{result['task']}": {
             "class_names": result["class_names"],
@@ -942,6 +1075,7 @@ def main() -> None:
         device,
         started_at,
         finished_at,
+        dos_ddos_rows,
     )
     manifest = {
         "started_at_utc": started_at,
@@ -973,11 +1107,12 @@ def main() -> None:
             "val": args.limit_val,
             "test": args.limit_test,
         },
-        "training_only_effective_number_weights": weight_maps,
-        "class_weight_method": "Cui et al. effective number of samples",
-        "class_weight_formula": "(1 - beta) / (1 - beta ** class_count)",
-        "class_weight_beta": EFFECTIVE_NUMBER_BETA,
+        "training_only_class_weights": weight_maps,
+        "class_weight_method": args.class_weighting,
+        "class_weight_formula": class_weight_payload["formula"],
+        "class_weight_beta": class_weight_payload["beta"],
         "class_weight_normalization": None,
+        "model_kwargs": {model: model_kwargs(model) for model in models},
         "run_config": asdict(config),
         "device": str(device),
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,

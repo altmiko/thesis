@@ -25,3 +25,4 @@ outputs/*
 .claude/
 .vscode
 data.zip
+hostspace/ConCap

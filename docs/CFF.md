@@ -449,7 +449,7 @@ data/processed/CICIDS_2017_Distrinet/preprocessing_manifest.json
 data/processed/CICIDS_2017_Distrinet/label_encoders.json
 ```
 
-`X_train.npy` has shape `(1,456,264, 79)` and dtype `float32`. It is the exact model-ready `RobustScaler` representation produced by `scripts/preprocess_cicids2017_distrinet.py`; the scaler was fitted on all 1,456,264 training rows only. The preprocessing pipeline performs a chronological 70/15/15 split independently within each mapped category before fitting the scaler. CFF does not open CICIDS validation/test matrices, labels, Parquet files, timestamps, or metadata.
+`X_train.npy` has shape `(1,456,265, 79)` and dtype `float32`. It is the exact model-ready `RobustScaler` representation produced by `scripts/preprocess_cicids2017_distrinet.py`; the scaler was fitted on all 1,456,265 training rows only. The preprocessing pipeline performs a chronological 70/15/15 split independently within each retained source attack label before fitting the scaler. CFF does not open CICIDS validation/test matrices, labels, Parquet files, timestamps, or metadata.
 
 The 79-feature order is loaded from `preprocessing_manifest.json::modelling_feature_names`, not copied into the CFF source. `label_encoders.json::category` supplies the configured class order:
 
@@ -489,21 +489,21 @@ C:/Users/user6/.local/share/mamba/envs/thesis/python.exe -m src.preprocessing.co
   --output-dir outputs/cff_cicids2017distrinet
 ```
 
-The corrected full run completed in **132.33 seconds** of CFF runtime and **133.54 seconds** end-to-end while the CICIoT run was executing concurrently. It produced 316 class-feature rows and 16 masks:
+The corrected-source-split run completed in **53.89 seconds** of CFF runtime and produced 316 class-feature rows and 16 masks:
 
 | Class | Training rows | Sampled | Constant | Near-constant | Span-degenerate | Eligible | Top-25% |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| DoS | 120,091 | 20,000 | 11 | 0 | 27 | 52 | 13 |
+| DoS | 120,093 | 20,000 | 11 | 0 | 27 | 52 | 13 |
 | DDoS | 66,568 | 20,000 | 22 | 3 | 36 | 43 | 11 |
 | Recon | 111,311 | 20,000 | 16 | 41 | 70 | 8 | 2 |
-| BruteForce | 4,863 | 4,863 | 20 | 5 | 35 | 44 | 11 |
+| BruteForce | 4,862 | 4,862 | 20 | 5 | 35 | 44 | 11 |
 
 Corrected top-25% selections:
 
-- **DoS:** Bwd IAT Min, Src Port, Fwd IAT Min, Bwd Bulk Rate Avg, Flow IAT Min, FIN Flag Count, Bwd IAT Std, Bwd IAT Mean, ACK Flag Count, Subflow Fwd Bytes, Bwd IAT Total, RST Flag Count, Down/Up Ratio.
+- **DoS:** Bwd IAT Min, Src Port, Fwd IAT Min, Bwd Bulk Rate Avg, FIN Flag Count, Flow IAT Min, ACK Flag Count, RST Flag Count, Subflow Fwd Bytes, Fwd Packet Length Std, Fwd Packet Length Max, Down/Up Ratio, Bwd Packet Length Std.
 - **DDoS:** Bwd IAT Min, Src Port, Fwd IAT Min, Bwd Bulk Rate Avg, Flow IAT Min, FIN Flag Count, Bwd IAT Mean, Bwd IAT Total, Bwd IAT Std, Flow Bytes/s, Flow IAT Std.
 - **Recon:** Src Port, Fwd Packets/s.
-- **BruteForce:** Fwd IAT Min, Bwd IAT Min, Src Port, Flow IAT Min, Down/Up Ratio, Fwd IAT Max, Fwd IAT Total, Flow Duration, Bwd IAT Total, Fwd IAT Std, Bwd IAT Std.
+- **BruteForce:** Fwd IAT Min, Bwd IAT Min, Src Port, Flow IAT Min, Fwd IAT Max, Down/Up Ratio, Fwd IAT Std, Flow Duration, Fwd IAT Total, Bwd IAT Total, Bwd IAT Std.
 
 The corrected run removes the broad flat-one artifact from locally collapsed features: span-degenerate rows are scored zero without fitting. A few eligible heavy-tailed timing features still have high normalized MAE; their class spans are comparable to pooled spans, so those are estimator/data diagnostics rather than small-denominator cases.
 

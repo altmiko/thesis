@@ -46,6 +46,44 @@ def test_lstm_uses_final_state_from_both_directions():
     assert torch.allclose(actual_features, expected_features)
 
 
+def test_lstm_feature_sequence_mode_accepts_only_tabular_schema_vectors():
+    model = LSTMOnly(
+        num_features=7,
+        num_classes=3,
+        hidden_dim=5,
+        fc_dim=4,
+        dropout=0.0,
+        feature_sequence=True,
+        feature_embedding_dim=6,
+        input_transform="asinh",
+    )
+    model.eval()
+
+    logits = model(torch.randn(2, 7))
+
+    assert logits.shape == (2, 3)
+    assert torch.isfinite(logits).all()
+    with pytest.raises(ValueError, match="feature-sequence mode"):
+        model(torch.randn(2, 4, 7))
+
+
+def test_cnn_multi_bin_pool_preserves_output_contract():
+    model = CNNOnly(
+        num_features=11,
+        num_classes=3,
+        conv_channels=(4, 5),
+        fc_dim=7,
+        pool_size=4,
+        input_transform="asinh",
+    )
+    model.eval()
+
+    logits, features = model(torch.randn(2, 11), return_features=True)
+
+    assert logits.shape == (2, 3)
+    assert features.shape == (2, 7)
+    assert model.fc[0].in_features == 20
+
 def test_serial_cnn_lstm_uses_final_state_from_both_directions():
     model = SerialCNNLSTM(
         num_features=7,

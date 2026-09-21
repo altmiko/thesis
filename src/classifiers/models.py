@@ -18,6 +18,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, Union
 
+def _transform_input(x: torch.Tensor, transform: str | None) -> torch.Tensor:
+    """Apply an optional monotonic stabilization to heavy-tailed tabular inputs."""
+    if transform is None:
+        return x
+    if transform == "asinh":
+        return torch.asinh(x)
+    raise ValueError(f"unsupported input transform: {transform}")
+
+
 
 class SimpleMLP(nn.Module):
     """
@@ -36,7 +45,8 @@ class SimpleMLP(nn.Module):
         num_features: int,
         num_classes: int,
         hidden_dims: Tuple[int, ...] = (128, 64),
-        dropout: float = 0.3
+        dropout: float = 0.3,
+        input_transform: str | None = None,
     ):
         """
         Initialize the MLP.
@@ -46,11 +56,14 @@ class SimpleMLP(nn.Module):
             num_classes: Number of output classes
             hidden_dims: Tuple of hidden layer dimensions
             dropout: Dropout probability
+            input_transform: Optional monotonic input transform (currently ``"asinh"``)
         """
         super().__init__()
 
         self.num_features = num_features
         self.num_classes = num_classes
+        self.input_transform = input_transform
+        _transform_input(torch.zeros(1), input_transform)
 
         layers = []
         in_dim = num_features
@@ -82,7 +95,7 @@ class SimpleMLP(nn.Module):
                 f"got {tuple(x.shape)}"
             )
 
-        h = self.features(x)
+        h = self.features(_transform_input(x, self.input_transform))
         return self.classifier(h)
 
 
@@ -93,11 +106,11 @@ class CNNOnly(nn.Module):
     Architecture:
         Input (batch, num_features) → Reshape to (batch, 1, num_features)
         → Conv1d(1→32, k=3) → ReLU → Conv1d(32→64, k=3) → ReLU
-        → AdaptiveMaxPool → Flatten → Dense(64) → ReLU → Dropout
+        → AdaptiveMaxPool(pool_size) → Flatten → Dense(64) → ReLU → Dropout
         → Dense(num_classes)
 
-    The 1D convolution treats features as a 1D "signal" to capture
-    local patterns between adjacent features.
+    Pool sizes above one preserve coarse feature position; ``pool_size=1``
+    retains the compact legacy baseline.
 
     Input shape: (batch, num_features)
     Output shape: (batch, num_classes) - logits
@@ -110,7 +123,9 @@ class CNNOnly(nn.Module):
         conv_channels: Tuple[int, int] = (32, 64),
         kernel_size: int = 3,
         fc_dim: int = 64,
-        dropout: float = 0.3
+        dropout: float = 0.3,
+        pool_size: int = 1,
+        input_transform: str | None = None,
     ):
         """
         Initialize the CNN.
@@ -122,11 +137,18 @@ class CNNOnly(nn.Module):
             kernel_size: Convolution kernel size
             fc_dim: Fully connected layer dimension
             dropout: Dropout probability
+            pool_size: Number of position-preserving adaptive pooling bins
+            input_transform: Optional monotonic input transform (currently ``"asinh"``)
         """
         super().__init__()
 
         self.num_features = num_features
         self.num_classes = num_classes
+        if pool_size < 1:
+            raise ValueError(f"pool_size must be >= 1, got {pool_size}")
+        self.pool_size = pool_size
+        self.input_transform = input_transform
+        _transform_input(torch.zeros(1), input_transform)
 
         # ``same`` preserves feature positions for both odd and even kernels.
         # The old kernel_size // 2 padding silently added one position for an
@@ -144,12 +166,12 @@ class CNNOnly(nn.Module):
             padding="same"
         )
 
-        # Pooling to fixed size
-        self.pool = nn.AdaptiveMaxPool1d(1)
+        # More than one bin preserves coarse feature position instead of
+        # collapsing every learned channel to a single orderless maximum.
+        self.pool = nn.AdaptiveMaxPool1d(pool_size)
 
-        # Fully connected layers
         self.fc = nn.Sequential(
-            nn.Linear(conv_channels[1], fc_dim),
+            nn.Linear(conv_channels[1] * pool_size, fc_dim),
             nn.ReLU(),
             nn.Dropout(dropout)
         )
@@ -182,14 +204,14 @@ class CNNOnly(nn.Module):
             )
 
         # Reshape for 1D conv: (batch, num_features) → (batch, 1, num_features)
-        x = x.unsqueeze(1)
+        x = _transform_input(x, self.input_transform).unsqueeze(1)
 
         # Convolutional layers
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
 
         # Pooling
-        x = self.pool(x).squeeze(-1)
+        x = self.pool(x).flatten(1)
 
         # FC layers
         features = self.fc(x)
@@ -202,17 +224,15 @@ class CNNOnly(nn.Module):
 
 class LSTMOnly(nn.Module):
     """
-    LSTM/BiLSTM for learning temporal patterns.
+    LSTM/BiLSTM baseline with explicit tabular and temporal modes.
 
-    For tabular data, we treat the feature vector as a sequence of length 1.
-    This is designed to be flexible for future extension to true sequences.
+    The legacy mode treats a tabular vector as one recurrent timestep and also
+    accepts true ``(batch, sequence, features)`` inputs. Feature-sequence mode
+    instead projects each scalar feature, adds a learned feature-identity
+    embedding, and recurrently integrates the fixed schema positions.
 
-    Architecture:
-        Input (batch, num_features) → Reshape to (batch, 1, num_features)
-        → BiLSTM(hidden=64) → Take last hidden state
-        → Dense(64) → ReLU → Dropout → Dense(num_classes)
-
-    Input shape: (batch, num_features) or (batch, seq_len, num_features)
+    Input shape: (batch, num_features), or in legacy mode
+    (batch, seq_len, num_features)
     Output shape: (batch, num_classes) - logits
     """
 
@@ -224,7 +244,10 @@ class LSTMOnly(nn.Module):
         num_layers: int = 1,
         bidirectional: bool = True,
         fc_dim: int = 64,
-        dropout: float = 0.3
+        dropout: float = 0.3,
+        feature_sequence: bool = False,
+        feature_embedding_dim: int = 16,
+        input_transform: str | None = None,
     ):
         """
         Initialize the LSTM.
@@ -237,6 +260,9 @@ class LSTMOnly(nn.Module):
             bidirectional: Whether to use bidirectional LSTM
             fc_dim: Fully connected layer dimension
             dropout: Dropout probability
+            feature_sequence: Treat scalar schema features as embedded sequence tokens
+            feature_embedding_dim: Token width used by feature-sequence mode
+            input_transform: Optional monotonic input transform (currently ``"asinh"``)
         """
         super().__init__()
 
@@ -244,9 +270,25 @@ class LSTMOnly(nn.Module):
         self.num_classes = num_classes
         self.hidden_dim = hidden_dim
         self.bidirectional = bidirectional
+        self.feature_sequence = feature_sequence
+        self.input_transform = input_transform
+        _transform_input(torch.zeros(1), input_transform)
+        if feature_sequence:
+            if feature_embedding_dim < 1:
+                raise ValueError(
+                    f"feature_embedding_dim must be >= 1, got {feature_embedding_dim}"
+                )
+            self.value_projection = nn.Linear(1, feature_embedding_dim)
+            self.feature_embedding = nn.Parameter(
+                torch.empty(num_features, feature_embedding_dim)
+            )
+            nn.init.normal_(self.feature_embedding, mean=0.0, std=0.02)
+            lstm_input_size = feature_embedding_dim
+        else:
+            lstm_input_size = num_features
 
         self.lstm = nn.LSTM(
-            input_size=num_features,
+            input_size=lstm_input_size,
             hidden_size=hidden_dim,
             num_layers=num_layers,
             batch_first=True,
@@ -284,7 +326,16 @@ class LSTMOnly(nn.Module):
             If return_features=False: logits of shape (batch, num_classes)
             If return_features=True: (logits, features) where features is (batch, fc_dim)
         """
-        if x.dim() == 2:
+        x = _transform_input(x, self.input_transform)
+        if self.feature_sequence:
+            if x.dim() != 2 or x.size(1) != self.num_features:
+                raise ValueError(
+                    "LSTMOnly feature-sequence mode expects input shape "
+                    f"(batch, {self.num_features}), got {tuple(x.shape)}"
+                )
+            x = self.value_projection(x.unsqueeze(-1))
+            x = x + self.feature_embedding.unsqueeze(0)
+        elif x.dim() == 2:
             if x.size(1) != self.num_features:
                 raise ValueError(
                     f"LSTMOnly expects {self.num_features} input features, "
@@ -302,7 +353,6 @@ class LSTMOnly(nn.Module):
                 "LSTMOnly expects input shape (batch, features) or "
                 f"(batch, sequence, {self.num_features}), got {tuple(x.shape)}"
             )
-
         # h_n contains the final state for the last recurrent layer.  For a
         # bidirectional LSTM, the backward state at output[:, -1] has only
         # seen the final timestep; use both final directional states instead.
@@ -342,7 +392,8 @@ class SerialCNNLSTM(nn.Module):
         kernel_size: int = 3,
         lstm_hidden: int = 64,
         fc_dim: int = 64,
-        dropout: float = 0.3
+        dropout: float = 0.3,
+        input_transform: str | None = None,
     ):
         """
         Initialize the Serial CNN-LSTM.
@@ -355,12 +406,15 @@ class SerialCNNLSTM(nn.Module):
             lstm_hidden: LSTM hidden dimension
             fc_dim: Fully connected layer dimension
             dropout: Dropout probability
+            input_transform: Optional monotonic input transform (currently ``"asinh"``)
         """
         super().__init__()
 
         self.num_features = num_features
         self.num_classes = num_classes
 
+        self.input_transform = input_transform
+        _transform_input(torch.zeros(1), input_transform)
         # CNN layers
         self.conv1 = nn.Conv1d(1, conv_channels[0], kernel_size, padding="same")
         self.conv2 = nn.Conv1d(
@@ -411,7 +465,7 @@ class SerialCNNLSTM(nn.Module):
             )
 
         # CNN forward
-        x = x.unsqueeze(1)
+        x = _transform_input(x, self.input_transform).unsqueeze(1)
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
 

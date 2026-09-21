@@ -101,14 +101,19 @@ def class_names_for_task(processed_dir: Path, task: TaskConfig) -> List[str]:
     return [str(name) for name in names]
 
 
-def build_model(model_type: str, num_features: int, num_classes: int) -> torch.nn.Module:
-    kwargs = {}
-    if model_type == "mlp":
+def build_model(
+    model_type: str,
+    num_features: int,
+    num_classes: int,
+    model_kwargs: Dict[str, object] | None = None,
+) -> torch.nn.Module:
+    kwargs = dict(model_kwargs or {})
+    if model_type == "mlp" and "hidden_dims" not in kwargs:
         kwargs["hidden_dims"] = (256, 128, 64)
     return get_model(model_type, num_features=num_features, num_classes=num_classes, **kwargs)
 
 
-def load_state_dict(path: Path, device: torch.device) -> Dict[str, torch.Tensor]:
+def load_checkpoint(path: Path, device: torch.device) -> object:
     try:
         return torch.load(path, map_location=device, weights_only=True)
     except TypeError:
@@ -127,8 +132,19 @@ def load_model(
     if not model_path.exists():
         raise FileNotFoundError(f"Missing checkpoint: {model_path.resolve()}")
 
-    model = build_model(model_type, num_features=num_features, num_classes=task.num_classes)
-    state_dict = load_state_dict(model_path, device)
+    checkpoint = load_checkpoint(model_path, device)
+    if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+        state_dict = checkpoint["state_dict"]
+        model_kwargs = checkpoint.get("model_kwargs", {})
+    else:
+        state_dict = checkpoint
+        model_kwargs = {}
+    model = build_model(
+        model_type,
+        num_features=num_features,
+        num_classes=task.num_classes,
+        model_kwargs=model_kwargs,
+    )
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()

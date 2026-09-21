@@ -13,7 +13,7 @@ under `data/raw/CICIDS_2017_Distrinet/`. It is not the original eight-file CIC
 row counts, and CICFlowMeter behavior. Consequently, the five corrected files are
 processed directly by:
 
-- [`scripts/preprocess_cicids2017_distrinet.py`](../scripts/preprocess_cicids2017_distrinet.py)
+- [`scripts/preprocess_cicids2017_distrinet.py`](../../../scripts/preprocess_cicids2017_distrinet.py)
 
 They are **not** passed through `scripts/merge_cicids2017.py`, which explicitly
 hard-codes the eight original TrafficLabelling files.
@@ -21,8 +21,8 @@ hard-codes the eight original TrafficLabelling files.
 The final method is:
 
 > **A leakage-controlled within-campaign split using chronological partitions within
-> each mapped category, exact-duplicate removal, and training-only estimation of
-> preprocessing statistics.**
+> each retained source attack label, exact-duplicate removal, and training-only
+> estimation of preprocessing statistics.**
 
 The end-to-end pipeline is:
 
@@ -34,20 +34,21 @@ five corrected DistriNet CSVs
 → discard unsupported categories before split construction
 → canonical float32 conversion
 → global exact duplicate removal on modelling features + category label
-→ chronological 70/15/15 split independently inside each mapped category
+→ chronological 70/15/15 split independently inside each retained source label
 → encode binary and five-category targets
 → fit RobustScaler and class weights on training only
 → transform validation and test with the fitted scaler
 → save Parquet datasets, NumPy matrices, encoders, scaler, weights, and audit reports
-→ assert category coverage, within-category chronology, and split disjointness
+→ assert source-label coverage, within-source chronology, and split disjointness
 ```
 
-This is a **closed-set two-head classification dataset**: every retained category
-appears in train, validation, and test. It intentionally does not evaluate independent
-future attack-family or attack-campaign generalization. CIC-IDS-2017 usually contains
-only one capture window/tool invocation for a given attack family; therefore category
-partitions remain chronological segments of the same campaigns. The split is
-leakage-controlled, not completely leakage-free.
+This is a **closed-set two-head classification dataset**: every retained source
+attack label, and therefore every mapped category, appears in train, validation,
+and test. It intentionally does not evaluate independent future attack-family or
+attack-campaign generalization. CIC-IDS-2017 usually contains only one capture
+window/tool invocation for a given source attack label; therefore partitions remain
+chronological segments of the same campaigns. The split is leakage-controlled, not
+completely leakage-free.
 
 ---
 
@@ -427,9 +428,11 @@ heterogeneity:
 | Idle Mean | 0 | 19,250,850 | 68,883,810 | 115,626,300 | 119,999,735 |
 
 This supports a median/IQR-based `RobustScaler` rather than mean/variance scaling.
-No winsorization is applied: it would require a learned threshold, could hide rare
-attack behavior, and is unnecessary for the robust scaler. The pristine raw-unit
-matrices are retained for validity checks.
+No winsorization is applied: it would require a learned threshold and could hide
+rare attack behavior. The pristine raw-unit matrices are retained for validity
+checks. Some zero-IQR columns still produced scaled magnitudes as high as
+`7.48e8`; the classifier runner therefore applies a differentiable, monotonic
+`asinh` stabilization inside each DistriNet model before its first learned layer.
 
 ### 5.10 Class imbalance and rare classes
 
@@ -518,36 +521,39 @@ is lost.
 
 ---
 
-## 7. Why the split is chronological within each class
+## 7. Why the split is chronological within each source attack label
 
 ### 7.1 Rejected whole-day split
 
 A strict Mon–Wed train, Thursday validation, Friday test design isolates days and
 attack campaigns, but it puts different attack families into different partitions.
-The classifier would never see Bot, PortScan, DDoS, web attacks, or Infiltration in
-training. That measures open-set temporal generalization rather than robustness to
-adversarial perturbations of attacks represented during training.
+That measures open-set temporal generalization rather than closed-set classification
+of attacks represented during training.
 
 ### 7.2 Rejected random split
 
 A random stratified row split would distribute temporally adjacent flows from the
-same attack invocation into every partition. It would satisfy class coverage but
-ignore time and create a stronger within-campaign similarity risk.
+same attack invocation into every partition. It would satisfy source-label coverage
+but ignore time and create a stronger within-campaign similarity risk.
 
 ### 7.3 Chosen protocol
 
-For each mapped category independently:
+For each retained source attack label independently:
 
-1. select all rows with that category;
+1. select all rows with that source label;
 2. retain timestamp-ascending order from the globally sorted merged data;
 3. break equal timestamps with day order and source row;
 4. allocate approximately 70% train, 15% validation, and 15% test;
 5. use deterministic largest-remainder apportionment;
 6. require at least one row per partition;
-7. concatenate all per-category train, validation, and test blocks.
+7. concatenate all source-label train, validation, and test blocks.
 
-No random shuffle occurs before membership assignment. Training may later be
-shuffled by a seeded data loader without changing membership.
+The source-label boundary matters for the five-category closed-set target. The
+former category-only split placed all 7,562 `DoS GoldenEye` rows in test while
+placing none in train or validation, so weak classifiers rejected an unseen attack
+subtype as Benign. Source-label splitting preserves chronology without creating that
+accidental open-set test. No random shuffle occurs before membership assignment.
+Training may later be shuffled by a seeded data loader without changing membership.
 
 ---
 
@@ -556,33 +562,47 @@ shuffled by a seeded data loader without changing membership.
 | Category | Total | Train | Validation | Test |
 |---|---:|---:|---:|---:|
 | Benign | 1,647,759 | 1,153,431 | 247,164 | 247,164 |
-| DoS | 171,559 | 120,091 | 25,734 | 25,734 |
+| DoS | 171,559 | 120,093 | 25,733 | 25,733 |
 | DDoS | 95,098 | 66,568 | 14,265 | 14,265 |
 | Recon | 159,016 | 111,311 | 23,853 | 23,852 |
-| BruteForce | 6,947 | 4,863 | 1,042 | 1,042 |
-| **Total** | **2,080,379** | **1,456,264** | **312,058** | **312,057** |
+| BruteForce | 6,947 | 4,862 | 1,043 | 1,042 |
+| **Total** | **2,080,379** | **1,456,265** | **312,058** | **312,056** |
 
-Every retained category occurs in every split. Exact percentages are stored in
-`class_distribution.csv`.
+### 8.1 Source-label coverage
 
-### 8.1 Minority-class handling
+| Source label | Category | Train | Validation | Test |
+|---|---|---:|---:|---:|
+| BENIGN | Benign | 1,153,431 | 247,164 | 247,164 |
+| DoS Hulk | DoS | 110,797 | 23,742 | 23,742 |
+| DoS GoldenEye | DoS | 5,294 | 1,134 | 1,134 |
+| DoS slowloris | DoS | 2,782 | 596 | 596 |
+| DoS Slowhttptest | DoS | 1,220 | 261 | 261 |
+| DDoS | DDoS | 66,568 | 14,265 | 14,265 |
+| PortScan | Recon | 111,311 | 23,853 | 23,852 |
+| FTP-Patator | BruteForce | 2,778 | 596 | 595 |
+| SSH-Patator | BruteForce | 2,084 | 447 | 447 |
+
+Every retained category and source attack label occurs in every split. Exact
+allocations are stored in `class_distribution.csv` and
+`source_label_distribution.csv`.
+
+### 8.2 Minority-class handling
 
 BruteForce is the smallest retained category. Rows are not oversampled or duplicated.
-The classifier runner computes Cui et al. class-balanced weights from training counts
-using the effective-number formula
-`(1 - beta) / (1 - beta ** class_count)` with `beta=0.999`.
+The classifier runner uses train-only inverse-frequency weights by default:
+`n_samples / (n_classes * class_count)`. The former effective-number setting with
+`beta=0.999` saturated near `0.001` for every class and provided effectively no
+imbalance correction.
 
 ```text
-Benign     0.001000000047
-DoS        0.001000000047
-DDoS       0.001000000047
-Recon      0.001000000047
-BruteForce 0.001007768326
+Category: Benign 0.252510, DoS 2.425229, DDoS 4.375270,
+          Recon 2.616570, BruteForce 59.903950
+Binary:   Benign 0.631275, Attack 2.404395
 ```
 
-The binary weights are Benign `0.001000000047` and Attack `0.001000000047`.
 The runner applies these weights to both heads' cross-entropy losses and records
-the exact counts and weights in `outputs/cicids2017distrinet/effective_number_weights.json`.
+the exact counts, method, formula, and weights in
+`outputs/cicids2017distrinet/class_weights.json`.
 
 ---
 
@@ -597,9 +617,9 @@ category: Benign → 0; DoS → 1; DDoS → 2; Recon → 3; BruteForce → 4
 
 | Split | Benign | Attack | Total |
 |---|---:|---:|---:|
-| Train | 1,153,431 | 302,833 | 1,456,264 |
+| Train | 1,153,431 | 302,834 | 1,456,265 |
 | Validation | 247,164 | 64,894 | 312,058 |
-| Test | 247,164 | 64,893 | 312,057 |
+| Test | 247,164 | 64,892 | 312,056 |
 
 The Parquet files retain `original_label`, `source_label`, `category_label`, and
 `binary_label` for audit. No fine-grained target array or classifier head is emitted.
@@ -611,7 +631,7 @@ The Parquet files retain `original_label`, `source_label`, `category_label`, and
 After split membership is immutable:
 
 1. the 79-column pristine training matrix is materialized as float32;
-2. `RobustScaler` is fitted on the **1,456,264 training rows only**;
+2. `RobustScaler` is fitted on the **1,456,265 training rows only**;
 3. validation and test are transformed using the fitted training center/IQR;
 4. the scaler is persisted as `scaler.pkl`;
 5. scaled and pristine matrices are both saved.
@@ -645,16 +665,16 @@ Any later learned preprocessing must obey the same boundary:
 
 ## 11. Leakage and overlap audit
 
-### 11.1 Membership, class coverage, and chronology
+### 11.1 Membership, source-label coverage, and chronology
 
 The final run asserts:
 
 - split indices are disjoint and exhaustive;
 - canonical `sample_id` values do not cross splits;
-- every retained category occurs in train, validation, and test;
-- for every category, the latest train timestamp is not later than the earliest
+- every retained source attack label and mapped category occurs in all three splits;
+- for every source label, the latest train timestamp is not later than the earliest
   validation timestamp;
-- for every category, the earliest validation timestamp is not later than the
+- for every source label, the earliest validation timestamp is not later than the
   earliest test timestamp;
 - no exact feature-plus-category duplicate crosses partitions.
 
@@ -703,10 +723,10 @@ Artifacts:
 | `y_{train,val,test}_cat.npy` | five-category target IDs |
 | `y_{train,val,test}_bin.npy` | binary target IDs |
 | `label_encoders.json` | binary and category label-to-ID mappings |
-| `class_weights_2.npy`, `class_weights_5.npy` | preprocessing-era inverse-frequency reference; not consumed by the classifier runner |
+| `class_weights_2.npy`, `class_weights_5.npy` | train-only inverse-frequency reference weights; the runner recomputes the same formula from training labels |
 | `timestamp_epoch_seconds_{split}.npy` | aligned Unix seconds, excluded from `X` |
-| `scaler.pkl` | train-fitted `RobustScaler` |
 | `class_distribution.csv` | category counts and split shares |
+| `source_label_distribution.csv` | source attack-label counts and split shares |
 | `duplicate_audit.json` | duplicate definition and counts |
 | `leakage_audit.json` | chronology, coverage, identity/feature overlap, conflict example |
 | `preprocessing_manifest.json` | input hashes, schema, feature order, mappings, policies, reports, and fit provenance |
@@ -714,9 +734,9 @@ Artifacts:
 Final shapes:
 
 ```text
-X_train: (1,456,264, 79)
+X_train: (1,456,265, 79)
 X_val:   (312,058, 79)
-X_test:  (312,057, 79)
+X_test:  (312,056, 79)
 ```
 
 The Parquet and NumPy row counts, category targets, binary targets, and timestamps
@@ -737,17 +757,66 @@ Verified conditions:
 - correct Unix-second conversion independent of pandas datetime storage resolution;
 - complete row-count reconciliation;
 - exact global float32-feature-plus-category deduplication;
-- chronological category partitioning;
-- every category present in every split;
+- chronological partitioning within each retained source attack label;
+- every source attack label and mapped category present in every split;
 - zero shared sample IDs;
 - zero feature-plus-category overlap;
 - recorded feature-only label conflict;
 - finite, non-negative pristine matrices;
 - finite scaled matrices;
 - aligned Parquet/NumPy targets and timestamps;
-- train-only scaler fit count of 1,456,264;
+- train-only scaler fit count of 1,456,265;
 - scaler inverse-transform recovery within float32 tolerance;
 - SHA-256 hashes for all five inputs in the production manifest.
+
+### 13.1 Regenerated classifier and confusion-matrix audit
+
+After correcting the split boundary, all four architectures were retrained for both
+the binary and five-category heads. All eight checkpoints, prediction files, numeric
+confusion matrices, and PNG confusion plots were regenerated from the corrected
+312,056-row test split.
+
+| Category model | Accuracy | Balanced accuracy | Macro F1 | DoS recall | DDoS recall |
+|---|---:|---:|---:|---:|---:|
+| SimpleMLP | 98.448% | 99.031% | 97.725% | 99.417% | 99.846% |
+| CNNOnly | 98.433% | 98.914% | 97.528% | 99.250% | 99.853% |
+| LSTMOnly | 98.387% | 98.696% | 97.241% | 98.306% | 99.853% |
+| SerialCNNLSTM | 98.426% | 98.907% | 97.622% | 99.339% | 99.853% |
+
+The corrected matrices do **not** show material DoS↔DDoS confusion:
+
+| Model | DoS correct / 25,733 | DoS→DDoS | DoS→Benign | DDoS correct / 14,265 | DDoS→DoS | DDoS→Benign |
+|---|---:|---:|---:|---:|---:|---:|
+| SimpleMLP | 25,583 | 0 | 150 | 14,243 | 0 | 12 |
+| CNNOnly | 25,540 | 0 | 193 | 14,244 | 0 | 21 |
+| LSTMOnly | 25,297 | 1 | 435 | 14,244 | 0 | 21 |
+| SerialCNNLSTM | 25,563 | 0 | 170 | 14,244 | 0 | 9 |
+
+The strongest category checkpoint, SimpleMLP, produced:
+
+| True \ Predicted | Benign | DoS | DDoS | Recon | BruteForce |
+|---|---:|---:|---:|---:|---:|
+| Benign | 242,593 | 53 | 2 | 4,515 | 1 |
+| DoS | 150 | 25,583 | 0 | 0 | 0 |
+| DDoS | 12 | 0 | 14,243 | 10 | 0 |
+| Recon | 64 | 0 | 17 | 23,771 | 0 |
+| BruteForce | 18 | 0 | 0 | 2 | 1,022 |
+
+The remaining DoS weakness is subtype-specific rather than DoS/DDoS confusion.
+`DoS Slowhttptest` recall ranges from 32.57% to 57.85%, with most misses predicted
+as Benign. By contrast, `DoS GoldenEye` recall is 99.56–100% after the subtype is
+represented in training.
+
+Artifacts:
+
+- numeric matrices: `outputs/cicids2017distrinet/confusion_matrices.json`;
+- plots: `outputs/cicids2017distrinet/plots/*_test_confusion.png`;
+- aligned predictions: `outputs/cicids2017distrinet/predictions/*_test_predictions.npz`;
+- normalized DoS/DDoS audit: `outputs/cicids2017distrinet/dos_ddos_error_audit.csv`;
+- consolidated report: `outputs/cicids2017distrinet/cicids2017_classifier_results.md`.
+
+Every packaged checkpoint was reloaded through its recorded architecture settings
+and produced finite logits with the expected output width.
 
 Run from the repository root:
 
@@ -766,26 +835,27 @@ A limited run can use `--max-rows-per-file`, but its manifest is marked
 ### 14.1 What the split controls
 
 - no random assignment before split construction;
-- chronological order within every mapped category;
+- chronological order within every retained source attack label;
 - deterministic tie-breaking;
 - global removal of identical category-labelled model samples;
 - disjoint source-record identities;
-- complete category coverage;
+- complete source-label and mapped-category coverage;
 - training-only learned preprocessing;
 - validation-only hyperparameter selection;
 - test isolation for final reporting.
 
 ### 14.2 What the split cannot control
 
-For most attack families, train, validation, and test samples remain segments of the
-same campaign, using the same attacker, victim, tool, service, and configuration.
-The split cannot create independent attack repetitions that CIC-IDS-2017 never
-captured. Tool-specific shortcuts and local network artifacts can therefore remain.
+For every retained source attack label, train, validation, and test remain
+chronological segments of the same campaign, using the same attacker, victim, tool,
+service, and configuration. The split cannot create independent attack repetitions
+that CIC-IDS-2017 never captured. Tool-specific shortcuts and local network
+artifacts can therefore remain.
 
 Appropriate wording:
 
-> **A leakage-controlled within-campaign chronological split for closed-set binary
-> and five-category classification.**
+> **A leakage-controlled, source-label-stratified within-campaign chronological
+> split for closed-set binary and five-category classification.**
 
 Inappropriate claims:
 
@@ -797,6 +867,11 @@ Inappropriate claims:
 
 A whole-day split can be reported as a separate open-set experiment, but it answers
 a different question and is not the primary adversarial-evasion split.
+
+Classifier validation and test difficulty also differ materially. For example, the
+SimpleMLP category checkpoint selected on validation reached 89.19% validation
+macro F1 but 97.73% test macro F1. The test score is therefore not evidence of
+stationary future-campaign performance.
 
 ### 14.3 DoS Hulk caveat
 

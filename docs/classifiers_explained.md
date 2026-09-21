@@ -236,10 +236,12 @@ convolutions and invalidates the interpretation of a trained checkpoint.
 Constructor defaults:
 
 ```text
-conv_channels = (32, 64)
-kernel_size  = 3
-fc_dim        = 64
-dropout       = 0.3
+conv_channels  = (32, 64)
+kernel_size    = 3
+fc_dim         = 64
+dropout        = 0.3
+pool_size      = 1
+input_transform = None
 ```
 
 For input `(B, F)`:
@@ -256,11 +258,11 @@ For input `(B, F)`:
 (B, 64, F)
   -> ReLU
 (B, 64, F)
-  -> AdaptiveMaxPool1d(1)
-(B, 64, 1)
-  -> squeeze last dimension
-(B, 64)
-  -> Linear(64, fc_dim)
+  -> AdaptiveMaxPool1d(pool_size)
+(B, 64, pool_size)
+  -> flatten
+(B, 64 * pool_size)
+  -> Linear(64 * pool_size, fc_dim)
 (B, fc_dim)
   -> ReLU -> Dropout(0.3)
 (B, fc_dim)
@@ -274,9 +276,9 @@ padding convention was one position too long for even kernels. The default
 kernel size is odd, but the implementation now has correct behavior for the
 full constructor range supported by PyTorch.
 
-The adaptive pool reduces every feature-position sequence to one maximum per
-channel. Consequently, the dense head always receives 64 values with default
-channels, regardless of feature count.
+The adaptive pool reduces every channel to `pool_size` position bins. The legacy
+default `pool_size=1` is compact but orderless after pooling. The DistriNet runner
+uses eight bins so the dense head retains coarse feature-location identity.
 
 ### 5.3 Feature extraction
 
@@ -325,43 +327,49 @@ because the returned representation includes dropout.
 
 ### 6.1 Purpose and input modes
 
-`LSTMOnly` is a sequence-compatible recurrent baseline. It has two input
-modes:
+`LSTMOnly` has three input interpretations:
 
-1. **Current tabular baseline:** `(B, F)` is converted to `(B, 1, F)`, so the
-   complete feature vector is one recurrent timestep.
-2. **True sequence mode:** `(B, T, F)` is passed directly, where `T` is a
-   sequence length and `F` is the feature width at every timestep.
+1. **Legacy/vector-timestep mode:** `(B, F)` is converted to `(B, 1, F)`.
+   This has only one recurrent timestep and therefore cannot learn recurrence
+   across features.
+2. **True sequence mode:** `(B, T, F)` is passed directly.
+3. **Feature-sequence mode:** each scalar in `(B, F)` is projected to a token,
+   receives a learned feature-identity embedding, and the fixed schema positions
+   become the recurrent sequence.
 
-For the current CICIoT2023 baseline arrays, `T=1`. Thus the model is not
-learning temporal dependencies between multiple observations in the baseline
-experiment. It is a sequence-compatible architecture that can accept future
-windows; it should not be described as exploiting temporal context unless
-actual `T > 1` sequences are supplied.
+The CICIDS2017-DistriNet runner uses feature-sequence mode. CICIoT2023 keeps the
+legacy checkpoint-compatible default. Only true sequence mode is temporal, and
+only when each timestep is a genuine observation rather than a schema position.
 
 ### 6.2 Architecture and defaults
 
 Constructor defaults:
 
 ```text
-hidden_dim   = 64
-num_layers   = 1
-bidirectional = True
-fc_dim       = 64
-dropout      = 0.3
+hidden_dim           = 64
+num_layers           = 1
+bidirectional        = True
+fc_dim               = 64
+dropout              = 0.3
+feature_sequence     = False
+feature_embedding_dim = 16
+input_transform      = None
 ```
 
-For 2D input, the shape path is:
+Legacy 2D input follows `(B, F) -> (B, 1, F)`. In feature-sequence mode:
 
 ```text
-(B, F) -> unsqueeze(1) -> (B, 1, F)
+(B, F) -> (B, F, 1) -> Linear(1, embedding_dim)
+       + learned feature embedding (F, embedding_dim)
+       -> (B, F, embedding_dim)
 ```
 
 The recurrent layer is:
 
 ```text
 LSTM(
-    input_size=F,
+    input_size=F,                 # legacy / true-sequence mode
+    # or feature_embedding_dim,   # feature-sequence mode
     hidden_size=64,
     num_layers=num_layers,
     batch_first=True,
@@ -733,80 +741,58 @@ The production split is unchanged by classifier training:
 
 | Split | Rows |
 |---|---:|
-| Train | 1,456,264 |
+| Train | 1,456,265 |
 | Validation | 312,058 |
-| Test | 312,057 |
+| Test | 312,056 |
 
 #### Architecture configurations
 
-All four architectures use the implementations in `src/classifiers/models.py`. The
-DistriNet runner changes only the input and output widths:
+The DistriNet runner records every non-default constructor option inside each
+checkpoint. All four models apply `asinh` to the already train-fitted scaled
+features before their first learned layer. This monotonic transform bounds the
+effect of zero-IQR RobustScaler columns whose observed magnitudes reached
+`7.48e8` in the training audit.
 
-| Model | DistriNet-specific configuration | Binary parameters | Category parameters |
-|---|---|---:|---:|
-| `SimpleMLP` | `num_features=79`, `hidden_dims=(256,128,64)` | 61,762 | 61,957 |
-| `CNNOnly` | `num_features=79`, constructor defaults | 10,626 | 10,821 |
-| `LSTMOnly` | `num_features=79`, constructor defaults | 82,626 | 82,821 |
-| `SerialCNNLSTM` | `num_features=79`, constructor defaults | 81,282 | 81,477 |
+| Model | DistriNet-specific configuration |
+|---|---|
+| `SimpleMLP` | `hidden_dims=(256,128,64)`, `input_transform="asinh"` |
+| `CNNOnly` | `pool_size=8`, `input_transform="asinh"` |
+| `LSTMOnly` | `feature_sequence=True`, `feature_embedding_dim=16`, `input_transform="asinh"` |
+| `SerialCNNLSTM` | `input_transform="asinh"` |
 
-The output-layer parameter difference is caused solely by changing the final
-width from 2 to 5. Convolutional, recurrent, dense-feature, and dropout
-settings are otherwise identical between heads.
+`pool_size=8` prevents the CNN from discarding all feature-location identity.
+Feature-sequence mode removes the LSTM's former one-timestep degeneracy. The
+serial architecture remains a feature-order baseline; it is not described as
+temporal traffic modeling.
 
-#### Effective-number class-balanced loss
+#### Train-only inverse-frequency loss weights
 
-Both heads use weighted softmax cross-entropy. The weight for class \(k\) is
-computed only from its training count \(n_k\):
+Both heads use weighted softmax cross-entropy. The default weight for class
+\(k\), computed only from the training labels, is:
 
 \[
-w_k = \frac{1-\beta}{1-\beta^{n_k}}, \qquad \beta=0.999.
+w_k = \frac{N}{K n_k},
 \]
 
-This is the class-balanced weighting proposed by Cui et al. in
-[*Class-Balanced Loss Based on Effective Number of Samples* (CVPR 2019)](https://openaccess.thecvf.com/content_CVPR_2019/html/Cui_Class-Balanced_Loss_Based_on_Effective_Number_of_Samples_CVPR_2019_paper.html).
-The runner uses the formula directly, without an extra sum-to-class-count
-normalization, and passes the resulting vector to:
-
-```python
-criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
-```
-
-The production training counts and float32 weights are:
+where \(N\) is the number of training rows, \(K\) is the number of classes, and
+\(n_k\) is the training count for class \(k\). The exact default weights are:
 
 | Head | Class | Training rows | Weight |
 |---|---|---:|---:|
-| Binary | Benign | 1,153,431 | 0.0010000000474974513 |
-| Binary | Attack | 302,833 | 0.0010000000474974513 |
-| Category | Benign | 1,153,431 | 0.0010000000474974513 |
-| Category | DoS | 120,091 | 0.0010000000474974513 |
-| Category | DDoS | 66,568 | 0.0010000000474974513 |
-| Category | Recon | 111,311 | 0.0010000000474974513 |
-| Category | BruteForce | 4,863 | 0.0010077683255076408 |
+| Binary | Benign | 1,153,431 | 0.631275 |
+| Binary | Attack | 302,834 | 2.404395 |
+| Category | Benign | 1,153,431 | 0.252510 |
+| Category | DoS | 120,093 | 2.425229 |
+| Category | DDoS | 66,568 | 4.375270 |
+| Category | Recon | 111,311 | 2.616570 |
+| Category | BruteForce | 4,862 | 59.903950 |
 
-Why the weights are nearly equal: the effective sample count is
-
-\[
-E_n = \frac{1-\beta^n}{1-\beta},
-\]
-
-whose upper limit is \(1/(1-\beta)\). At \(\beta=0.999\), that limit is
-1,000. Every DistriNet class has more than 4,800 training rows, so every class
-is already near the saturation region. BruteForce therefore receives only
-about \(1.0078\times\) the weight of the other categories even though its raw
-count is much smaller.
-
-This is correct for the configured beta; it is not equivalent to the former
-inverse-frequency weighting. Larger beta values shift the saturation scale:
-
-| Beta | Approximate saturation scale \(1/(1-\beta)\) |
-|---:|---:|
-| 0.999 | 1,000 |
-| 0.9999 | 10,000 |
-| 0.99999 | 100,000 |
-| 0.999999 | 1,000,000 |
-
-Beta is a loss hyperparameter. Any alternative must be selected with training
-and validation data only; test performance must not choose it.
+The former effective-number configuration used `beta=0.999`. Its saturation
+scale was only \(1/(1-\beta)=1,000\), below every class count, so all weights
+were approximately `0.001` and the loss was effectively unweighted. That
+explains the weak MLP/CNN minority recall; it was not DoS/DDoS pair confusion.
+The runner retains `effective` and `none` as explicit experiment options, but
+`balanced` is the default.
 
 #### Optimization and checkpoint selection
 
@@ -814,13 +800,13 @@ The production run uses:
 
 ```text
 seed                    = 42
-epochs                  = 5
+epochs                  = 10
 batch_size               = 2048
 optimizer                = Adam
 learning_rate            = 1e-3
 scheduler                = ReduceLROnPlateau(mode="max", patience=1, factor=0.5)
 gradient_clip_norm       = 5.0
-early_stopping_patience  = 2
+early_stopping_patience  = 3
 selection_metric         = validation macro-F1
 selection_tie_break      = validation loss
 device                   = CUDA
@@ -830,75 +816,71 @@ The test split is evaluated only after validation-based checkpoint selection.
 Each saved checkpoint is reloaded into its source architecture and exercised
 on held-out rows before the run is accepted.
 
-#### Current effective-number run
+#### Current corrected-split run
 
 Aggregate held-out results:
 
 | Head | Model | Accuracy | Balanced accuracy | Macro F1 | Weighted F1 |
 |---|---|---:|---:|---:|---:|
-| Binary | `SerialCNNLSTM` | 98.188% | 97.692% | 97.274% | 98.196% |
-| Binary | `LSTMOnly` | 92.671% | 89.165% | 88.939% | 92.692% |
-| Binary | `SimpleMLP` | 89.284% | 76.765% | 80.892% | 88.288% |
-| Binary | `CNNOnly` | 89.251% | 76.610% | 80.779% | 88.233% |
-| Category | `SerialCNNLSTM` | 98.773% | 97.407% | 97.832% | 98.772% |
-| Category | `LSTMOnly` | 91.864% | 83.587% | 84.438% | 91.677% |
-| Category | `CNNOnly` | 89.284% | 70.502% | 74.732% | 86.989% |
-| Category | `SimpleMLP` | 89.260% | 70.604% | 74.624% | 86.944% |
+| Binary | `SerialCNNLSTM` | 99.666% | 99.667% | 99.494% | 99.666% |
+| Binary | `CNNOnly` | 98.472% | 98.904% | 97.736% | 98.490% |
+| Binary | `LSTMOnly` | 98.423% | 98.812% | 97.662% | 98.441% |
+| Binary | `SimpleMLP` | 98.418% | 98.768% | 97.652% | 98.435% |
+| Category | `SimpleMLP` | 98.448% | 99.031% | 97.725% | 98.504% |
+| Category | `SerialCNNLSTM` | 98.426% | 98.907% | 97.622% | 98.483% |
+| Category | `CNNOnly` | 98.433% | 98.914% | 97.528% | 98.489% |
+| Category | `LSTMOnly` | 98.387% | 98.696% | 97.241% | 98.438% |
 
-Per-class results for the strongest model, `SerialCNNLSTM`:
+The corrected audit shows that direct DoS↔DDoS confusion is not the remaining
+problem. Across all four category models, only one DoS row is predicted as
+DDoS and no DDoS row is predicted as DoS. Test recall ranges from 98.306% to
+99.417% for DoS and from 99.846% to 99.853% for DDoS.
 
-| Head | Class | Support | Precision | Recall | F1 |
-|---|---|---:|---:|---:|---:|
-| Binary | Benign | 247,164 | 0.991653 | 0.985423 | 0.988528 |
-| Binary | Attack | 64,893 | 0.945776 | 0.968410 | 0.956959 |
-| Category | Benign | 247,164 | 0.991900 | 0.992839 | 0.992369 |
-| Category | DoS | 25,734 | 0.999121 | 0.928033 | 0.962266 |
-| Category | DDoS | 14,265 | 0.996154 | 0.998528 | 0.997339 |
-| Category | Recon | 23,852 | 0.931343 | 0.994130 | 0.961713 |
-| Category | BruteForce | 1,042 | 1.000000 | 0.956814 | 0.977930 |
+The strongest category checkpoint, `SimpleMLP`, has:
 
-`SerialCNNLSTM` test confusion matrices, with true classes in rows and predicted
-classes in columns:
-
-| Binary | Benign | Attack |
-|---|---:|---:|
-| Benign | 243,561 | 3,603 |
-| Attack | 2,050 | 62,843 |
-
-| Category | Benign | DoS | DDoS | Recon | BruteForce |
+| True \ Predicted | Benign | DoS | DDoS | Recon | BruteForce |
 |---|---:|---:|---:|---:|---:|
-| Benign | 245,394 | 21 | 1 | 1,748 | 0 |
-| DoS | 1,852 | 23,882 | 0 | 0 | 0 |
-| DDoS | 21 | 0 | 14,244 | 0 | 0 |
-| Recon | 86 | 0 | 54 | 23,712 | 0 |
-| BruteForce | 45 | 0 | 0 | 0 | 997 |
+| Benign | 242,593 | 53 | 2 | 4,515 | 1 |
+| DoS | 150 | 25,583 | 0 | 0 | 0 |
+| DDoS | 12 | 0 | 14,243 | 10 | 0 |
+| Recon | 64 | 0 | 17 | 23,771 | 0 |
+| BruteForce | 18 | 0 | 0 | 2 | 1,022 |
+
+The remaining DoS weakness is subtype-specific: `DoS Slowhttptest` recall is
+32.57–57.85% depending on architecture, with most errors going to Benign.
+`DoS GoldenEye`, which was absent from the former training split, now has
+99.56–100% recall. Exact normalized rates are in
+`outputs/cicids2017distrinet/dos_ddos_error_audit.csv`.
 
 The complete per-model classification reports, numeric confusion matrices,
-plots, predictions, histories, checkpoints, and effective-number weights are
-under `outputs/cicids2017distrinet/`. The consolidated human-readable report is
+plots, predictions, histories, checkpoints, and class weights are under
+`outputs/cicids2017distrinet/`. The consolidated human-readable report is
 `outputs/cicids2017distrinet/cicids2017_classifier_results.md`.
 
 ## 10. Checkpoints and reconstruction
 
-The baseline runner saves neural checkpoints as state dictionaries:
+The CICIoT2023 baseline runner saves raw neural state dictionaries. The
+CICIDS2017-DistriNet runner saves a package containing:
 
 ```text
-models/{model_type}_{task_name}.pt
+state_dict, model_type, model_kwargs, num_features, num_classes
 ```
 
-Examples include `mlp_binary.pt`, `cnn_8class.pt`, and `serial_34class.pt`.
-Review code reconstructs the architecture, loads the state dictionary, moves
-the model to the selected device, and calls `eval()`.
+Both use `models/{model_type}_{task_name}.pt`. The packaged format is required
+because input transforms, CNN pool bins, and LSTM feature-sequence mode cannot
+be reconstructed safely from a filename. Review and attack loaders accept both
+formats; the attack loader retains hidden-width inference for legacy raw MLP
+state dictionaries.
 
 Checkpoint loading requirements:
 
 1. Use the same `num_features` as training.
 2. Use the same `num_classes` and label ID mapping.
-3. Use the same architecture keyword arguments.
-4. For baseline MLP checkpoints, use `hidden_dims=(256, 128, 64)`.
+3. Use the saved architecture keyword arguments when present.
+4. For legacy baseline MLP checkpoints, use `hidden_dims=(256, 128, 64)`.
 5. Do not change feature order or preprocessing between training and loading.
-6. Treat changed layer widths, channel counts, kernel configuration, recurrent
-   hidden size, layer count, or directionality as a new checkpoint format.
+6. Treat changed layer widths, channels, pool bins, feature-token settings,
+   kernel configuration, or recurrent dimensions as a new checkpoint format.
 
 The corrected bidirectional state selection changes the forward computation but
 not parameter names or tensor shapes. Existing checkpoints with matching
