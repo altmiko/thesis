@@ -154,3 +154,64 @@ class BetaScheduler:
     @property
     def current_beta(self) -> float:
         return self._current_beta
+
+
+def compute_manifold_elbo(
+    batch_x_scaled: torch.Tensor,
+    model_out: dict,
+    engine,
+    beta: float,
+    *,
+    continuous_likelihood: str = "gaussian",
+    free_bits_lambda: float = 0.0,
+    continuous_logvar_floor: float = -7.0,
+    continuous_logvar_ceiling: float = 2.0,
+    pre_projection_weight: float = 0.0,
+    constraint_l1_weight: float = 1.0,
+    constraint_l2_weight: float = 1.0,
+    continuous_feature_weights: torch.Tensor | None = None,
+) -> dict:
+    """Generic ELBO for the typed VAE + layered ConstraintEngine.
+
+    Responsibilities are separated (spec Step 7):
+      recon + beta * KL
+      + pre_projection_weight * C0(pre-projection raw)   [Layer-0 soft, usually 0
+        for the typed decoder whose activations already satisfy Layer 0]
+      + C1 (Layer-1) + C2 (Layer-2) soft penalties on the produced raw output.
+    The hard Layer-0 projection itself is structural in the decoder, not a penalty.
+    """
+    mu = model_out["mu"]
+    logvar = model_out["logvar"]
+    reconstructed = model_out["continuous_mu"]
+    raw = model_out["continuous_mu_raw"]
+    eff_logvar = model_out["continuous_logvar"].clamp(continuous_logvar_floor, continuous_logvar_ceiling)
+    target = batch_x_scaled
+
+    if continuous_likelihood == "gaussian":
+        per_feature = 0.5 * (eff_logvar + (target - reconstructed).square() / eff_logvar.exp() + _LOG_2PI)
+    elif continuous_likelihood == "laplace":
+        per_feature = _LOG_2 + eff_logvar + (target - reconstructed).abs() / eff_logvar.exp()
+    else:
+        raise ValueError("continuous_likelihood must be 'gaussian' or 'laplace'")
+    if continuous_feature_weights is not None:
+        per_feature = per_feature * continuous_feature_weights.to(per_feature.device).unsqueeze(0)
+    recon = per_feature.sum(dim=1).mean()
+
+    per_dim_kl = -0.5 * (1.0 + logvar - mu.square() - logvar.exp())
+    kl = (per_dim_kl.clamp(min=float(free_bits_lambda)) if free_bits_lambda > 0 else per_dim_kl).sum(dim=1).mean()
+
+    zero = mu.new_tensor(0.0)
+    l_pre = engine.layer0.soft_penalty(raw) if pre_projection_weight > 0 else zero
+    pen = engine.penalty(raw, w1=constraint_l1_weight, w2=constraint_l2_weight)
+
+    loss = recon + beta * kl + pre_projection_weight * l_pre + pen["total"]
+    return {
+        "loss": loss,
+        "recon_continuous": recon,
+        "kl": kl,
+        "per_dim_kl_mean": per_dim_kl.mean(dim=0),
+        "pre_projection": l_pre,
+        "constraint_l1": pen["c1"],
+        "constraint_l2": pen["c2"],
+        "constraint_total": pen["total"],
+    }

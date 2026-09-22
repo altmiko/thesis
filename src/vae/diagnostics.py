@@ -251,32 +251,31 @@ def _diag_per_feature_recon(
             # Mean over batch, per column
             nll_accum += nll_per_sample.sum(dim=0).cpu().numpy()
 
-            # --- Independent binary: BCE per column ---
-            binary_logits = out["binary_logits"]   # (B, 11)
-            bce_per_sample = torch.nn.functional.binary_cross_entropy_with_logits(
-                binary_logits, target_ind_bin, reduction="none"
-            )  # (B, 11)
-            bce_accum += bce_per_sample.sum(dim=0).cpu().numpy()
-
-            # --- Protocol: top-1 accuracy ---
-            proto_pred = out["protocol_logits"].argmax(dim=1)  # (B,)
-            n_proto_correct += (proto_pred == target_proto_idx).sum().item()
-
-            # Per-protocol-value accuracy
-            target_np = target_proto_idx.cpu().numpy()
-            pred_np = proto_pred.cpu().numpy()
-            for b_idx in range(B):
-                raw_val = PROTOCOL_ALLOWLIST[int(target_np[b_idx])]
-                proto_total_by_raw[raw_val] = proto_total_by_raw.get(raw_val, 0) + 1
-                if int(pred_np[b_idx]) == int(target_np[b_idx]):
-                    proto_correct_by_raw[raw_val] = proto_correct_by_raw.get(raw_val, 0) + 1
+            # --- Legacy binary/protocol heads (empty under the continuous schema) ---
+            if out["binary_logits"].shape[1] > 0:
+                bce_per_sample = torch.nn.functional.binary_cross_entropy_with_logits(
+                    out["binary_logits"], target_ind_bin, reduction="none"
+                )
+                bce_accum += bce_per_sample.sum(dim=0).cpu().numpy()
+            if out["protocol_logits"].shape[1] > 0:
+                proto_pred = out["protocol_logits"].argmax(dim=1)
+                n_proto_correct += (proto_pred == target_proto_idx).sum().item()
+                target_np = target_proto_idx.cpu().numpy()
+                pred_np = proto_pred.cpu().numpy()
+                for b_idx in range(B):
+                    raw_val = PROTOCOL_ALLOWLIST[int(target_np[b_idx])]
+                    proto_total_by_raw[raw_val] = proto_total_by_raw.get(raw_val, 0) + 1
+                    if int(pred_np[b_idx]) == int(target_np[b_idx]):
+                        proto_correct_by_raw[raw_val] = proto_correct_by_raw.get(raw_val, 0) + 1
 
             n_total += B
 
     # Average over samples
     nll_per_col = nll_accum / n_total
     bce_per_col = bce_accum / n_total
-    proto_top1_acc = float(n_proto_correct / n_total) if n_total > 0 else 0.0
+    proto_top1_acc = (
+        float(n_proto_correct / n_total) if (n_total > 0 and proto_total_by_raw) else None
+    )
 
     # Per-protocol-value accuracy (only values that appear in val)
     proto_per_val_acc: dict[str, float] = {}
@@ -305,8 +304,8 @@ def _diag_per_feature_recon(
     worst_5 = ranking[:5]
 
     logger.info(
-        "Per-feature recon: protocol top-1=%.4f, worst feature=%s (%.4f)",
-        proto_top1_acc,
+        "Per-feature recon: protocol top-1=%s, worst feature=%s (%.4f)",
+        f"{proto_top1_acc:.4f}" if proto_top1_acc is not None else "n/a",
         worst_5[0]["feature"] if worst_5 else "N/A",
         worst_5[0]["error"] if worst_5 else 0.0,
     )
@@ -381,72 +380,44 @@ def _diag_unconditional_validity(
         }
         post_summary = dict(pre_summary)
 
-    # --- 4. Protocol-to-derived-binary consistency ---
-    # decode_to_39 with mode='hard' always sets derived binaries deterministically
-    # from the protocol argmax, so this should be 1.0 by construction.
-    proto_idx_batch = decode_meta["protocol_idx_batch"].cpu().numpy()  # (1000,)
-
-    # Column positions in the 39-dim output
-    protocol_col = partition["protocol_idx"][0]   # 1
-    derived_idx = partition["derived_binary_idx"]  # [22, 23, 26, 27] = TCP, UDP, ICMP, IGMP
-
-    # In raw space: verify each sample's derived binary columns are consistent with its protocol
-    # derived_binary_idx order: TCP=22, UDP=23, ICMP=26, IGMP=27
-    # PROTOCOL_TO_BINARY: 6→TCP, 17→UDP, 1→ICMP, 2→IGMP
-    # derived_binary_order in decode_to_39: [TCP, UDP, ICMP, IGMP] at positions derived_idx
-    protocol_raw_col = np.round(raw_samples_post[:, protocol_col]).astype(int)  # (1000,)
-    derived_cols_raw = np.round(raw_samples_post[:, derived_idx]).astype(int)   # (1000, 4)
-
-    # Build expected derived binaries from protocol raw value
-    _proto_to_derived_col = {6: 0, 17: 1, 1: 2, 2: 3}  # raw→col in derived_binary_order
-    n_consistent = 0
-    for i in range(n_samples):
-        proto_val = int(protocol_raw_col[i])
-        derived_row = derived_cols_raw[i]  # [TCP, UDP, ICMP, IGMP]
-        expected_idx = _proto_to_derived_col.get(proto_val, None)
-        consistent = True
-        if expected_idx is not None:
-            # If protocol has a derived binary, that column must be 1 and others 0
-            for j in range(4):
-                expected_val = 1 if j == expected_idx else 0
-                if derived_row[j] != expected_val:
-                    consistent = False
-                    break
-        else:
-            # Protocol has no derived binary (HOPOPT=0, GRE=47): all derived must be 0
-            if derived_row.any():
-                consistent = False
-        if consistent:
-            n_consistent += 1
-
-    proto_binary_consistency = float(n_consistent / n_samples)
-    if proto_binary_consistency < 1.0:
-        logger.error(
-            "BUG: protocol_binary_consistency=%.6f (expected 1.0). "
-            "%d/%d samples inconsistent.",
-            proto_binary_consistency,
-            n_samples - n_consistent,
-            n_samples,
-        )
-    else:
-        logger.info("Protocol-binary consistency: 1.0 (as expected)")
-
-    # --- 5. Protocol distribution in generated samples ---
+    # --- 4-6. Legacy protocol / derived-binary consistency ---
+    # Absent under the continuous schema (no categorical protocol head, no derived
+    # binaries): vacuously consistent. Retained for older categorical checkpoints.
+    proto_idx_batch = decode_meta.get("protocol_idx_batch")
+    derived_idx = partition.get("derived_binary_idx", [])
     proto_dist_gen: dict[str, float] = {}
-    for proto_allowlist_idx in range(len(PROTOCOL_ALLOWLIST)):
-        raw_val = PROTOCOL_ALLOWLIST[proto_allowlist_idx]
-        count = int((proto_idx_batch == proto_allowlist_idx).sum())
-        proto_dist_gen[str(raw_val)] = float(count / n_samples)
-
-    # --- 6. Protocol distribution in the validation split (reference distribution) ---
-    val_proto_indices = val_ds.target_protocol_index.numpy()
     proto_dist_val: dict[str, float] = {}
-    n_val_proto = len(val_proto_indices)
-    for proto_allowlist_idx in range(len(PROTOCOL_ALLOWLIST)):
-        raw_val = PROTOCOL_ALLOWLIST[proto_allowlist_idx]
-        count = int((val_proto_indices == proto_allowlist_idx).sum())
-        if count > 0:
-            proto_dist_val[str(raw_val)] = float(count / n_val_proto)
+    if proto_idx_batch is None or not derived_idx:
+        proto_binary_consistency = 1.0
+    else:
+        proto_idx_batch = proto_idx_batch.cpu().numpy()
+        protocol_col = partition["protocol_idx"][0]
+        protocol_raw_col = np.round(raw_samples_post[:, protocol_col]).astype(int)
+        derived_cols_raw = np.round(raw_samples_post[:, derived_idx]).astype(int)
+        _proto_to_derived_col = {6: 0, 17: 1, 1: 2, 2: 3}
+        n_consistent = 0
+        for i in range(n_samples):
+            proto_val = int(protocol_raw_col[i])
+            derived_row = derived_cols_raw[i]
+            expected_idx = _proto_to_derived_col.get(proto_val, None)
+            consistent = True
+            if expected_idx is not None:
+                for j in range(len(derived_idx)):
+                    if derived_row[j] != (1 if j == expected_idx else 0):
+                        consistent = False
+                        break
+            elif derived_row.any():
+                consistent = False
+            n_consistent += int(consistent)
+        proto_binary_consistency = float(n_consistent / n_samples)
+        for k in range(len(PROTOCOL_ALLOWLIST)):
+            proto_dist_gen[str(PROTOCOL_ALLOWLIST[k])] = float((proto_idx_batch == k).sum() / n_samples)
+        val_proto_indices = val_ds.target_protocol_index.numpy()
+        n_val_proto = len(val_proto_indices)
+        for k in range(len(PROTOCOL_ALLOWLIST)):
+            count = int((val_proto_indices == k).sum())
+            if count > 0:
+                proto_dist_val[str(PROTOCOL_ALLOWLIST[k])] = float(count / n_val_proto)
 
     return {
         "n_samples": n_samples,

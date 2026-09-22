@@ -130,6 +130,8 @@ def parse_models(value: str) -> list[str]:
     return models
 
 
+
+
 def resolve_device(value: str) -> torch.device:
     if value == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")

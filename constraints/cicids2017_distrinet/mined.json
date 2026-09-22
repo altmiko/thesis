@@ -1,0 +1,135 @@
+{
+  "schema_version": "1.0",
+  "dataset": "cicids2017_distrinet",
+  "mining": {
+    "fit_split": "train",
+    "fit_rows": 1456265,
+    "source": "X_train_pristine.npy",
+    "keep_if_violation_rate_lte": 0.01,
+    "product_rtol": 0.05,
+    "monotone_tol": 1e-06,
+    "retained_rules": 14,
+    "retained_max_violation_rate": 0.0,
+    "rejected_half_range_violation_rate_range": [0.023526624618458867, 0.4279070086831724]
+  },
+  "constraints": [
+    {
+      "type": "MonotoneNondecreasing",
+      "name": "fwd_packet_length_order",
+      "params": {
+        "features": ["Fwd Packet Length Min", "Fwd Packet Length Mean", "Fwd Packet Length Max"],
+        "tol": 1e-06
+      }
+    },
+    {
+      "type": "MonotoneNondecreasing",
+      "name": "bwd_packet_length_order",
+      "params": {
+        "features": ["Bwd Packet Length Min", "Bwd Packet Length Mean", "Bwd Packet Length Max"],
+        "tol": 1e-06
+      }
+    },
+    {
+      "type": "MonotoneNondecreasing",
+      "name": "packet_length_order",
+      "params": {
+        "features": ["Packet Length Min", "Packet Length Mean", "Packet Length Max"],
+        "tol": 1e-06
+      }
+    },
+    {
+      "type": "MonotoneNondecreasing",
+      "name": "flow_iat_order",
+      "params": {
+        "features": ["Flow IAT Min", "Flow IAT Mean", "Flow IAT Max"],
+        "tol": 1e-06
+      }
+    },
+    {
+      "type": "MonotoneNondecreasing",
+      "name": "fwd_iat_order",
+      "params": {
+        "features": ["Fwd IAT Min", "Fwd IAT Mean", "Fwd IAT Max"],
+        "tol": 1e-06
+      }
+    },
+    {
+      "type": "MonotoneNondecreasing",
+      "name": "bwd_iat_order",
+      "params": {
+        "features": ["Bwd IAT Min", "Bwd IAT Mean", "Bwd IAT Max"],
+        "tol": 1e-06
+      }
+    },
+    {
+      "type": "MonotoneNondecreasing",
+      "name": "active_order",
+      "params": {
+        "features": ["Active Min", "Active Mean", "Active Max"],
+        "tol": 1e-06
+      }
+    },
+    {
+      "type": "MonotoneNondecreasing",
+      "name": "idle_order",
+      "params": {
+        "features": ["Idle Min", "Idle Mean", "Idle Max"],
+        "tol": 1e-06
+      }
+    },
+    {
+      "type": "ProductEquality",
+      "name": "packet_variance_eq_std_squared",
+      "params": {
+        "target": "Packet Length Variance",
+        "factors": ["Packet Length Std", "Packet Length Std"],
+        "rtol": 0.05
+      }
+    },
+    {
+      "type": "ProductEquality",
+      "name": "avg_packet_size_eq_packet_mean",
+      "params": {
+        "target": "Average Packet Size",
+        "factors": ["Packet Length Mean"],
+        "rtol": 0.05
+      }
+    },
+    {
+      "type": "ProductEquality",
+      "name": "fwd_segment_avg_eq_fwd_mean",
+      "params": {
+        "target": "Fwd Segment Size Avg",
+        "factors": ["Fwd Packet Length Mean"],
+        "rtol": 0.05
+      }
+    },
+    {
+      "type": "ProductEquality",
+      "name": "bwd_segment_avg_eq_bwd_mean",
+      "params": {
+        "target": "Bwd Segment Size Avg",
+        "factors": ["Bwd Packet Length Mean"],
+        "rtol": 0.05
+      }
+    },
+    {
+      "type": "ProductEquality",
+      "name": "fwd_total_eq_count_mean",
+      "params": {
+        "target": "Total Length of Fwd Packet",
+        "factors": ["Total Fwd Packet", "Fwd Packet Length Mean"],
+        "rtol": 0.05
+      }
+    },
+    {
+      "type": "ProductEquality",
+      "name": "bwd_total_eq_count_mean",
+      "params": {
+        "target": "Total Length of Bwd Packet",
+        "factors": ["Total Bwd packets", "Bwd Packet Length Mean"],
+        "rtol": 0.05
+      }
+    }
+  ]
+}

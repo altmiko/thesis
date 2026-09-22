@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "dataset": "ciciot2023",
+  "note": "Layer-2 dataset-specific soft constraints. Hand-seeded now; an automatic constraint-mining script can overwrite this file in-place with the same format. Exact identities (e.g. Variance=Std^2) are kept here as soft checks pending promotion to Layer-0 derived recompute after clean-data exactness verification.",
+  "constraints": [
+    {"type": "MonotoneNondecreasing", "name": "pktsize_order", "params": {"features": ["Min", "AVG", "Max"]}},
+    {"type": "HalfRangeBound", "name": "std_halfrange", "params": {"value": "Std", "lo": "Min", "hi": "Max", "rtol": 0.05}},
+    {"type": "ProductEquality", "name": "totsum_eq_number_avg", "params": {"target": "Tot sum", "factors": ["Number", "AVG"], "rtol": 0.05}},
+    {"type": "ProductEquality", "name": "variance_eq_std_squared", "params": {"target": "Variance", "factors": ["Std", "Std"], "rtol": 0.05}}
+  ]
+}
