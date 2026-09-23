@@ -2,16 +2,24 @@
 
 ## Audit verdict
 
-**Current experimental pipeline status: NOT YET TRUSTWORTHY for a final thesis claim.**
+**Current post-fix status: CONDITIONALLY TRUSTWORTHY for the audited CPU experiment configuration.**
 
-The central saved numbers are internally reproducible from their per-sample artifacts, the main VAE attack is genuinely latent, the final projected vector is used consistently for prediction and validation, and no fitted scaler/model was found using test rows. However, the final verification gate fails on two governance requirements:
+The original audit findings remain below as the immutable “before” record. Section 22 records the
+implemented fixes and post-fix reruns. The main attack is genuinely VAE-latent, every success and
+validity flag is computed from the same final projected vector, fitted objects remain train/val
+only as documented, and the independent metric auditor reports zero runner disagreements.
 
-1. The CICIDS2017 attack implementation and result files are largely untracked and artifacts contain no Git/source identity. Existing results cannot be tied to the code that generated them.
-2. The CICIDS2017 masked-method source states that dependency formulas were cross-checked on TEST while the mask was being defined. Test-informed rule promotion violates the final-only test policy unless contemporaneous evidence proves the rules were frozen before that check.
+The former blockers are closed for the new `*_postfix` artifacts: each artifact stores row IDs,
+Git state, a source-tree hash, run ID, complete config, checkpoint hashes, predictions, logits,
+validity masks, costs, and controls; mask-rule provenance is train-only; timing dilation now uses
+`exp(relu(mean_log_ratio))`; loaders enforce victim architecture and VAE class identity; and
+per-sample summed losses remove material batch-composition coupling.
 
-A third methodological issue needs a decision before final reporting: the latent-to-timing map converts a decoder log-ratio using `1 + relu(delta_log)` rather than `exp(relu(delta_log))`. That is a heuristic linearization, not an exact conversion from log-time movement to a dilation ratio. Changing it requires rerunning all VAE-Latent-Primitive experiments.
-
-No finding shows that the independently recomputed 78.46%, 7.73%, or 99.61% artifact-level rates were arithmetically fabricated. The stronger claim about *why* latent ASR is low is inconsistent across the two current reports and must be corrected.
+Post-fix CPU headline results are Primitive-Direct 78.4406% three-seed strict-valid ASR,
+VAE-Latent-Primitive 8.6291%, Input PGD 99.63% targeted but 0% strict-valid, Raw 68.6036%
+targeted but 0% strict-valid, and Masked 2.2677% strict-valid (seed42). These supersede the old
+7.7% latent, 80.7% raw, and 6.9% masked tables. Final thesis claims should use only Section 22
+and the `*_postfix` result directories.
 
 ## 1. Repository and experiment architecture map
 
@@ -478,15 +486,17 @@ PYTHONPATH=src python -m attack.run_cicids2017_vae_latent_attack \
   --objective cw --epsilon-z 10 --kappa 0 --restarts 1 \
   --lambda-latent 0.005 --lambda-cost 0.05 --lambda-realism 0.001 \
   --p-max 1460 --alpha-max 100 --mtu-cap 0 --seeds 42,43,44 \
-  --stage-a-dir outputs/cicids2017_vae_attacks/stage_a \
-  --output-dir outputs/cicids2017_vae_latent_attack_repro
+  --stage-a-dir outputs/cicids2017_vae_stage_a \
+  --output-dir outputs/cicids2017_vae_latent_attack_postfix
 
 # Independent artifact audit
 python audit_results.py \
-  outputs/cicids2017_primitive_attack \
-  outputs/cicids2017_vae_latent_attack \
-  outputs/cicids2017_input_baseline \
-  --json outputs/audit_results.json
+  outputs/cicids2017_primitive_attack_postfix \
+  outputs/cicids2017_input_baseline_postfix \
+  outputs/cicids2017_vae_latent_attack_postfix \
+  outputs/cicids2017_latent_raw_postfix \
+  outputs/cicids2017_latent_masked_postfix \
+  --json outputs/audit_results_postfix.json
 
 # Verification
 python -m pytest \
@@ -499,21 +509,101 @@ python -m pytest \
 
 ## 21. Final verification gate
 
-| Gate | Status |
+| Gate | Post-fix status |
 |---|---|
-| same-seed reproducibility | PASS (CPU bit-identical; CPU/CUDA decisions stable) |
-| no train/test leakage | **FAIL/PENDING** (test cited in mask rule validation/promotion provenance) |
+| same-seed reproducibility | PASS; deterministic CPU reruns and golden replay |
+| no train/test leakage | PASS; mask rule provenance is explicitly train-only |
 | schema consistency | PASS |
 | scaler audit | PASS |
-| checkpoint identity checks | PASS for current files; production enforcement incomplete |
+| checkpoint identity checks | PASS; victim architecture and VAE class enforced |
 | zero-radius sanity | PASS |
 | zero-step sanity | PASS |
 | decoder-gradient test | PASS |
+| batch-composition stability | PASS within numerical tolerance |
 | final post-projection evaluation | PASS |
-| independent metric recomputation | PASS, zero disagreements |
+| independent metric recomputation | PASS; zero disagreements for all post-fix cells |
 | clean-correct denominator match | PASS |
-| artifact provenance | **FAIL** |
-| manual sample audit | PASS |
-| 3-seed stability | PASS for canonical methods |
+| artifact provenance | PASS; all 176 artifacts contain every required field |
+| NaN/Inf audit | PASS; zero non-finite fields in all 176 artifacts |
+| manual sample audit | PASS; 5 success-valid, 5 unsuccessful, 5 invalid post-fix rows |
+| 3-seed stability | PASS for Primitive, Input PGD, and Latent-Primitive |
 
-**Decision:** do not label the complete pipeline trustworthy until H1/H2 are closed and the alpha mapping is explicitly justified or corrected with before/after reruns.
+**Decision:** the `*_postfix` CPU results pass the requested code/artifact verification gates.
+They are traceable to exact source-tree hashes despite the working tree being dirty during the
+runs. Commit the code and report without regenerating or silently replacing these artifacts.
+The older non-postfix result directories remain historical only.
+
+## 22. Post-fix closure and rerun results
+
+### 22.1 Implemented corrections
+
+| Original finding | Closure |
+|---|---|
+| H1 untraceable source/artifacts | Closed: immutable run manifests and per-artifact Git/source/data/scaler/checkpoint/config identities |
+| H2 TEST cited in mask-rule promotion | Closed: rule provenance is train-only; test cannot promote/remove/tune rules |
+| H3 linearized log-time mapping | Closed: `alpha = exp(relu(mean_log_ratio))`; all affected latent results rerun |
+| H4 contradictory causal reports | Closed for current report: old tables are historical; this section is authoritative |
+| H5 weak checkpoint loading | Closed: expected victim model type and VAE class/class ID are mandatory |
+| M1 incomplete artifact fields | Closed: required provenance and per-sample fields present in every artifact |
+| M2 batch-size coupling | Closed: independent per-sample losses are summed before Adam; batch-composition regressions pass |
+| M4 incomplete deterministic setup | Closed: attack runners seed Python/NumPy/Torch and enable deterministic Torch/cuDNN policy |
+| M5 missing decoded/logit arrays | Closed for latent postfix artifacts |
+| L1 missing primitive method ID | Closed: `primitive_direct` is explicit |
+
+### 22.2 Independent post-fix results
+
+| Method | Seeds | Clean-correct N/seed | Targeted ASR | Targeted strict-valid ASR | Mean normalized cost |
+|---|---:|---:|---:|---:|---:|
+| Primitive-Direct | 42/43/44 | 16,228 | 78.4406% mean | **78.4406% ± 0.0994 pp** | 2.6669–2.7493 |
+| Input PGD | 42/43/44 | 16,228 | **99.6323% mean** | **0.0000%** | 0.4163–0.4166 |
+| VAE-Latent-Primitive | 42/43/44 | 16,228 | 8.6332% mean | **8.6291% ± 0.0947 pp** | 0.1025–0.1035 |
+| VAE-Latent-Raw | 42 | 16,228 | **68.6036%** | **0.0000%** | 0.8071 |
+| VAE-Latent-Masked | 42 | 16,228 | 2.2738% | **2.2677%** | 0.2264 |
+
+`audit_results.py` independently reconstructed every denominator, success count, strict mask,
+and cost from NPZ arrays. Runner disagreements: zero.
+
+### 22.3 Provenance identities
+
+| Output directory | Run ID | Source-tree SHA-256 prefix | Artifacts |
+|---|---|---|---:|
+| `cicids2017_primitive_attack_postfix` | `d41b35fcaabf4a86cc49` | `b8c85e93fce2f492` | 48 |
+| `cicids2017_input_baseline_postfix` | `4690c0b7f1fb8ff4d3c6` | `d7ea91ad1136f57a` | 48 |
+| `cicids2017_vae_latent_attack_postfix` | `ffbdef9093e634e82e3d` | `d7ea91ad1136f57a` | 48 |
+| `cicids2017_latent_raw_postfix` | `027628559931010a1a14` | `d7ea91ad1136f57a` | 16 |
+| `cicids2017_latent_masked_postfix` | `b6a0af02623577766335` | `d7ea91ad1136f57a` | 16 |
+
+All runs record Git `7f2a781881aafa4de26da08636e98e35fdad8535` plus dirty-state and exact
+source-tree hashes. All ran on Python 3.12.3 / PyTorch 2.5.1 CPU. This is a reproducible CPU
+configuration; it is not represented as a CUDA rerun.
+
+### 22.4 Before/after interpretation
+
+- Exponential timing conversion raises canonical latent strict-valid ASR from 7.73% to 8.63%
+  and mean cost from about 0.072 to 0.103.
+- Removing batch coupling lowers Masked seed42 strict-valid ASR from 6.91% to 2.27%.
+- Raw remains highly evasive but entirely invalid, now 68.60% targeted rather than 80.66%.
+- Direct Primitive and Input PGD remain effectively unchanged.
+- The corrected evidence still supports the same qualitative conclusion: the valid latent methods
+  are much weaker than direct primitive optimization, while unconstrained Raw/Input success does
+  not survive strict validity. Do not reuse the old numerical tables.
+
+### 22.5 Final regression evidence
+
+```text
+171 passed, 1 non-failing PyTorch same-padding warning, 25.83 s
+```
+
+The initial collection attempt exposed that the active Python lacked Matplotlib even though
+`environment.yml` declares `matplotlib==3.11.0`. Installing that declared pin into the active
+interpreter resolved collection; no test or source suppression was used.
+
+### 22.6 Post-fix manual sample audit
+
+`outputs/manual_sample_audit_postfix.json` records 15 inspected seed42 latent-primitive rows:
+5 successful-valid, 5 unsuccessful, and 5 invalid across BruteForce, DDoS, DoS and multiple
+victims. Every sample had zero changes outside the primitive/dependency closure. Successful
+samples classified to Benign while passing PAVE, mined, and internal realizability; unsuccessful
+samples preserved their non-Benign prediction; invalid examples were independently rejected by
+PAVE or the mined gate while internal dependency consistency still passed. This confirms the
+external validators are not generator-embedded tautologies.

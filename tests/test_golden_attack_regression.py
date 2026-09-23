@@ -49,7 +49,7 @@ def test_golden_provenance_and_row_ids_are_unchanged():
             "manifest_sha256": REPO / "data/processed/CICIDS_2017_Distrinet/preprocessing_manifest.json",
             "scaler_sha256": REPO / "data/processed/CICIDS_2017_Distrinet/scaler.pkl",
             "victim_sha256": REPO / "outputs/cicids2017distrinet/models/lstm_category.pt",
-            "vae_sha256": REPO / "outputs/cicids2017_vae_attacks/stage_a/vae_DoS.pt",
+            "vae_sha256": REPO / "outputs/cicids2017_vae_stage_a/vae_DoS.pt",
         }
         changed = {
             name: {"expected": str(expected[name]), "actual": _sha256(path)}
@@ -93,20 +93,27 @@ def test_golden_attack_outputs_are_unchanged():
             },
         )
         vae, _ = load_stage_a(
-            adapter, REPO / "outputs/cicids2017_vae_attacks/stage_a/vae_DoS.pt", device="cpu"
+            adapter, REPO / "outputs/cicids2017_vae_stage_a/vae_DoS.pt",
+            expected_class_name="DoS", device="cpu",
         )
         victim = load_category_victim(
-            REPO / "outputs/cicids2017distrinet/models/lstm_category.pt", device="cpu"
+            REPO / "outputs/cicids2017distrinet/models/lstm_category.pt",
+            adapter=adapter, expected_model_type="lstm", device="cpu",
         )
-        idr = np.load(REPO / "outputs/cicids2017_vae_attacks/stage_a/idr_DoS.npz")
+        idr = np.load(REPO / "outputs/cicids2017_vae_stage_a/idr_DoS.npz")
         realism = {
             "mean": torch.tensor(idr["mean"], dtype=torch.float32),
             "precision": torch.tensor(idr["precision"], dtype=torch.float32),
             "threshold_sq": torch.tensor(float(idr["threshold_sq"]), dtype=torch.float32),
         }
         config_values = json.loads(str(expected["config_json"]))
-        target_class = int(config_values.pop("target_class"))
-        config = LatentAttackConfig(**config_values)
+        target_class = int(config_values.pop("target_class", 0))
+        attack_config = {
+            key: value
+            for key, value in config_values.items()
+            if key in LatentAttackConfig.__dataclass_fields__
+        }
+        config = LatentAttackConfig(**attack_config)
         random.seed(42)
         np.random.seed(42)
         torch.manual_seed(42)

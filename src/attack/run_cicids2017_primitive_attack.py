@@ -46,6 +46,13 @@ from attack.run_cicids2017_vae_attacks import _idr_mask
 from datasets.cicids2017 import CICIDS2017Adapter
 from evaluation.pave_style_validator import PAVEStyleValidator
 from experiments.ablations import build_ablation
+from experiments.provenance import (
+    artifact_provenance_arrays,
+    build_provenance,
+    deterministic_runtime,
+    ensure_fresh_output_dir,
+    load_row_ids,
+)
 from src.classifiers.cicids2017d_victims import load_category_victim
 from vae.cicids2017_stage_a import ATTACK_CLASSES, load_stage_a
 
@@ -71,9 +78,7 @@ _ENV_LENGTH = ("Fwd Packet Length Max", "Fwd Packet Length Min",
 
 
 def _seed(seed: int) -> None:
-    random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
+    deterministic_runtime(seed)
 
 
 def _class_rows(y: np.ndarray, class_id: int, limit: int | None, seed: int) -> np.ndarray:
@@ -114,9 +119,13 @@ def optimize_primitives(model, victim, raw, center, scale, bounds, *, steps, lr,
         opt.zero_grad(set_to_none=True)
         ctl = controls()
         logits = victim((model.generate(raw, ctl) - center) / scale)
-        cost = (torch.sigmoid(u) * pad_active + torch.sigmoid(v) * timing_active).mean()
-        loss = F.cross_entropy(logits, target) + cost_weight * cost
-        loss.backward()
+        loss_per_sample = (
+            F.cross_entropy(logits, target, reduction="none")
+            + cost_weight * (
+                torch.sigmoid(u) * pad_active + torch.sigmoid(v) * timing_active
+            )
+        )
+        loss_per_sample.sum().backward()
         opt.step()
     with torch.no_grad():
         ctl = controls()
@@ -189,16 +198,35 @@ def run(*, classes, victims, device, test_limit, steps, lr, p_max, alpha_max, mt
     raw_train = np.load(adapter._processed / "X_train_pristine.npy", mmap_mode="r")
     layer1_fit = np.ascontiguousarray(raw_train[:200000], dtype=np.float32)
     layer2_path = repo / "constraints" / adapter.name / "mined.json"
-    stage_a_dir = stage_a_dir or (repo / "outputs" / "cicids2017_vae_attacks" / "stage_a")
+    stage_a_dir = stage_a_dir or (repo / "outputs" / "cicids2017_vae_stage_a")
     victim_dir = repo / "outputs" / "cicids2017distrinet" / "models"
-    artifact_dir = output_dir / "attack_artifacts"
-    artifact_dir.mkdir(parents=True, exist_ok=True)
 
     pave = PAVEStyleValidator(integer_tolerance=SCALER_ATOL, range_tolerance=SCALER_ATOL).fit(
         np.asarray(raw_train, dtype=np.float64), manifest.names, schema=manifest)
     envelope = train_envelope(raw_train, model.i)
     bounds_cfg = {"p_max": p_max, "alpha_max": alpha_max, "mtu_cap": mtu_cap,
                   **{f"env_{k}": v for k, v in envelope.items()}}
+    config = {"test_limit_per_class": test_limit, "attack_steps": steps, "learning_rate": lr,
+              "p_max": p_max, "alpha_max": alpha_max, "mtu_cap": mtu_cap,
+              "cost_weight": cost_weight, "seeds": seeds, "init_noise": init_noise,
+              "scaler_atol": SCALER_ATOL, "dur_floor_us": model.dur_floor_us,
+              "attack_batch_size_per_class": test_limit}
+    checkpoint_paths = {
+        **{f"victim_{name}": victim_dir / f"{name}_category.pt" for name in victims},
+        **{f"vae_{name}": stage_a_dir / f"vae_{name}.pt" for name in classes},
+        **{f"idr_{name}": stage_a_dir / f"idr_{name}.npz" for name in classes},
+    }
+    provenance = build_provenance(
+        repo_root=repo, dataset=adapter.name, method_id="primitive_direct", config=config,
+        preprocessing_manifest=adapter._processed / "preprocessing_manifest.json",
+        scaler=adapter._processed / "scaler.pkl", checkpoints=checkpoint_paths,
+    )
+    ensure_fresh_output_dir(output_dir)
+    artifact_dir = output_dir / "attack_artifacts"; artifact_dir.mkdir()
+    (output_dir / "run_manifest.json").write_text(
+        json.dumps(provenance, indent=2), encoding="utf-8"
+    )
+    all_row_ids = load_row_ids(adapter._processed, "test")
 
     results = {
         "dataset": adapter.name,
@@ -209,10 +237,9 @@ def run(*, classes, victims, device, test_limit, steps, lr, p_max, alpha_max, mt
         "vae_role": "realism gate only (val-anchored Mahalanobis IDR); NOT in the attack gradient path",
         "packet_level_verification": {"available": packet_backend.available(),
                                        "reason": packet_backend.reason},
-        "config": {"test_limit_per_class": test_limit, "attack_steps": steps, "learning_rate": lr,
-                   "p_max": p_max, "alpha_max": alpha_max, "mtu_cap": mtu_cap,
-                   "cost_weight": cost_weight, "seeds": seeds, "init_noise": init_noise,
-                   "scaler_atol": SCALER_ATOL, "dur_floor_us": model.dur_floor_us},
+        "strict_valid_definition": "PAVE & mined & primitive-realizability evaluator",
+        "config": config,
+        "provenance": provenance,
         "primitives": [pspec.__dict__ for pspec in model.primitives()],
         "feature_roles": {n: {"role": r.value, "reason": why} for n, (r, why) in model.roles().items()},
         "cells": [],
@@ -224,13 +251,19 @@ def run(*, classes, victims, device, test_limit, steps, lr, p_max, alpha_max, mt
         idx = _class_rows(test.y, cid, test_limit, 42 + cid)
         raw_np = np.ascontiguousarray(np.asarray(raw_test[idx]), dtype=np.float32)
         raw = torch.tensor(raw_np, device=device)
-        base_vae, _ = load_stage_a(adapter, stage_a_dir / f"vae_{class_name}.pt", device=device)
+        base_vae, _ = load_stage_a(
+            adapter, stage_a_dir / f"vae_{class_name}.pt",
+            expected_class_name=class_name, device=device,
+        )
         idr_path = stage_a_dir / f"idr_{class_name}.npz"
         engine = build_ablation("A4", adapter, encoder_input_transform="asinh",
                                 layer1_fit_x_raw=layer1_fit, layer2_path=layer2_path).engine
         bounds = model.per_flow_bounds(raw, bounds_cfg)
         for vname in victims:
-            victim = load_category_victim(victim_dir / f"{vname}_category.pt", device=device)
+            victim = load_category_victim(
+                victim_dir / f"{vname}_category.pt", adapter=adapter,
+                expected_model_type=vname, device=device,
+            )
             for seed in seeds:
                 _seed(seed)
                 ctl = optimize_primitives(model, victim, raw, center, scale, bounds,
@@ -246,6 +279,14 @@ def run(*, classes, victims, device, test_limit, steps, lr, p_max, alpha_max, mt
                     model, val, victim, base_vae, engine, pave, raw, adv_raw,
                     center, scale, cid, idr_path, groups_idx)
                 ap = artifact_dir / f"{class_name}_{vname}_seed{seed}.npz"
+                strict = masks["pave_valid"] & masks["mined_valid"] & masks["realizable"]
+                checkpoint_ids = {
+                    key: provenance["checkpoints"][key]["sha256"]
+                    for key in (f"victim_{vname}", f"vae_{class_name}", f"idr_{class_name}")
+                }
+                with torch.no_grad():
+                    clean_logits = victim((raw - center) / scale)
+                    final_logits = victim((adv_raw - center) / scale)
                 np.savez_compressed(
                     ap,
                     X_clean_raw=raw_np,
@@ -258,13 +299,25 @@ def run(*, classes, victims, device, test_limit, steps, lr, p_max, alpha_max, mt
                     p_hi=bounds["p"].cpu().numpy().astype(np.float32),
                     alpha_hi=bounds["alpha"].cpu().numpy().astype(np.float32),
                     y_true=np.full(len(idx), cid, dtype=np.int64),
+                    true_label=np.full(len(idx), cid, dtype=np.int64),
                     y_pred_clean=yc.cpu().numpy().astype(np.int64),
+                    clean_prediction=yc.cpu().numpy().astype(np.int64),
                     y_pred_adv=ya.cpu().numpy().astype(np.int64),
+                    final_adversarial_prediction=ya.cpu().numpy().astype(np.int64),
+                    clean_logits=clean_logits.cpu().numpy().astype(np.float32),
+                    final_adversarial_logits=final_logits.cpu().numpy().astype(np.float32),
                     cost_total=cost["total"].cpu().numpy().astype(np.float32),
                     cost_padding=cost["padding"].cpu().numpy().astype(np.float32),
                     cost_timing=cost["timing"].cpu().numpy().astype(np.float32),
                     cost_rate=cost["rate"].cpu().numpy().astype(np.float32),
                     timing_active=model.active_mask(raw, "alpha").cpu().numpy(),
+                    target_success_flag=masks["benign"].cpu().numpy(),
+                    strict_valid=strict.cpu().numpy(),
+                    **artifact_provenance_arrays(
+                        provenance, row_ids=all_row_ids[idx], class_name=class_name,
+                        victim=vname, method_id="primitive_direct", seed=seed,
+                        checkpoint_ids=checkpoint_ids,
+                    ),
                     **{k: m.cpu().numpy() for k, m in masks.items()},
                 )
                 denom = int(masks["clean_correct"].sum())

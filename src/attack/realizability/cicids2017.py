@@ -319,18 +319,17 @@ class CICIDS2017PrimitiveModel:
         p_hat = torch.minimum(p_hat, bounds["p"].clamp(min=0.0))
         p_hat = torch.where(self.active_mask(raw0, "p"), p_hat, torch.zeros_like(p_hat))
 
-        # --- alpha_hat: geometric-mean of defined fwd-timing dilation ratios (each >=... ~1) ---
+        # Geometric mean of timing ratios. Averaging log ratios and exponentiating is
+        # the exact conversion back to a multiplicative delay factor.
         def ratio(n):
             base = db(n)
             return torch.where(base.abs() > eps, da(n) / base.clamp(min=eps), torch.ones_like(base))
-        log_ratios = torch.stack([
+        mean_log_ratio = torch.stack([
             torch.log(ratio("Fwd IAT Total").clamp(min=eps)),
             torch.log(ratio("Fwd IAT Mean").clamp(min=eps)),
             torch.log(ratio("Flow Duration").clamp(min=eps)),
         ], 0).mean(0)
-        # Delay-only projection: identity maps exactly to alpha=1; positive proposed dilation
-        # passes through with full gradient (a flow can be slowed, never compressed).
-        alpha_hat = 1.0 + torch.relu(log_ratios)
+        alpha_hat = torch.exp(torch.relu(mean_log_ratio))
         alpha_hat = torch.minimum(alpha_hat, bounds["alpha"].clamp(min=1.0))
         alpha_hat = torch.where(self.active_mask(raw0, "alpha"), alpha_hat, torch.ones_like(alpha_hat))
         return {"p": p_hat, "alpha": alpha_hat}

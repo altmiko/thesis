@@ -101,13 +101,14 @@ class LatentPrimitiveAttack:
 
     @staticmethod
     def _targeted_loss(logits: torch.Tensor, target: torch.Tensor, objective: str, kappa: float) -> torch.Tensor:
+        """Per-sample targeted loss; callers sum it to keep each row batch-size invariant."""
         if objective == "ce":
-            return F.cross_entropy(logits, target)
+            return F.cross_entropy(logits, target, reduction="none")
         target_logit = logits.gather(1, target[:, None]).squeeze(1)
         masked = logits.clone()
         masked.scatter_(1, target[:, None], float("-inf"))
         strongest_other = masked.max(1).values
-        return torch.relu(strongest_other - target_logit + kappa).mean()
+        return torch.relu(strongest_other - target_logit + kappa)
 
     @staticmethod
     def _targeted_margin(logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -143,7 +144,7 @@ class LatentPrimitiveAttack:
         x_adv_raw.retain_grad()
         logits = victim((x_adv_raw - center) / scale)
         cls_loss = self._targeted_loss(logits, target, cfg.objective, cfg.kappa)
-        cls_loss.backward()
+        cls_loss.sum().backward()
 
         def norm(t):
             if t is None or t.grad is None:
@@ -178,22 +179,25 @@ class LatentPrimitiveAttack:
 
             cls_loss = self._targeted_loss(logits, target, cfg.objective, cfg.kappa)
             delta_z = z_adv - z0
-            latent_loss = delta_z.square().sum(1).mean()
-            per_sample_cost = ((x_adv_raw - raw0).abs() / scale).mean(1)
-            cost_loss = per_sample_cost.mean()
+            latent_loss = delta_z.square().sum(1)
+            cost_loss = ((x_adv_raw - raw0).abs() / scale).mean(1)
             decoded_move = (decoded_adv_raw - decoded_base_raw) / scale
-            recon_loss = decoded_move.square().mean()
+            recon_loss = decoded_move.square().mean(1)
             dist_sq = self._mahalanobis(z_adv, realism)
             if dist_sq is None:
-                realism_loss = torch.zeros((), device=raw0.device, dtype=raw0.dtype)
+                realism_loss = torch.zeros(raw0.shape[0], device=raw0.device, dtype=raw0.dtype)
             else:
                 threshold = realism["threshold_sq"].clamp(min=1e-12)
-                realism_loss = torch.relu(dist_sq / threshold - 1.0).mean()
+                realism_loss = torch.relu(dist_sq / threshold - 1.0)
 
-            loss = (cfg.lambda_cls * cls_loss + cfg.lambda_latent * latent_loss
-                    + cfg.lambda_cost * cost_loss + cfg.lambda_realism * realism_loss
-                    + cfg.lambda_recon * recon_loss)
-            loss.backward()
+            loss_per_sample = (
+                cfg.lambda_cls * cls_loss
+                + cfg.lambda_latent * latent_loss
+                + cfg.lambda_cost * cost_loss
+                + cfg.lambda_realism * realism_loss
+                + cfg.lambda_recon * recon_loss
+            )
+            loss_per_sample.sum().backward()
             optimizer.step()
             if scheduler is not None:
                 scheduler.step()

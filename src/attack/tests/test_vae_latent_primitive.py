@@ -31,8 +31,14 @@ def setup():
     raw = torch.tensor(np.ascontiguousarray(np.asarray(
         np.load(ad._processed / "X_test_pristine.npy", mmap_mode="r")[rows]), dtype=np.float32))
     repo = ad.repo_root
-    vae, _ = load_stage_a(ad, repo / "outputs/cicids2017_vae_attacks/stage_a/vae_DoS.pt")
-    victim = load_category_victim(repo / "outputs/cicids2017distrinet/models/mlp_category.pt")
+    vae, _ = load_stage_a(
+        ad, repo / "outputs/cicids2017_vae_stage_a/vae_DoS.pt",
+        expected_class_name="DoS",
+    )
+    victim = load_category_victim(
+        repo / "outputs/cicids2017distrinet/models/mlp_category.pt",
+        adapter=ad, expected_model_type="mlp",
+    )
     bounds = model.per_flow_bounds(raw, cfg)
     return model, vae, victim, raw, center, scale, bounds
 
@@ -176,3 +182,25 @@ def test_no_movement_controls_are_identity(setup, steps, epsilon_z, init_noise):
     )
     assert torch.allclose(result.x_adv_realized_raw, raw[:8], atol=1e-3, rtol=1e-4)
     assert torch.equal(result.realized_logits.argmax(1), result.clean_logits.argmax(1))
+
+
+def test_attack_is_invariant_to_unrelated_batch_rows(setup):
+    model, vae, victim, raw, center, scale, bounds = setup
+    attack = LatentPrimitiveAttack(
+        model, LatentAttackConfig(steps=6, learning_rate=0.03, epsilon_z=10.0)
+    )
+    torch.manual_seed(321)
+    full = attack.attack(
+        vae, victim, raw[:16], center, scale,
+        {key: value[:16] for key, value in bounds.items()},
+    )
+    torch.manual_seed(321)
+    subset = attack.attack(
+        vae, victim, raw[:8], center, scale,
+        {key: value[:8] for key, value in bounds.items()},
+    )
+    assert torch.allclose(full.z_adv[:8], subset.z_adv, atol=1e-6, rtol=1e-6)
+    assert torch.allclose(
+        full.x_adv_realized_raw[:8], subset.x_adv_realized_raw, atol=1e-5, rtol=1e-6
+    )
+    assert torch.equal(full.realized_logits[:8].argmax(1), subset.realized_logits.argmax(1))

@@ -3,13 +3,10 @@
 Attacker degrees of freedom are a small forward-direction / timing set; every other
 feature is frozen unless it is an *exact* CICFlowMeter identity of a perturbed parent.
 
-Formula verification is empirical against the pristine (unscaled) TRAIN array
-``data/processed/CICIDS_2017_Distrinet/X_train_pristine.npy`` (1,456,265 rows) and
-cross-checked on the TEST array (312,056 rows). Each identity below holds with
-``exact_fraction == 1.0`` at ``rtol = 1e-4`` and worst-case relative error ~1e-7 once
-the zero-duration convention is applied (both splits contain zero rows with
-Flow Duration == 0). This mirrors the repo's own audit,
-``outputs/cicids2017distrinet/feature_audit/structural_relationship_checks.csv``.
+Formula verification is performed against the pristine, unscaled TRAIN array
+``data/processed/CICIDS_2017_Distrinet/X_train_pristine.npy`` (1,456,265 rows).
+Each identity below has zero TRAIN violations at ``rtol=1e-4``. The rule set is
+frozen from training data; validation/test data never promotes, removes, or tunes a rule.
 
 Rate features are enabled here because the check passes; note the CICFlowMeter
 zero-duration convention (rate := 0 when Flow Duration == 0) is reproduced so an
@@ -82,42 +79,42 @@ DERIVED: tuple[DerivedFeature, ...] = (
         parents=("Total Length of Fwd Packet", "Total Fwd Packet"),
         formula=_fwd_packet_length_mean,
         expression="Total Length of Fwd Packet / max(Total Fwd Packet, 1)",
-        source="CICFlowMeter mean; empirical exact_fraction=1.0 (train+test, rtol 1e-4)",
+        source="CICFlowMeter mean; zero TRAIN violations at rtol=1e-4",
     ),
     DerivedFeature(
         name="Fwd Segment Size Avg",
         parents=("Fwd Packet Length Mean",),
         formula=_fwd_segment_size_avg,
         expression="Fwd Packet Length Mean",
-        source="structural_relationship_checks.csv: identity, satisfaction 1.0, max_rel_err 0",
+        source="CICFlowMeter identity; zero TRAIN violations",
     ),
     DerivedFeature(
         name="Fwd IAT Mean",
         parents=("Fwd IAT Total", "Total Fwd Packet"),
         formula=_fwd_iat_mean,
         expression="Fwd IAT Total / max(Total Fwd Packet - 1, 1)",
-        source="structural_relationship_checks.csv: 'Fwd IAT Total from mean and interval count' TRUE",
+        source="CICFlowMeter interval-count identity; zero TRAIN violations at rtol=1e-4",
     ),
     DerivedFeature(
         name="Fwd Packets/s",
         parents=("Total Fwd Packet", "Flow Duration"),
         formula=_rate(lambda x, i: _col(x, i, "Total Fwd Packet")),
         expression="Total Fwd Packet / (Flow Duration / 1e6)   [0 if duration==0]",
-        source="empirical exact_fraction=1.0 (train+test, rtol 1e-4) with zero-duration guard",
+        source="CICFlowMeter rate identity; zero TRAIN violations with zero-duration guard",
     ),
     DerivedFeature(
         name="Bwd Packets/s",
         parents=("Total Bwd packets", "Flow Duration"),
         formula=_rate(lambda x, i: _col(x, i, "Total Bwd packets")),
         expression="Total Bwd packets / (Flow Duration / 1e6)   [0 if duration==0]",
-        source="empirical exact_fraction=1.0 (train+test, rtol 1e-4) with zero-duration guard",
+        source="CICFlowMeter rate identity; zero TRAIN violations with zero-duration guard",
     ),
     DerivedFeature(
         name="Flow Packets/s",
         parents=("Total Fwd Packet", "Total Bwd packets", "Flow Duration"),
         formula=_rate(lambda x, i: _col(x, i, "Total Fwd Packet") + _col(x, i, "Total Bwd packets")),
         expression="(Total Fwd Packet + Total Bwd packets) / (Flow Duration / 1e6)   [0 if duration==0]",
-        source="empirical exact_fraction=1.0 (train+test, rtol 1e-4) with zero-duration guard",
+        source="CICFlowMeter rate identity; zero TRAIN violations with zero-duration guard",
     ),
     DerivedFeature(
         name="Flow Bytes/s",
@@ -126,7 +123,7 @@ DERIVED: tuple[DerivedFeature, ...] = (
             lambda x, i: _col(x, i, "Total Length of Fwd Packet") + _col(x, i, "Total Length of Bwd Packet")
         ),
         expression="(Total Length of Fwd Packet + Total Length of Bwd Packet) / (Flow Duration / 1e6)   [0 if duration==0]",
-        source="empirical exact_fraction=1.0 (train+test, rtol 1e-4) with zero-duration guard",
+        source="CICFlowMeter rate identity; zero TRAIN violations with zero-duration guard",
     ),
 )
 

@@ -73,11 +73,11 @@ class _BaseDecoderLatentAttack:
     @staticmethod
     def _targeted_loss(logits, target, objective, kappa):
         if objective == "ce":
-            return torch.nn.functional.cross_entropy(logits, target)
+            return torch.nn.functional.cross_entropy(logits, target, reduction="none")
         target_logit = logits.gather(1, target[:, None]).squeeze(1)
         masked = logits.clone()
         masked.scatter_(1, target[:, None], float("-inf"))
-        return torch.relu(masked.max(1).values - target_logit + kappa).mean()
+        return torch.relu(masked.max(1).values - target_logit + kappa)
 
     @staticmethod
     def _targeted_margin(logits, target):
@@ -101,7 +101,7 @@ class _BaseDecoderLatentAttack:
         x_adv = self._realize_continuous(raw0, decoded_adv, decoded_base_raw)
         x_adv.retain_grad()
         logits = victim((x_adv - center) / scale)
-        self._targeted_loss(logits, target, cfg.objective, cfg.kappa).backward()
+        self._targeted_loss(logits, target, cfg.objective, cfg.kappa).sum().backward()
 
         def norm(t):
             if t is None or t.grad is None:
@@ -118,7 +118,7 @@ class _BaseDecoderLatentAttack:
         z_adv = (z0 + cfg.init_noise * torch.randn_like(z0)).detach().requires_grad_(True)
         optimizer = torch.optim.Adam(self.optimizer_parameters(z_adv), lr=cfg.learning_rate)
         scheduler = (torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.steps)
-                     if cfg.lr_schedule == "cosine" else None)
+                     if cfg.lr_schedule == "cosine" and cfg.steps > 0 else None)
 
         for _ in range(cfg.steps):
             optimizer.zero_grad(set_to_none=True)
@@ -127,17 +127,22 @@ class _BaseDecoderLatentAttack:
             logits = victim((x_adv - center) / scale)
 
             cls_loss = self._targeted_loss(logits, target, cfg.objective, cfg.kappa)
-            latent_loss = (z_adv - z0).square().sum(1).mean()
-            cost_loss = ((x_adv - raw0).abs() / scale).mean(1).mean()
+            latent_loss = (z_adv - z0).square().sum(1)
+            cost_loss = ((x_adv - raw0).abs() / scale).mean(1)
             dist_sq = self._mahalanobis(z_adv, realism)
             if dist_sq is None:
-                realism_loss = torch.zeros((), device=raw0.device, dtype=raw0.dtype)
+                realism_loss = torch.zeros(raw0.shape[0], device=raw0.device, dtype=raw0.dtype)
             else:
-                realism_loss = torch.relu(dist_sq / realism["threshold_sq"].clamp(min=1e-12) - 1.0).mean()
-
-            loss = (cfg.lambda_cls * cls_loss + cfg.lambda_latent * latent_loss
-                    + cfg.lambda_cost * cost_loss + cfg.lambda_realism * realism_loss)
-            loss.backward()
+                realism_loss = torch.relu(
+                    dist_sq / realism["threshold_sq"].clamp(min=1e-12) - 1.0
+                )
+            loss_per_sample = (
+                cfg.lambda_cls * cls_loss
+                + cfg.lambda_latent * latent_loss
+                + cfg.lambda_cost * cost_loss
+                + cfg.lambda_realism * realism_loss
+            )
+            loss_per_sample.sum().backward()
             optimizer.step()
             if scheduler is not None:
                 scheduler.step()

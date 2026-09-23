@@ -307,11 +307,24 @@ def load_stage_a(
     adapter: CICIDS2017Adapter,
     checkpoint_path: str | Path,
     *,
+    expected_class_name: str,
     device: str | torch.device = "cpu",
 ) -> tuple[MixedInputBetaVAE, dict]:
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
     manifest = adapter.feature_manifest()
     manifest.assert_compatible_hash(checkpoint["manifest_hash"], context=str(checkpoint_path))
+    mapping = adapter.class_mapping()
+    if checkpoint.get("class_name") != expected_class_name:
+        raise ValueError(
+            f"{checkpoint_path}: expected class {expected_class_name!r}, "
+            f"got {checkpoint.get('class_name')!r}"
+        )
+    expected_class_id = mapping.name_to_id[expected_class_name]
+    if int(checkpoint.get("class_id", -1)) != expected_class_id:
+        raise ValueError(
+            f"{checkpoint_path}: expected class_id {expected_class_id}, "
+            f"got {checkpoint.get('class_id')!r}"
+        )
     cfg = checkpoint["model_config"]
     model = MixedInputBetaVAE(
         manifest=manifest,
@@ -330,7 +343,7 @@ def load_stage_a(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--classes", default=",".join(ATTACK_CLASSES))
-    parser.add_argument("--output-dir", type=Path, default=Path("outputs/cicids2017_vae_attacks/stage_a"))
+    parser.add_argument("--output-dir", type=Path, default=Path("outputs/cicids2017_vae_stage_a"))
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=2048)

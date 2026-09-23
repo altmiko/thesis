@@ -190,9 +190,10 @@ def audit_output(output_dir: Path, *, tolerance: float = 1e-6) -> dict:
 
     seed_tsv = [row["micro"]["targeted_strict_valid_asr"] for row in seed_rows]
     provenance_required = {
-        "row_id", "dataset", "class", "victim", "method", "seed", "true_label",
-        "clean_prediction", "final_adversarial_prediction", "clean_correct", "target_success",
-        "validity_flags", "cost", "git_commit", "config", "checkpoint_identifiers",
+        "row_id", "dataset", "class_name", "victim", "method", "seed", "true_label",
+        "clean_prediction", "final_adversarial_prediction", "clean_correct",
+        "target_success_flag", "strict_valid", "cost_total", "git_commit", "git_dirty",
+        "source_tree_sha256", "run_id", "config_json", "checkpoint_identifiers_json",
     }
     artifact_keys: set[str] = set()
     if cells:

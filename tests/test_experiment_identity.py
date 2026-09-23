@@ -8,12 +8,15 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 from datasets.cicids2017 import CICIDS2017Adapter
+from src.classifiers.cicids2017d_victims import load_category_victim
+from vae.cicids2017_stage_a import load_stage_a
 
 
 ATTACK_CLASSES = {"DoS": 1, "DDoS": 2, "Recon": 3, "BruteForce": 4}
@@ -75,7 +78,7 @@ def test_all_victim_checkpoint_dimensions_match_experiment():
 def test_all_vae_checkpoint_classes_and_schema_match_experiment():
     adapter = CICIDS2017Adapter(REPO)
     manifest_hash = adapter.feature_manifest().content_hash
-    checkpoint_dir = REPO / "outputs/cicids2017_vae_attacks/stage_a"
+    checkpoint_dir = REPO / "outputs/cicids2017_vae_stage_a"
     for class_name, class_id in ATTACK_CLASSES.items():
         checkpoint = torch.load(
             checkpoint_dir / f"vae_{class_name}.pt", map_location="cpu", weights_only=True
@@ -85,3 +88,19 @@ def test_all_vae_checkpoint_classes_and_schema_match_experiment():
         assert checkpoint["manifest_hash"] == manifest_hash
         assert int(checkpoint["model_config"]["latent_dim"]) == 16
         assert float(checkpoint["training_config"]["beta_target"]) == 0.5
+
+
+def test_loaders_reject_wrong_model_and_class_identity():
+    adapter = CICIDS2017Adapter(REPO)
+    with pytest.raises(ValueError, match="expected model_type"):
+        load_category_victim(
+            REPO / "outputs/cicids2017distrinet/models/mlp_category.pt",
+            adapter=adapter,
+            expected_model_type="cnn",
+        )
+    with pytest.raises(ValueError, match="expected class"):
+        load_stage_a(
+            adapter,
+            REPO / "outputs/cicids2017_vae_stage_a/vae_DoS.pt",
+            expected_class_name="DDoS",
+        )

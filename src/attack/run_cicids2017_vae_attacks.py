@@ -300,7 +300,9 @@ def run(
         class_id = mapping.name_to_id[class_name]
         checkpoint_path = stage_a_dir / f"vae_{class_name}.pt"
         idr_path = stage_a_dir / f"idr_{class_name}.npz"
-        base_model, checkpoint = load_stage_a(adapter, checkpoint_path, device=device)
+        base_model, checkpoint = load_stage_a(
+            adapter, checkpoint_path, expected_class_name=class_name, device=device
+        )
         base_state = checkpoint["state_dict"]
         if resolved is not None:
             mutable_mask = resolved.perturbable_mask().to(device)
@@ -330,7 +332,8 @@ def run(
 
         for victim_name in victims:
             victim = load_category_victim(
-                victim_dir / f"{victim_name}_category.pt", device=device
+                victim_dir / f"{victim_name}_category.pt",
+                adapter=adapter, expected_model_type=victim_name, device=device,
             )
             victim_results: dict = {}
             for ablation in ablations:

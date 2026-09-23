@@ -36,8 +36,14 @@ def setup():
     raw = torch.tensor(np.ascontiguousarray(np.asarray(
         np.load(ad._processed / "X_test_pristine.npy", mmap_mode="r")[rows]), dtype=np.float32))
     repo = ad.repo_root
-    vae, _ = load_stage_a(ad, repo / "outputs/cicids2017_vae_attacks/stage_a/vae_DoS.pt")
-    victim = load_category_victim(repo / "outputs/cicids2017distrinet/models/mlp_category.pt")
+    vae, _ = load_stage_a(
+        ad, repo / "outputs/cicids2017_vae_stage_a/vae_DoS.pt",
+        expected_class_name="DoS",
+    )
+    victim = load_category_victim(
+        repo / "outputs/cicids2017distrinet/models/mlp_category.pt",
+        adapter=ad, expected_model_type="mlp",
+    )
     int_idx = [model.i[n] for n in rmask.mask.perturbable if n in _INTEGER_FEATURES]
     cfg = LatentAttackConfig(steps=8, learning_rate=0.08, epsilon_z=10.0)
     return dict(model=model, rmask=rmask, projector=projector, center=center, scale=scale,
@@ -113,6 +119,26 @@ def test_same_seed_reproduces_result(setup, variant):
         res = atk.attack(setup["vae"], victim, raw, center, scale, target_class=0)
         outs.append(res.x_adv_realized_raw)
     assert torch.equal(outs[0], outs[1])
+
+
+@pytest.mark.parametrize("variant", ["raw", "masked"])
+def test_attack_is_invariant_to_unrelated_batch_rows(setup, variant):
+    raw, center, scale, victim = setup["raw"], setup["center"], setup["scale"], setup["victim"]
+    torch.manual_seed(321)
+    full = _make(setup, variant).attack(
+        setup["vae"], victim, raw[:16], center, scale, target_class=0
+    )
+    torch.manual_seed(321)
+    subset = _make(setup, variant).attack(
+        setup["vae"], victim, raw[:8], center, scale, target_class=0
+    )
+    latent_atol = 1e-4 if variant == "raw" else 1e-6
+    raw_atol = 1e-2 if variant == "raw" else 1e-5
+    assert torch.allclose(full.z_adv[:8], subset.z_adv, atol=latent_atol, rtol=1e-6)
+    assert torch.allclose(
+        full.x_adv_realized_raw[:8], subset.x_adv_realized_raw, atol=raw_atol, rtol=1e-6
+    )
+    assert torch.equal(full.realized_logits[:8].argmax(1), subset.realized_logits.argmax(1))
 
 
 @pytest.mark.parametrize("variant", ["raw", "masked"])
