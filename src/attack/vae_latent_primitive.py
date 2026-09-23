@@ -216,7 +216,7 @@ class LatentPrimitiveAttack:
                 raw0, decoded_adv_raw, decoded_base_raw, bounds)
             x_cont = self.primitive_model.generate(raw0, controls_cont, quantize=False)
             logits_cont = victim((x_cont - center) / scale)
-            controls_real = self.primitive_model.project_controls(raw0, controls_cont)
+            controls_real = self.primitive_model.project_controls(raw0, controls_cont, bounds)
             x_real = self.primitive_model.generate(raw0, controls_real, quantize=True)
             logits_real = victim((x_real - center) / scale)
             dz = z_adv - z0

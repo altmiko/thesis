@@ -30,7 +30,7 @@ def _engine_and_model():
     x_raw = transform.inverse_transform(np.asarray(split.x[idx]))
 
     l1 = [RobustTailBound.fit(manifest, x_raw, feature_names=["Header_Length", "Rate", "IAT"], tau=6.0)]
-    l2 = load_layer2(_REPO / "constraints" / "ciciot2023" / "mined.json", manifest)
+    l2 = load_layer2(_REPO / "old_constraints" / "ciciot2023" / "mined.json", manifest)
     engine = ConstraintEngine(manifest, layer1=l1, layer2=l2)
 
     torch.manual_seed(0)

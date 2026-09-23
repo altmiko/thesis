@@ -1,0 +1,699 @@
+{
+  "schema_version": "2.0",
+  "dataset": "cicids2017_distrinet",
+  "mining": {
+    "fit_split": "train",
+    "confirm_split": "val",
+    "test_used": false,
+    "discovery_sample": 200000,
+    "val_sample": 200000,
+    "prefilter_support": 0.99,
+    "train_support_threshold": 0.999,
+    "val_support_threshold": 0.995,
+    "tolerance_percentile": 99.9,
+    "min_antecedent_rate": 0.01,
+    "min_antecedent_rows": 1000,
+    "candidates_tested": 7586,
+    "candidates_by_family": {
+      "pairwise": 4425,
+      "arithmetic": 3140,
+      "implication": 21
+    },
+    "accepted_pre_prune": 24,
+    "retained_rules": 16,
+    "seed": 42
+  },
+  "rules": [
+    {
+      "id": "MINED_0001",
+      "name": "order::Fwd Packet Length Min<=Mean<=Max",
+      "source_type": "MINED",
+      "rule_type": "monotone_chain",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "features": [
+          "Fwd Packet Length Min",
+          "Fwd Packet Length Mean",
+          "Fwd Packet Length Max"
+        ]
+      },
+      "features": [
+        "Fwd Packet Length Min",
+        "Fwd Packet Length Mean",
+        "Fwd Packet Length Max"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "Ordered statistics are non-decreasing: Fwd Packet Length Min <= Fwd Packet Length Mean <= Fwd Packet Length Max. A mean cannot fall below the minimum or above the maximum of the same group.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "monotone_chain"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 200000,
+        "antecedent_rate": null,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 1456265,
+        "eligible_rows_val_full": 312058,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0002",
+      "name": "order::Bwd Packet Length Min<=Mean<=Max",
+      "source_type": "MINED",
+      "rule_type": "monotone_chain",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "features": [
+          "Bwd Packet Length Min",
+          "Bwd Packet Length Mean",
+          "Bwd Packet Length Max"
+        ]
+      },
+      "features": [
+        "Bwd Packet Length Min",
+        "Bwd Packet Length Mean",
+        "Bwd Packet Length Max"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "Ordered statistics are non-decreasing: Bwd Packet Length Min <= Bwd Packet Length Mean <= Bwd Packet Length Max. A mean cannot fall below the minimum or above the maximum of the same group.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "monotone_chain"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 200000,
+        "antecedent_rate": null,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 1456265,
+        "eligible_rows_val_full": 312058,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0003",
+      "name": "order::Flow IAT Min<=Mean<=Max",
+      "source_type": "MINED",
+      "rule_type": "monotone_chain",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "features": [
+          "Flow IAT Min",
+          "Flow IAT Mean",
+          "Flow IAT Max"
+        ]
+      },
+      "features": [
+        "Flow IAT Min",
+        "Flow IAT Mean",
+        "Flow IAT Max"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "Ordered statistics are non-decreasing: Flow IAT Min <= Flow IAT Mean <= Flow IAT Max. A mean cannot fall below the minimum or above the maximum of the same group.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "monotone_chain"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 200000,
+        "antecedent_rate": null,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 1456265,
+        "eligible_rows_val_full": 312058,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0004",
+      "name": "order::Fwd IAT Min<=Mean<=Max",
+      "source_type": "MINED",
+      "rule_type": "monotone_chain",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "features": [
+          "Fwd IAT Min",
+          "Fwd IAT Mean",
+          "Fwd IAT Max"
+        ]
+      },
+      "features": [
+        "Fwd IAT Min",
+        "Fwd IAT Mean",
+        "Fwd IAT Max"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "Ordered statistics are non-decreasing: Fwd IAT Min <= Fwd IAT Mean <= Fwd IAT Max. A mean cannot fall below the minimum or above the maximum of the same group.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "monotone_chain"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 200000,
+        "antecedent_rate": null,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 1456265,
+        "eligible_rows_val_full": 312058,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0005",
+      "name": "order::Bwd IAT Min<=Mean<=Max",
+      "source_type": "MINED",
+      "rule_type": "monotone_chain",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "features": [
+          "Bwd IAT Min",
+          "Bwd IAT Mean",
+          "Bwd IAT Max"
+        ]
+      },
+      "features": [
+        "Bwd IAT Min",
+        "Bwd IAT Mean",
+        "Bwd IAT Max"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "Ordered statistics are non-decreasing: Bwd IAT Min <= Bwd IAT Mean <= Bwd IAT Max. A mean cannot fall below the minimum or above the maximum of the same group.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "monotone_chain"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 200000,
+        "antecedent_rate": null,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 1456265,
+        "eligible_rows_val_full": 312058,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0006",
+      "name": "order::Packet Length Min<=Mean<=Max",
+      "source_type": "MINED",
+      "rule_type": "monotone_chain",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "features": [
+          "Packet Length Min",
+          "Packet Length Mean",
+          "Packet Length Max"
+        ]
+      },
+      "features": [
+        "Packet Length Min",
+        "Packet Length Mean",
+        "Packet Length Max"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "Ordered statistics are non-decreasing: Packet Length Min <= Packet Length Mean <= Packet Length Max. A mean cannot fall below the minimum or above the maximum of the same group.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "monotone_chain"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 200000,
+        "antecedent_rate": null,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 1456265,
+        "eligible_rows_val_full": 312058,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0007",
+      "name": "order::Active Min<=Mean<=Max",
+      "source_type": "MINED",
+      "rule_type": "monotone_chain",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "features": [
+          "Active Min",
+          "Active Mean",
+          "Active Max"
+        ]
+      },
+      "features": [
+        "Active Min",
+        "Active Mean",
+        "Active Max"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "Ordered statistics are non-decreasing: Active Min <= Active Mean <= Active Max. A mean cannot fall below the minimum or above the maximum of the same group.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "monotone_chain"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 200000,
+        "antecedent_rate": null,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 1456265,
+        "eligible_rows_val_full": 312058,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0008",
+      "name": "order::Idle Min<=Mean<=Max",
+      "source_type": "MINED",
+      "rule_type": "monotone_chain",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "features": [
+          "Idle Min",
+          "Idle Mean",
+          "Idle Max"
+        ]
+      },
+      "features": [
+        "Idle Min",
+        "Idle Mean",
+        "Idle Max"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "Ordered statistics are non-decreasing: Idle Min <= Idle Mean <= Idle Max. A mean cannot fall below the minimum or above the maximum of the same group.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "monotone_chain"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 200000,
+        "antecedent_rate": null,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 1456265,
+        "eligible_rows_val_full": 312058,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0009",
+      "name": "sum::PSH Flag Count==Fwd PSH Flags+Bwd PSH Flags",
+      "source_type": "MINED",
+      "rule_type": "sum_equality",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "lhs": "PSH Flag Count",
+        "addends": [
+          "Fwd PSH Flags",
+          "Bwd PSH Flags"
+        ]
+      },
+      "features": [
+        "PSH Flag Count",
+        "Fwd PSH Flags",
+        "Bwd PSH Flags"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 1e-06
+      },
+      "description": "PSH Flag Count equals the sum of Fwd PSH Flags and Bwd PSH Flags.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "sum_equality"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "train_rel_residual_p999": 0.0,
+        "val_rel_residual_p999": 0.0,
+        "eligible_rows_train": 200000,
+        "abs_error": {
+          "p50": 0.0,
+          "p99": 0.0,
+          "max": 0.0
+        },
+        "rel_error": {
+          "p50": 0.0,
+          "p99": 0.0,
+          "max": 0.0
+        },
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 1456265,
+        "eligible_rows_val_full": 312058,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0010",
+      "name": "impl0::Total Bwd packets==0=>Total Length of Bwd Packet==0",
+      "source_type": "MINED",
+      "rule_type": "implication_zero",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "antecedent": "Total Bwd packets",
+        "consequent": "Total Length of Bwd Packet"
+      },
+      "features": [
+        "Total Bwd packets",
+        "Total Length of Bwd Packet"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "When Total Bwd packets is zero, Total Length of Bwd Packet is also zero.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "implication_zero"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 2065,
+        "antecedent_rate": 0.010325,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 14566,
+        "eligible_rows_val_full": 32750,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0011",
+      "name": "impl0::Total Bwd packets==0=>Bwd IAT Total==0",
+      "source_type": "MINED",
+      "rule_type": "implication_zero",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "antecedent": "Total Bwd packets",
+        "consequent": "Bwd IAT Total"
+      },
+      "features": [
+        "Total Bwd packets",
+        "Bwd IAT Total"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "When Total Bwd packets is zero, Bwd IAT Total is also zero.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "implication_zero"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 2065,
+        "antecedent_rate": 0.010325,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 14566,
+        "eligible_rows_val_full": 32750,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0012",
+      "name": "impl0::Total Bwd packets==0=>Bwd IAT Mean==0",
+      "source_type": "MINED",
+      "rule_type": "implication_zero",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "antecedent": "Total Bwd packets",
+        "consequent": "Bwd IAT Mean"
+      },
+      "features": [
+        "Total Bwd packets",
+        "Bwd IAT Mean"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "When Total Bwd packets is zero, Bwd IAT Mean is also zero.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "implication_zero"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 2065,
+        "antecedent_rate": 0.010325,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 14566,
+        "eligible_rows_val_full": 32750,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0013",
+      "name": "impl0::Total Bwd packets==0=>Bwd IAT Std==0",
+      "source_type": "MINED",
+      "rule_type": "implication_zero",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "antecedent": "Total Bwd packets",
+        "consequent": "Bwd IAT Std"
+      },
+      "features": [
+        "Total Bwd packets",
+        "Bwd IAT Std"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "When Total Bwd packets is zero, Bwd IAT Std is also zero.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "implication_zero"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 2065,
+        "antecedent_rate": 0.010325,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 14566,
+        "eligible_rows_val_full": 32750,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0014",
+      "name": "impl0::Total Bwd packets==0=>Bwd IAT Max==0",
+      "source_type": "MINED",
+      "rule_type": "implication_zero",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "antecedent": "Total Bwd packets",
+        "consequent": "Bwd IAT Max"
+      },
+      "features": [
+        "Total Bwd packets",
+        "Bwd IAT Max"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "When Total Bwd packets is zero, Bwd IAT Max is also zero.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "implication_zero"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 2065,
+        "antecedent_rate": 0.010325,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 14566,
+        "eligible_rows_val_full": 32750,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0015",
+      "name": "impl0::Total Bwd packets==0=>Bwd IAT Min==0",
+      "source_type": "MINED",
+      "rule_type": "implication_zero",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "antecedent": "Total Bwd packets",
+        "consequent": "Bwd IAT Min"
+      },
+      "features": [
+        "Total Bwd packets",
+        "Bwd IAT Min"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "When Total Bwd packets is zero, Bwd IAT Min is also zero.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "implication_zero"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 2065,
+        "antecedent_rate": 0.010325,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 14566,
+        "eligible_rows_val_full": 32750,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    },
+    {
+      "id": "MINED_0016",
+      "name": "impl0::Total Bwd packets==0=>Bwd Packets/s==0",
+      "source_type": "MINED",
+      "rule_type": "implication_zero",
+      "hardness": "EMPIRICAL",
+      "params": {
+        "antecedent": "Total Bwd packets",
+        "consequent": "Bwd Packets/s"
+      },
+      "features": [
+        "Total Bwd packets",
+        "Bwd Packets/s"
+      ],
+      "tolerance": {
+        "absolute": 1e-06,
+        "relative": 0.0
+      },
+      "description": "When Total Bwd packets is zero, Bwd Packets/s is also zero.",
+      "provenance": {
+        "origin": "empirically mined from train split",
+        "external_reference": null,
+        "automatically_mined": true,
+        "template": "implication_zero"
+      },
+      "evidence": {
+        "train_support": 1.0,
+        "validation_support": 1.0,
+        "eligible_rows_train": 2065,
+        "antecedent_rate": 0.010325,
+        "train_support_full": 1.0,
+        "validation_support_full": 1.0,
+        "train_rows_full": 1456265,
+        "validation_rows_full": 312058,
+        "eligible_rows_train_full": 14566,
+        "eligible_rows_val_full": 32750,
+        "why_accepted": "train support 1.000000 >= 0.999 and held-out validation support 1.000000 >= 0.995"
+      }
+    }
+  ]
+}

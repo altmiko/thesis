@@ -26,7 +26,7 @@ def _cells(path):
 
 
 def _pooled(cells, seed=None):
-    d = {"denom": 0, "tb": 0, "tsv": 0, "cost": [], "pave": [], "mined": [], "real": [],
+    d = {"denom": 0, "tb": 0, "tsv": 0, "cost": [], "mined": [], "real": [],
          "idr": [], "lat": []}
     for c in cells:
         if seed is not None and c["seed"] != seed:
@@ -34,8 +34,8 @@ def _pooled(cells, seed=None):
         d["denom"] += c["n_clean_correct"]
         d["tb"] += c["n_targeted_benign_success"]
         d["tsv"] += c["n_targeted_strict_valid"]
-        for k, key in (("cost", "cost_total_mean"), ("pave", "pave_validity"),
-                       ("mined", "mined_validity"), ("real", "realizability_aware_validity")):
+        for k, key in (("cost", "cost_total_mean"), ("mined", "mined_validity"),
+                       ("real", "realizability_aware_validity_diagnostic")):
             if key in c and c[key] == c[key]:
                 d[k].append(c[key])
         idr = c.get("IDR", c.get("IDR_generator_relative"))
@@ -50,7 +50,7 @@ def _fmt(d):
     m = lambda xs: (float(np.mean(xs)) if xs else float("nan"))
     return {"tb": d["tb"] / d["denom"] if d["denom"] else float("nan"),
             "tsv": d["tsv"] / d["denom"] if d["denom"] else float("nan"),
-            "cost": m(d["cost"]), "pave": m(d["pave"]), "mined": m(d["mined"]),
+            "cost": m(d["cost"]), "mined": m(d["mined"]),
             "real": m(d["real"]), "idr": m(d["idr"]), "lat": m(d["lat"])}
 
 
@@ -63,21 +63,21 @@ def main() -> None:
     victims = list(dict.fromkeys(c["victim"] for c in latent)) or ["mlp", "cnn", "lstm", "serial"]
     L = ["# Attack comparison — CICIDS2017-DistriNet\n",
          "Denominator: clean-correct malicious test rows per (class,victim). Target: Benign. "
-         "strict = PAVE ∧ mined ∧ internal-realizability. Cost = mean normalized L1 (physical/primitive space).\n"]
+         "strict = validator_v2 hybrid_valid. Cost = mean normalized L1 (physical/primitive space).\n"]
 
     # ---- Method comparison (pooled micro over all cells, seed 42) ----
     L.append("## Method comparison (pooled/micro, seed 42)\n")
-    L.append("| Method | Targeted-Benign ASR | Targeted Strict-Valid ASR | Primitive cost | PAVE | Mined | Realizability | IDR/realism |")
-    L.append("|---|--:|--:|--:|--:|--:|--:|--:|")
+    L.append("| Method | Targeted-Benign ASR | Targeted v2-Valid ASR | Primitive cost | v2 Hybrid | Realizability diagnostic | IDR/realism |")
+    L.append("|---|--:|--:|--:|--:|--:|--:|")
     for name, cells in (("Input PGD (unconstrained)", inp), ("Primitive-Direct (baseline)", direct),
                         ("VAE-Latent-Primitive (proposed)", latent)):
         if not cells:
-            L.append(f"| {name} | – | – | – | – | – | – | – |"); continue
+            L.append(f"| {name} | – | – | – | – | – | – |"); continue
         f = _fmt(_pooled(cells, seed=42))
         idr = "generator-rel." if "proposed" in name else ("%.1f" % (f["idr"]*100) if f["idr"]==f["idr"] else "–")
         idrv = ("%.1f (gen-rel.)" % (f["idr"]*100)) if "proposed" in name else (("%.1f" % (f["idr"]*100)) if f["idr"]==f["idr"] else "–")
         L.append(f"| {name} | {f['tb']*100:.1f} | {f['tsv']*100:.1f} | {f['cost']:.3f} "
-                 f"| {f['pave']*100:.1f} | {f['mined']*100:.1f} | {f['real']*100:.1f} | {idrv} |")
+                 f"| {f['mined']*100:.1f} | {f['real']*100:.1f} | {idrv} |")
 
     # ---- Proposed method per class x victim (mean+/-std over seeds) ----
     L.append("\n## Proposed VAE-latent method (per class × victim, mean±std over seeds)\n")
@@ -136,7 +136,7 @@ def main() -> None:
             if not f.exists():
                 continue
             d = np.load(f)
-            strict = d["pave_valid"].astype(bool) & d["mined_valid"].astype(bool) & d["realizable"].astype(bool)
+            strict = d["strict_valid"].astype(bool)
             ok = d["clean_correct"].astype(bool) & d["benign"].astype(bool) & strict
             if ok.sum() == 0:
                 continue

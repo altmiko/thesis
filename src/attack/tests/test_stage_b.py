@@ -38,7 +38,7 @@ def _setup(mode="both", freeze_all=False):
             mutable[manifest.index_by_name(nfrozen)] = False
     head = ResidualHead(16, manifest.n_features)
     gen = ResidualAttackGenerator(vae, projector, mutable, head=head, mode=mode)
-    l2 = load_layer2(_REPO / "constraints" / "ciciot2023" / "mined.json", manifest)
+    l2 = load_layer2(_REPO / "old_constraints" / "ciciot2023" / "mined.json", manifest)
     engine = ConstraintEngine(manifest, layer1=[], layer2=l2)
     return adapter, manifest, transform, gen, engine
 

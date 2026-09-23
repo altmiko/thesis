@@ -9,7 +9,7 @@ number that was tuned on val/test.
 |---|------|-----------------|-------------|---------|
 | A | **Algebraic identities** (`p, alpha` -> feature map) | CICFlowMeter extractor semantics + 0% train violation across 400k–600k rows | `generate()` recomputes them; realizability validator re-checks | `attack/realizability/cicids2017.py` |
 | B | **Exact derivations** (manifest) | 0% train violation, 100% val pass | Layer-0 projector recomputes | `datasets/cicids2017.py::_DERIVATIONS`, `constraints/layer0.py` |
-| C | **Mined density rules** (Layer 2) | fit on 1,456,265 pristine train rows; keep if train violation-rate ≤ 1% | `ConstraintEngine` Layer 2 (validation only) | `constraints/cicids2017_distrinet/mined.json` |
+| C | **Mined density rules** (Layer 2) | fit on 1,456,265 pristine train rows; keep if train violation-rate ≤ 1% | `ConstraintEngine` Layer 2 (validation only) | `old_constraints/cicids2017_distrinet/mined.json` |
 | D | **Robust tail bound** (Layer 1) | median/IQR/tau fit on first 200,000 pristine train rows | `ConstraintEngine` Layer 1 (validation) | `constraints/layer1.py::RobustTailBound.fit` |
 
 (CFF — *which* features are perturbable — is a fifth, separate data-driven ingredient; see
@@ -87,7 +87,7 @@ exist and each validates its parent arity — anything else raises.
 ## C. Mined density rules (Layer 2) — `mined.json`
 
 This is the file people usually mean by "the mined constraints." It lives at
-`constraints/cicids2017_distrinet/mined.json` and is loaded verbatim by the engine
+`old_constraints/cicids2017_distrinet/mined.json` and is loaded verbatim by the engine
 (`constraints/layer2.py::load_layer2` → `registry.build_constraint`).
 
 ### The mining procedure
@@ -153,7 +153,7 @@ The `ProductEquality.validate` test is a **relative** one:
 
 `load_layer2` checks the declared `dataset` matches the manifest, rebuilds each rule via the
 registry, and tags it `layer = 2` regardless of its underlying class. The CICIoT2023 sibling
-file `constraints/ciciot2023/mined.json` uses the same format.
+file `old_constraints/ciciot2023/mined.json` uses the same format.
 
 ---
 

@@ -1,7 +1,7 @@
 # 03 — The Constraint Engine and Its Layers
 
 **Source:** `src/constraints/{base,layer0,layer1,layer2,registry,engine}.py`.
-**Serialized rules:** `constraints/<dataset>/mined.json`.
+**Serialized rules:** `old_constraints/<dataset>/mined.json`.
 
 The constraint engine is the machinery that *applies* the discovered constraints (doc 02). It
 implements a **three-layer hierarchy** and keeps **generation** (projection + soft penalties)

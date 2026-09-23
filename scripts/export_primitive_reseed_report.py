@@ -136,8 +136,7 @@ def main() -> None:
                 if not f.exists():
                     continue
                 d = np.load(f)
-                strict = (d["pave_valid"].astype(bool) & d["mined_valid"].astype(bool)
-                          & d["realizable"].astype(bool))
+                strict = d["strict_valid"].astype(bool)
                 ok = d["clean_correct"].astype(bool) & d["benign"].astype(bool) & strict
                 idxs = np.flatnonzero(ok)
                 if idxs.size == 0:

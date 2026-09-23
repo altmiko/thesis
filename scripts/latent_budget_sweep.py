@@ -33,8 +33,10 @@ def main() -> None:
                                  lambda_latent=0.005, lambda_cost=lc, lambda_realism=0.001,
                                  epsilon_z=10.0, init_noise=0.3)
         res = run(classes=list(ATTACK_CLASSES), victims=list(VICTIMS), device="cpu",
-                  test_limit=512, cost_weight=0.01, p_max=1460.0, alpha_max=100.0, mtu_cap=0.0,
-                  stage_a_dir=None, output_dir=out_root / f"lc{lc}", seeds=[42], config=cfg,
+                  test_limit=512, cost_weight=0.01,
+                  calibration_path=Path("artifacts/primattack/budget_calibration.json"),
+                  budget_name="maximum-evaluated", stage_a_dir=None,
+                  output_dir=out_root / f"lc{lc}", seeds=[42], config=cfg,
                   variant=f"lc{lc}")
         pt = _pooled(res["cells"]); pt["lambda_cost"] = lc
         rows.append(pt); print(json.dumps(pt), flush=True)

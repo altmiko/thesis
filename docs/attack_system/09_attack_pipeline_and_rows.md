@@ -29,7 +29,7 @@ STAGE CFF  Conditional Feature Freedom (preprocessing/conditional_feature_freedo
   rank perturbable features per class on TRAIN only -> outputs/cff_.../masks/*.npy
   (consumed only by the masked ladder run_cicids2017_vae_attacks.py)
 
-STAGE C  Mined constraints (constraints/cicids2017_distrinet/mined.json)  [static, TRAIN-mined]
+STAGE C  Mined constraints (old_constraints/cicids2017_distrinet/mined.json)  [static, TRAIN-mined]
 
 ATTACK  (primitive / latent / input-baseline / masked)
   for class -> pick rows -> load VAE+IDR -> build A4 engine -> per-flow bounds

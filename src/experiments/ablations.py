@@ -126,7 +126,7 @@ def build_ablation(
 
     layer2 = []
     if 2 in want:
-        path = layer2_path or (_REPO / "constraints" / adapter.name / "mined.json")
+        path = layer2_path or (_REPO / "old_constraints" / adapter.name / "mined.json")
         layer2 = load_layer2(path, manifest)
 
     engine = ConstraintEngine(

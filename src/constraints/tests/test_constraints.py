@@ -218,7 +218,7 @@ def test_ciciot_layer0_high_pass_and_layer2_loads():
     idx = np.arange(min(20000, split.x.shape[0]))
     x_raw = torch.tensor(transform.inverse_transform(np.asarray(split.x[idx])), dtype=torch.float32)
 
-    l2 = load_layer2(_REPO / "constraints" / "ciciot2023" / "mined.json", manifest)
+    l2 = load_layer2(_REPO / "old_constraints" / "ciciot2023" / "mined.json", manifest)
     engine = ConstraintEngine(manifest, layer1=[], layer2=l2)
     v = engine.validate(x_raw)
     # real clean data must be within Layer-0 semantic domain essentially always

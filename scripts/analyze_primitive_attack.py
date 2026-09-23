@@ -165,7 +165,7 @@ def main() -> None:
             if d is None:
                 continue
             sub = d["clean_correct"].astype(bool) & d["benign"].astype(bool) & \
-                  d["pave_valid"].astype(bool) & d["mined_valid"].astype(bool) & d["realizable"].astype(bool)
+                  d["strict_valid"].astype(bool)
             P.append(d["p"][sub]); A.append(d["alpha"][sub])
         P = np.concatenate(P) if P else np.array([]); A = np.concatenate(A) if A else np.array([])
         if P.size == 0:
@@ -175,8 +175,8 @@ def main() -> None:
 
     # ---------- Table 3: validity breakdown (seed 42, macro over victims) ----------
     L.append("\n## Validity breakdown (mean over victims, seed 42)\n")
-    L.append("| Class | Feature (PAVE) | Dependency | Mined | Discrete | Realizability-aware | Strict |")
-    L.append("|---|--:|--:|--:|--:|--:|--:|")
+    L.append("| Class | Dependency diagnostic | v2 Hybrid | Discrete diagnostic | Realizability diagnostic | Strict (=v2) |")
+    L.append("|---|--:|--:|--:|--:|--:|")
     for cl in classes:
         acc = defaultdict(list)
         for v in victims:
@@ -184,10 +184,10 @@ def main() -> None:
             if not g:
                 continue
             x = g[0]
-            acc["pave"].append(x["pave_validity"]); acc["dep"].append(x["dependency_validity"])
+            acc["dep"].append(x["dependency_validity"])
             acc["mined"].append(x["mined_validity"]); acc["disc"].append(x["discreteness_validity"])
             acc["real"].append(x["realizability_aware_validity"]); acc["strict"].append(x["strict_validity"])
-        L.append(f"| {cl} | {_mean(acc['pave'])*100:.1f} | {_mean(acc['dep'])*100:.1f} | {_mean(acc['mined'])*100:.1f} "
+        L.append(f"| {cl} | {_mean(acc['dep'])*100:.1f} | {_mean(acc['mined'])*100:.1f} "
                  f"| {_mean(acc['disc'])*100:.1f} | {_mean(acc['real'])*100:.1f} | {_mean(acc['strict'])*100:.1f} |")
 
     # ---------- Table 4: failure reasons (pooled seed 42) ----------
@@ -215,7 +215,7 @@ def main() -> None:
             if d is None:
                 continue
             cc = d["clean_correct"].astype(bool)
-            strict = d["pave_valid"].astype(bool) & d["mined_valid"].astype(bool) & d["realizable"].astype(bool)
+            strict = d["strict_valid"].astype(bool)
             cc_all.append(cc); tb_all.append(d["benign"].astype(bool)); tsv_all.append(d["benign"].astype(bool) & strict)
         cc_all = np.concatenate(cc_all); tb_all = np.concatenate(tb_all); tsv_all = np.concatenate(tsv_all)
         tb = tb_all[cc_all].mean(); tsv = tsv_all[cc_all].mean()
@@ -270,7 +270,7 @@ def main() -> None:
             d = dist_rows.get((cl, v))
             if d is None:
                 continue
-            strict = d["pave_valid"].astype(bool) & d["mined_valid"].astype(bool) & d["realizable"].astype(bool)
+            strict = d["strict_valid"].astype(bool)
             ok = d["clean_correct"].astype(bool) & d["benign"].astype(bool) & strict
             idxs = np.flatnonzero(ok)
             if idxs.size == 0:

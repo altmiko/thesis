@@ -62,8 +62,8 @@ DatasetAdapter ─► FeatureManifest ──► FeatureTransform (train-only, fa
 | `src/constraints/layer2.py` | **new** | JSON rule-set loader/dumper (dataset-guarded) |
 | `src/constraints/engine.py` | **new** | `ConstraintEngine`: `project`, `penalty` (C1/C2), hierarchical `validate` (rate_l0 / rate_l0_l1 / rate_l0_l1_l2) |
 | `src/constraints/registry.py` | **new** | serializable type registry |
-| `constraints/ciciot2023/mined.json` | **new** | Layer-2 rule set (order, half-range, Tot=N·AVG, Var=Std²) |
-| `constraints/cicids2017_distrinet/mined.json` | **new** | 14 train-mined order/product rules; zero train violations at the retained tolerance |
+| `old_constraints/ciciot2023/mined.json` | **new** | Layer-2 rule set (order, half-range, Tot=N·AVG, Var=Std²) |
+| `old_constraints/cicids2017_distrinet/mined.json` | **new** | 14 train-mined order/product rules; zero train violations at the retained tolerance |
 | `src/vae/cicids2017_stage_a.py` | **new** | four per-attack-class typed β-VAEs; train-only loss weights; val checkpoint selection and IDR calibration |
 | `src/classifiers/cicids2017d_victims.py` | **new** | safe loading of the four existing category victims with attack input gradients |
 | `src/attack/run_cicids2017_vae_attacks.py` | **new** | CICIDS A1–A6 runner; CFF masks; Stage-B; hierarchical ASR/IDR/True-IDSR |
@@ -87,7 +87,7 @@ To support a new flow dataset you write **one adapter file** only:
 3. Implement `feature_transform()` — `FeatureTransform.fit(X_train)` or
    `from_sklearn_scaler(scaler, manifest)`.
 4. Implement `load_split()`.
-5. *Optional*: drop `constraints/<dataset>/mined.json` for Layer 2.
+5. *Optional*: drop `old_constraints/<dataset>/mined.json` for Layer 2.
 
 You do **not** edit dataset-specific logic into the decoder, constraint engine, attack
 head, Stage-B trainer, or validators. `src/datasets/cicids2017.py` now implements this
@@ -108,7 +108,7 @@ percentile Mahalanobis gate; test is attack/evaluation only.
 |---|---|---|---|
 | **0** | hard, structural / inviolable | non-negativity, [0,1] aggregates, bounded [l,u], immutable copy, exact derived recompute | `constraints/layer0.py` (P0 projector, differentiable) |
 | **1** | soft, generic algorithm + train-fit params | robust tail bound, product equality, monotone order, half-range | `constraints/layer1.py` |
-| **2** | soft, dataset/extractor-specific or mined | per-dataset `constraints/<dataset>/mined.json` | `constraints/layer2.py` + registry |
+| **2** | soft, dataset/extractor-specific or mined | per-dataset `old_constraints/<dataset>/mined.json` | `constraints/layer2.py` + registry |
 
 **Generation vs evaluation are kept separate.** Generation uses `P0` (project) and
 soft penalties `C1`/`C2` in the objective. Evaluation uses the engine's independent

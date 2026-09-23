@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 import torch
 
+from attack.primattack_budget import class_calibration, load_calibration
 from attack.realizability.cicids2017 import CICIDS2017PrimitiveModel
-from attack.run_cicids2017_primitive_attack import train_envelope
 from attack.vae_latent_primitive import LatentAttackConfig, LatentPrimitiveAttack
 from datasets import get_adapter
 from src.classifiers.cicids2017d_victims import load_category_victim
@@ -22,10 +22,12 @@ def setup():
     transform = ad.feature_transform()
     center = torch.tensor(transform.center, dtype=torch.float32)
     scale = torch.tensor(transform.scale, dtype=torch.float32)
-    train_raw = np.load(ad._processed / "X_train_pristine.npy", mmap_mode="r")
-    env = train_envelope(train_raw, model.i)
-    cfg = {"p_max": 1460.0, "alpha_max": 100.0, "mtu_cap": 0.0,
-           **{f"env_{k}": v for k, v in env.items()}}
+    calibration = load_calibration(
+        ad.repo_root / "artifacts/primattack/budget_calibration.json"
+    )
+    cfg = class_calibration(
+        calibration, "DoS", "maximum-evaluated"
+    ).bounds_config()
     test = ad.load_split("test")
     rows = np.flatnonzero(test.y == ad.class_mapping().name_to_id["DoS"])[:32]
     raw = torch.tensor(np.ascontiguousarray(np.asarray(
@@ -113,10 +115,12 @@ def test_single_packet_timing_disabled_in_latent_graph(setup):
     all_raw = np.asarray(np.load(ad._processed / "X_test_pristine.npy", mmap_mode="r")[:10000])
     idx = np.flatnonzero(all_raw[:, model.i["Total Fwd Packet"]] < 2)[:16]
     raw = torch.tensor(np.ascontiguousarray(all_raw[idx], dtype=np.float32))
-    train_raw = np.load(ad._processed / "X_train_pristine.npy", mmap_mode="r")
-    env = train_envelope(train_raw, model.i)
-    bounds = model.per_flow_bounds(raw, {"p_max":1460.,"alpha_max":100.,"mtu_cap":0.,
-        **{f"env_{k}":v for k,v in env.items()}})
+    calibration = load_calibration(
+        ad.repo_root / "artifacts/primattack/budget_calibration.json"
+    )
+    bounds = model.per_flow_bounds(
+        raw, class_calibration(calibration, "DoS", "maximum-evaluated").bounds_config()
+    )
     with torch.no_grad():
         z0, _ = vae.encode((raw - center) / scale)
         d0 = vae.decode(z0)["continuous_mu_raw"]

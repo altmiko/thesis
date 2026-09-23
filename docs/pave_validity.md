@@ -184,7 +184,7 @@ active, `strict_valid` defaults to the PAVE-style mask and `mined_validity_rate`
 
 `_raw_split` prefers saved pristine raw arrays (`X_<split>_pristine.npy` under the
 adapter's processed dir) and otherwise inverse-transforms the scaled split with the
-train-fit transform. `_build_mined_checker` loads `constraints/<dataset>/mined.json` as a
+train-fit transform. `_build_mined_checker` loads `old_constraints/<dataset>/mined.json` as a
 **Layer-2-only** `ConstraintEngine` (`active_layers={2}`) when the file exists (unless
 `--no-mined`).
 

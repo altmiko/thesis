@@ -35,7 +35,7 @@ def _raw_split(adapter: Any, split_name: str, limit: int | None = None) -> np.nd
 
 def _build_mined_checker(adapter: Any, source: Path | None) -> ConstraintEngine | None:
     manifest = adapter.feature_manifest()
-    rule_path = source or (_REPO / "constraints" / manifest.dataset_name / "mined.json")
+    rule_path = source or (_REPO / "old_constraints" / manifest.dataset_name / "mined.json")
     if not rule_path.exists():
         return None
     return ConstraintEngine(

@@ -36,12 +36,10 @@ def _artifact_path(output_dir: Path, recorded: str) -> Path:
 
 def _strict_mask(data: np.lib.npyio.NpzFile) -> tuple[np.ndarray, tuple[str, ...]]:
     keys = set(data.files)
-    if {"pave_valid", "mined_valid", "realizable"} <= keys:
-        names = ("pave_valid", "mined_valid", "realizable")
-    elif {"pave_valid", "mined_valid", "mask_valid"} <= keys:
-        names = ("pave_valid", "mined_valid", "mask_valid")
-    elif "strict_valid" in keys:
+    if "strict_valid" in keys:
         names = ("strict_valid",)
+    elif "mined_valid" in keys:
+        names = ("mined_valid",)
     else:
         raise KeyError(
             "artifact has no recognized independent strict-validity masks; "

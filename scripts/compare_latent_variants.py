@@ -62,7 +62,6 @@ def _pool(cells):
         "tb_asr": tb / denom if denom else float("nan"),
         "tsv_asr": tsv / denom if denom else float("nan"),
         "validity": _wmean(cells, "strict_validity"),
-        "pave": _wmean(cells, "pave_validity"),
         "mined": _wmean(cells, "mined_validity"),
         "cost": _wmean(cells, "cost_total_mean"),
         "latent": _wmean(cells, "latent_l2_mean"),
@@ -82,9 +81,7 @@ def _matched_budget(res, internal_key, caps):
         z = np.load(c["artifact"])
         cc = z["clean_correct"].astype(bool)
         denom += int(cc.sum())
-        strict = z["pave_valid"].astype(bool) & z["mined_valid"].astype(bool)
-        if internal_key in z:
-            strict &= z[internal_key].astype(bool)
+        strict = z["strict_valid"].astype(bool)
         good = z["benign"].astype(bool) & strict & cc
         succ_cost.extend(z["cost_total"][good].tolist())
     succ_cost = np.asarray(succ_cost)
@@ -152,15 +149,15 @@ def main() -> None:
             lines.append("| " + " | ".join(row) + " |")
         lines.append("")
 
-    # validity breakdown
+    # v2-only validity breakdown
     lines += ["## Validity breakdown (pooled, %)", "",
-              "| Method | PAVE (Level-A) | mined density | strict (all gates) |",
-              "|---|--:|--:|--:|"]
+              "| Method | v2 Hybrid | strict (=v2) |",
+              "|---|--:|--:|"]
     for label, d, key, lat in METHODS:
         p = pooled[label]
         if p is None:
             continue
-        lines.append(f"| {label} | {_fmt_pct(p['pave'])} | {_fmt_pct(p['mined'])} | {_fmt_pct(p['validity'])} |")
+        lines.append(f"| {label} | {_fmt_pct(p['mined'])} | {_fmt_pct(p['validity'])} |")
     lines.append("")
 
     # gradient-norm diagnostics

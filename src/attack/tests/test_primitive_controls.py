@@ -53,7 +53,7 @@ def test_uniform_padding_shift_identities(setup):
     p = 37.0
     adv = model.generate(raw, _ctl(raw.shape[0], p, 1.0))
     nf = raw[:, i["Total Fwd Packet"]]
-    active = nf >= 1
+    active = model.active_mask(raw, "p")  # semantic: fwd packets AND fwd payload present
     tl0, tl1 = raw[:, i["Total Length of Fwd Packet"]], adv[:, i["Total Length of Fwd Packet"]]
     assert torch.allclose(tl1[active], tl0[active] + nf[active] * p, atol=1e-6)
     m0, m1 = raw[:, i["Fwd Packet Length Mean"]], adv[:, i["Fwd Packet Length Mean"]]
@@ -108,10 +108,69 @@ def test_single_forward_packet_disables_timing(setup):
         assert torch.allclose(adv[single, i[f]], raw[single, i[f]], atol=1e-6)
 
 
+def test_no_forward_payload_disables_padding(setup):
+    """A flow with no forward payload (Total Length of Fwd Packet == 0) is not paddable:
+    pad_allowed=False, p_hi=0, and p is forced to identity even if requested (Recon fix)."""
+    model, _, raw, i = setup
+    no_payload = raw[:, i["Total Length of Fwd Packet"]] <= 0
+    if not bool(no_payload.any()):
+        pytest.skip("no zero-forward-payload flows in sample")
+    caps = model.infer_capabilities(raw)
+    assert not bool(caps.pad_allowed[no_payload].any())  # never admissible without payload
+    # requesting a large p on these flows must not change the forward length block
+    adv = model.generate(raw, _ctl(raw.shape[0], 28.0, 1.0))
+    for f in ("Total Length of Fwd Packet", "Fwd Packet Length Max",
+              "Fwd Packet Length Min", "Fwd Packet Length Mean"):
+        assert torch.allclose(adv[no_payload, i[f]], raw[no_payload, i[f]], atol=1e-6)
+
+
+def test_bounds_gated_by_capabilities(setup):
+    """per_flow_bounds forces the identity cap where a primitive is inadmissible, while the
+    numeric (envelope) cap is retained separately for provenance."""
+    model, _, raw, i = setup
+    env_feats = ("Fwd Packet Length Max", "Fwd Packet Length Min", "Fwd Packet Length Mean",
+                 "Total Length of Fwd Packet", "Fwd IAT Total", "Fwd IAT Max", "Fwd IAT Std",
+                 "Fwd IAT Mean", "Flow Duration")
+    cfg = {"p_max": 1460.0, "max_relative_duration_change": 10.0,
+           **{f"env_{n}": float(raw[:, i[n]].max()) + 1e6 for n in env_feats}}
+    caps = model.infer_capabilities(raw)
+    b = model.per_flow_bounds(raw, cfg, capabilities=caps)
+    # inadmissible padding => p_hi == 0; inadmissible timing => alpha_hi == 1 (identity)
+    assert bool((b["p"][~caps.pad_allowed] == 0).all())
+    assert torch.allclose(b["alpha"][~caps.timing_allowed],
+                          torch.ones_like(b["alpha"][~caps.timing_allowed]))
+    # semantic cap never exceeds the numeric cap; equals it where admissible
+    assert bool((b["p"] <= b["p_numeric"] + 1e-6).all())
+    assert torch.allclose(b["p"][caps.pad_allowed], b["p_numeric"][caps.pad_allowed], atol=1e-6)
+
+
+def test_capability_reasons_are_consistent(setup):
+    """Every disabled primitive carries a machine-readable reason; enabled ones say *_ALLOWED."""
+    from attack.realizability.base import (PAD_ALLOWED, TIMING_ALLOWED,
+                                           NO_FORWARD_PAYLOAD, SINGLE_FWD_PACKET,
+                                           ZERO_TIMING_HEADROOM)
+    model, _, raw, _ = setup
+    caps = model.infer_capabilities(raw)
+    pad = caps.pad_allowed.cpu().numpy()
+    tim = caps.timing_allowed.cpu().numpy()
+    for k, ok in enumerate(pad):
+        assert (caps.pad_reason[k] == PAD_ALLOWED) == bool(ok)
+        if not ok:
+            assert caps.pad_reason[k] == NO_FORWARD_PAYLOAD or caps.pad_reason[k] != PAD_ALLOWED
+    for k, ok in enumerate(tim):
+        assert (caps.timing_reason[k] == TIMING_ALLOWED) == bool(ok)
+        if not ok:
+            assert caps.timing_reason[k] in (SINGLE_FWD_PACKET, ZERO_TIMING_HEADROOM)
+
+
 def test_projection_makes_integer_fields_integral(setup):
     model, val, raw, _ = setup
     ctl = _ctl(raw.shape[0], 42.7, 3.3)
-    proj = model.project_controls(raw, ctl)
+    bounds = {
+        "p": torch.full((raw.shape[0],), 100.0, dtype=raw.dtype),
+        "alpha": torch.full((raw.shape[0],), 5.0, dtype=raw.dtype),
+    }
+    proj = model.project_controls(raw, ctl, bounds)
     assert torch.allclose(proj["p"], torch.round(proj["p"]))  # p is integer bytes
     adv = model.generate(raw, proj, quantize=True)
     for name in model.integer_features():

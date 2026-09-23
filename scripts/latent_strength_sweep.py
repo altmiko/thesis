@@ -58,7 +58,9 @@ def _run_cfg(overrides, *, classes, victims, seed, test_limit, scratch, log_grad
     if out.exists():
         shutil.rmtree(out)
     res = run(classes=classes, victims=victims, device="cpu", test_limit=test_limit,
-              cost_weight=0.01, p_max=1460.0, alpha_max=100.0, mtu_cap=0.0, stage_a_dir=None,
+              cost_weight=0.01,
+              calibration_path=Path("artifacts/primattack/budget_calibration.json"),
+              budget_name="maximum-evaluated", stage_a_dir=None,
               output_dir=out, seeds=[seed], config=cfg, variant="full")
     cells = res["cells"]
     # free disk: keep only the json summary, drop per-cell npz artifacts.

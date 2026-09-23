@@ -21,6 +21,7 @@ from attack.residual_head import ResidualAttackGenerator, ResidualHead
 from attack.train_attack_head import StageBConfig, VictimGuidedTrainer
 from datasets.cicids2017 import CICIDS2017Adapter
 from experiments.ablations import build_ablation
+from validation.attack_interface import structural_masks
 from src.classifiers.cicids2017d_victims import load_category_victim
 from vae.cicids2017_stage_a import ATTACK_CLASSES, load_stage_a
 
@@ -212,11 +213,18 @@ def _evaluate(
             return float("nan")
         return float((mask & clean_correct).sum().item() / denom)
 
-    joint_valid = valid["pass_l0_l1_l2"]
+    engine_l2 = valid["pass_l0_l1_l2"]
     per_constraint = {
         name: 1.0 - conditional_rate(mask)
         for name, mask in valid["per_constraint"].items()
     }
+    # validator_v2 is the HEADLINE structural verdict (joint_valid -> True_IDSR,
+    # adv_validity_rate). The engine masks (pass_l0 / pass_l0_l1 / engine_l2) remain
+    # the A0-A6 ablation ladder (ASR_L0 / ASR_L0_L1 / ASR_L0_L1_L2).
+    v2_hybrid = torch.tensor(
+        structural_masks(raw_adv.detach().cpu().numpy())["hybrid_valid"],
+        device=raw_adv.device)
+    joint_valid = v2_hybrid
     eligible_cost = per_sample_cost[clean_correct]
     result = {
         "denominator_clean_correct": denom,
@@ -229,9 +237,11 @@ def _evaluate(
         "targeted_benign_rate": conditional_rate(benign_target),
         "ASR_L0": conditional_rate(evasion & valid["pass_l0"]),
         "ASR_L0_L1": conditional_rate(evasion & valid["pass_l0_l1"]),
-        "ASR_L0_L1_L2": conditional_rate(evasion & joint_valid),
+        "ASR_L0_L1_L2": conditional_rate(evasion & engine_l2),
         "IDR": conditional_rate(in_distribution),
         "True_IDSR": conditional_rate(evasion & joint_valid & in_distribution),
+        "ASR_v2_hybrid_valid": conditional_rate(evasion & joint_valid),
+        "adv_validity_rate_engine_L0_L1_L2": conditional_rate(engine_l2),
         "mean_normalized_cost": float(eligible_cost.mean()) if denom else float("nan"),
         "median_normalized_cost": float(eligible_cost.median()) if denom else float("nan"),
         "constraint_violation_rates": per_constraint,
@@ -277,7 +287,7 @@ def run(
     test = adapter.load_split("test")
     raw_train = np.load(adapter._processed / "X_train_pristine.npy", mmap_mode="r")
     layer1_fit_raw = _subset(raw_train, layer1_fit_limit, 42)
-    layer2_path = repo_root / "constraints" / adapter.name / "mined.json"
+    layer2_path = repo_root / "old_constraints" / adapter.name / "mined.json"
     stage_a_dir = stage_a_dir or (output_dir / "stage_a")
     victim_dir = repo_root / "outputs" / "cicids2017distrinet" / "models"
     artifact_dir = output_dir / "attack_artifacts"

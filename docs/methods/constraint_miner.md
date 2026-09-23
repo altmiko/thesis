@@ -7,8 +7,8 @@ of THE REFACTOR PRINCIPLE (constraints C in `CLAUDE.md`). Everything numeric is 
 
 - **Package:** `src/constraints/` — `base.py`, `layer0.py`, `layer1.py`, `layer2.py`,
   `engine.py`, `registry.py`.
-- **Serialized rule sets:** `constraints/<dataset>/mined.json`
-  (`constraints/ciciot2023/mined.json`, `constraints/cicids2017_distrinet/mined.json`).
+- **Serialized rule sets:** `old_constraints/<dataset>/mined.json`
+  (`old_constraints/ciciot2023/mined.json`, `old_constraints/cicids2017_distrinet/mined.json`).
 - **Sibling (perturbability mining, not rules):**
   `src/preprocessing/conditional_feature_freedom.py` (§ CFF).
 - **Tests:** `src/constraints/tests/test_constraints.py`, `test_toggles.py`.
@@ -29,7 +29,7 @@ index (`base.py`). Two roles are kept strictly distinct per constraint:
 |---|---|---|---|
 | **0** | hard, semantically inviolable | datatype / representation / exact identity (manifest `value_type`, derivations) | `layer0.py` |
 | **1** | soft, generic algorithm + train-fit params | universal algorithm; medians/IQRs/tolerances fit on TRAIN | `layer1.py` |
-| **2** | soft, dataset/extractor-specific or **mined** | per-dataset `constraints/<dataset>/mined.json` | `layer2.py` + `registry.py` |
+| **2** | soft, dataset/extractor-specific or **mined** | per-dataset `old_constraints/<dataset>/mined.json` | `layer2.py` + `registry.py` |
 
 The distinction that makes Layers 1/2 "mined": the **algorithm is dataset-independent**;
 only the numeric parameters (and which features a relation references) come from data.
@@ -98,7 +98,7 @@ feature triples/products satisfy the relation on train (§ Layer 2 mining proced
 Layer 2 rules are **not baked into code**. They are a serializable list of
 `{"type", "name", "params"}` entries, rebuilt against a manifest through the registry.
 
-### Serialized format (`constraints/<dataset>/mined.json`)
+### Serialized format (`old_constraints/<dataset>/mined.json`)
 
 ```json
 {
@@ -208,7 +208,7 @@ Downstream code loads **only** the serialized rule set (never re-hardcodes rules
   `docs/pave_validity.md`).
 - `experiments/ablations.py` (A4 "+ Layer 2 dataset/mined constraints"),
   `attack/run_cicids2017_vae_attacks.py`, and the Stage-B / manifold-loss tests all load
-  `constraints/<dataset>/mined.json` via `load_layer2`.
+  `old_constraints/<dataset>/mined.json` via `load_layer2`.
 
 ## CFF — perturbability mining (sibling, not rule mining)
 
@@ -239,5 +239,5 @@ validation. See `docs/CFF.md` for full detail.
   hardcoded indices, no dataset code inside the generic engine.
 - **Generation ≠ evaluation.** `project`/`penalty` (generation) and `validate`
   (evaluation) are independent; validity never trusts the projector.
-- **Serializable & extensible.** Rules live in `constraints/<dataset>/mined.json`; new
+- **Serializable & extensible.** Rules live in `old_constraints/<dataset>/mined.json`; new
   rule kinds register via `register_constraint` with no engine edits.

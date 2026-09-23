@@ -10,9 +10,8 @@ Two genuine VAE latent attacks whose decoder movement is NOT compressed into (p,
   perturbation mask or the primitive realizability layer. Not a proposed attack.
 
 ``z_adv`` is the only optimizer leaf; the decoder stays in the classifier-gradient path; feature
-values are never optimized directly. PAVE (Level-A), mined density, and IDR are run exactly as
-for the other methods; the internal consistency gate is the mask (frozen unchanged + DERIVED_EXACT
-consistent) rather than the (p, alpha) primitive model, since these are not primitive attacks.
+values are never optimized directly. Structural validity is validator_v2 ``hybrid_valid`` only;
+IDR remains a separate realism metric. Mask frozen/derived checks remain diagnostics, not gates.
 """
 from __future__ import annotations
 
@@ -32,8 +31,7 @@ from attack.run_cicids2017_vae_attacks import _idr_mask
 from attack.vae_latent_primitive import LatentAttackConfig
 from attack.vae_latent_variants import LatentMaskedAttack, LatentRawAttack
 from datasets.cicids2017 import CICIDS2017Adapter
-from evaluation.pave_style_validator import PAVEStyleValidator
-from experiments.ablations import build_ablation
+from validation.attack_interface import structural_masks
 from experiments.provenance import (
     artifact_provenance_arrays,
     build_provenance,
@@ -64,9 +62,9 @@ def _decompose_cost(adv_raw, raw, scale, groups_idx):
     return out
 
 
-def evaluate_variant(*, rmask, victim, base_vae, engine, pave, raw, adv_raw, center, scale,
+def evaluate_variant(*, rmask, victim, base_vae, raw, adv_raw, center, scale,
                      class_id, idr_path, groups_idx):
-    """Variant-appropriate masks; strict = PAVE & mined & mask-frozen & mask-derived-consistent."""
+    """Variant masks; strict validity is validator_v2 hybrid_valid only."""
     with torch.no_grad():
         x_clean = (raw - center) / scale
         x_adv = (adv_raw - center) / scale
@@ -76,9 +74,8 @@ def evaluate_variant(*, rmask, victim, base_vae, engine, pave, raw, adv_raw, cen
         evasion = adv_pred != class_id
         benign = adv_pred == 0
 
-        pave_valid = torch.tensor(np.asarray(pave.validate_batch(adv_raw.cpu().numpy())["valid_mask"]),
-                                  device=raw.device)
-        mined = engine.validate(adv_raw)["pass_l0_l1_l2"]
+        mined = torch.tensor(structural_masks(adv_raw.detach().cpu().numpy())["hybrid_valid"],
+                             device=raw.device)
         in_dist = _idr_mask(base_vae, x_adv, idr_path)
         frozen_ok = ~rmask.frozen_violation_mask(adv_raw, raw, atol=SCALER_ATOL, rtol=1e-4)
         derived_ok = ~rmask.derived_consistency_mask(adv_raw, scale=scale, tol=1e-3)
@@ -87,7 +84,7 @@ def evaluate_variant(*, rmask, victim, base_vae, engine, pave, raw, adv_raw, cen
 
     masks = {
         "clean_correct": clean_correct, "evasion": evasion, "benign": benign,
-        "pave_valid": pave_valid, "mined_valid": mined, "in_dist": in_dist,
+        "mined_valid": mined, "in_dist": in_dist,
         "frozen_ok": frozen_ok, "derived_ok": derived_ok,
         "mask_valid": frozen_ok & derived_ok,
     }
@@ -123,13 +120,9 @@ def run(*, variant, classes, victims, device, test_limit, stage_a_dir, output_di
     test = adapter.load_split("test")
     raw_test = np.load(adapter._processed / "X_test_pristine.npy", mmap_mode="r")
     raw_train = np.load(adapter._processed / "X_train_pristine.npy", mmap_mode="r")
-    layer1_fit = np.ascontiguousarray(raw_train[:200000], dtype=np.float32)
-    layer2_path = repo / "constraints" / adapter.name / "mined.json"
     stage_a_dir = stage_a_dir or (repo / "outputs" / "cicids2017_vae_stage_a")
     victim_dir = repo / "outputs" / "cicids2017distrinet" / "models"
 
-    pave = PAVEStyleValidator(integer_tolerance=SCALER_ATOL, range_tolerance=SCALER_ATOL).fit(
-        np.asarray(raw_train, dtype=np.float64), manifest.names, schema=manifest)
 
     method_id = f"vae_latent_{variant}"
     desc = {"masked": "VAE-Latent-Masked (z_adv optimized; decoder movement on PERTURBABLE features; "
@@ -160,8 +153,7 @@ def run(*, variant, classes, victims, device, test_limit, stage_a_dir, output_di
         "denominator": "clean-correct malicious test rows per (class, victim)",
         "vae_role": "GENERATOR (encoder+decoder in the classifier-gradient path); realism gate is "
                     "the same VAE -> IDR is generator-relative",
-        "strict_valid_definition": "PAVE(Level-A) & mined-density & mask-frozen-unchanged & "
-                                   "mask-DERIVED_EXACT-consistent (mask realizability, not primitive)",
+        "strict_valid_definition": "validator_v2 (hybrid_valid) only",
         "perturbable_features": list(rmask.mask.perturbable),
         "config": run_config,
         "provenance": provenance,
@@ -179,8 +171,6 @@ def run(*, variant, classes, victims, device, test_limit, stage_a_dir, output_di
         )
         idr_path = stage_a_dir / f"idr_{class_name}.npz"
         realism = _load_realism(idr_path, device)
-        engine = build_ablation("A4", adapter, encoder_input_transform="asinh",
-                                layer1_fit_x_raw=layer1_fit, layer2_path=layer2_path).engine
         for vname in victims:
             victim = load_category_victim(
                 victim_dir / f"{vname}_category.pt", adapter=adapter,
@@ -195,12 +185,12 @@ def run(*, variant, classes, victims, device, test_limit, stage_a_dir, output_di
                     assert torch.allclose(adv_raw[:, fidx], raw[:, fidx], atol=SCALER_ATOL, rtol=1e-4), \
                         "frozen feature changed in masked latent attack"
                 masks, cost, changed, yc, ya = evaluate_variant(
-                    rmask=rmask, victim=victim, base_vae=vae, engine=engine, pave=pave, raw=raw,
+                    rmask=rmask, victim=victim, base_vae=vae, raw=raw,
                     adv_raw=adv_raw, center=center, scale=scale, class_id=cid, idr_path=idr_path,
                     groups_idx=groups_idx)
                 ap = artifact_dir / f"{class_name}_{vname}_seed{seed}.npz"
                 ll = res.latent_l2.cpu().numpy()
-                strict = masks["pave_valid"] & masks["mined_valid"] & masks["mask_valid"]
+                strict = masks["mined_valid"]
                 checkpoint_ids = {
                     key: provenance["checkpoints"][key]["sha256"]
                     for key in (f"victim_{vname}", f"vae_{class_name}", f"idr_{class_name}")
@@ -237,7 +227,7 @@ def run(*, variant, classes, victims, device, test_limit, stage_a_dir, output_di
                     **{k: m.cpu().numpy() for k, m in masks.items()},
                 )
                 denom = int(masks["clean_correct"].sum()); cc = masks["clean_correct"]
-                strict = masks["pave_valid"] & masks["mined_valid"] & masks["mask_valid"]
+                strict = masks["mined_valid"]
                 rate = lambda m: (float((m & cc).sum()) / denom) if denom else float("nan")
                 llc = ll[cc.cpu().numpy()]
                 cell = {
@@ -248,9 +238,9 @@ def run(*, variant, classes, victims, device, test_limit, stage_a_dir, output_di
                     "untargeted_asr": rate(masks["evasion"]),
                     "targeted_benign_asr": rate(masks["benign"]),
                     "targeted_strict_valid_asr": rate(masks["benign"] & strict),
-                    "strict_validity": rate(strict), "pave_validity": rate(masks["pave_valid"]),
+                    "strict_validity": rate(strict),
                     "mined_validity": rate(masks["mined_valid"]),
-                    "mask_validity": rate(masks["mask_valid"]),
+                    "mask_validity_diagnostic": rate(masks["mask_valid"]),
                     "frozen_ok_rate": rate(masks["frozen_ok"]),
                     "derived_ok_rate": rate(masks["derived_ok"]),
                     "dependency_validity": rate(masks["derived_ok"]),
@@ -264,7 +254,7 @@ def run(*, variant, classes, victims, device, test_limit, stage_a_dir, output_di
                 results["cells"].append(cell)
                 print(json.dumps({k: cell[k] for k in
                                   ("class", "victim", "seed", "n_clean_correct", "targeted_benign_asr",
-                                   "targeted_strict_valid_asr", "strict_validity", "mask_validity",
+                                   "targeted_strict_valid_asr", "strict_validity", "mask_validity_diagnostic",
                                    "latent_l2_mean", "cost_total_mean")}), flush=True)
         output_dir.mkdir(parents=True, exist_ok=True)
         (output_dir / "attack_results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")

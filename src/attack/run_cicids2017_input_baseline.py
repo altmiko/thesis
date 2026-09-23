@@ -23,8 +23,6 @@ from attack.realizability.validator import RealizabilityValidator
 from attack.run_cicids2017_primitive_attack import (
     VICTIMS, _class_rows, evaluate_cell, _LENGTH_COLS, _TIMING_COLS, _RATE_COLS)
 from datasets.cicids2017 import CICIDS2017Adapter
-from evaluation.pave_style_validator import PAVEStyleValidator
-from experiments.ablations import build_ablation
 from experiments.provenance import (
     artifact_provenance_arrays,
     build_provenance,
@@ -67,8 +65,6 @@ def run(*, classes, victims, device, test_limit, epsilon, steps, alpha, stage_a_
     test = adapter.load_split("test")
     raw_test = np.load(adapter._processed / "X_test_pristine.npy", mmap_mode="r")
     raw_train = np.load(adapter._processed / "X_train_pristine.npy", mmap_mode="r")
-    layer1_fit = np.ascontiguousarray(raw_train[:200000], dtype=np.float32)
-    layer2_path = repo / "constraints" / adapter.name / "mined.json"
     stage_a_dir = stage_a_dir or (repo / "outputs" / "cicids2017_vae_stage_a")
     victim_dir = repo / "outputs" / "cicids2017distrinet" / "models"
     config = {"epsilon": epsilon, "steps": steps, "alpha": alpha,
@@ -90,13 +86,11 @@ def run(*, classes, victims, device, test_limit, epsilon, steps, alpha, stage_a_
         json.dumps(provenance, indent=2), encoding="utf-8"
     )
     all_row_ids = load_row_ids(adapter._processed, "test")
-    pave = PAVEStyleValidator(integer_tolerance=SCALER_ATOL, range_tolerance=SCALER_ATOL).fit(
-        np.asarray(raw_train, dtype=np.float64), manifest.names, schema=manifest)
 
     results = {"dataset": adapter.name, "method_id": "input_pgd",
                "attack": "Input-space targeted PGD (L-inf, unconstrained; NO realizability model)",
                "threat_model": "targeted Attack->Benign", "denominator": "clean-correct malicious test rows",
-               "strict_valid_definition": "PAVE & mined & primitive-realizability evaluator",
+               "strict_valid_definition": "validator_v2 (hybrid_valid) only",
                "config": config, "provenance": provenance, "cells": []}
     for class_name in classes:
         cid = mapping.name_to_id[class_name]
@@ -108,8 +102,6 @@ def run(*, classes, victims, device, test_limit, epsilon, steps, alpha, stage_a_
             expected_class_name=class_name, device=device,
         )
         idr_path = stage_a_dir / f"idr_{class_name}.npz"
-        engine = build_ablation("A4", adapter, encoder_input_transform="asinh",
-                                layer1_fit_x_raw=layer1_fit, layer2_path=layer2_path).engine
         for vname in victims:
             victim = load_category_victim(
                 victim_dir / f"{vname}_category.pt", adapter=adapter,
@@ -121,10 +113,10 @@ def run(*, classes, victims, device, test_limit, epsilon, steps, alpha, stage_a_
                 target = torch.zeros(raw.shape[0], dtype=torch.long, device=device)
                 x_adv = targeted_pgd(victim, x0, target, epsilon=epsilon, steps=steps, alpha=alpha)
                 adv_raw = (x_adv * scale + center).detach()
-                masks, cost, yc, ya = evaluate_cell(model, val, victim, base_vae, engine, pave, raw,
+                masks, cost, yc, ya = evaluate_cell(model, val, victim, base_vae, raw,
                                                     adv_raw, center, scale, cid, idr_path, groups_idx)
                 ap = artifact_dir / f"{class_name}_{vname}_seed{seed}.npz"
-                strict = masks["pave_valid"] & masks["mined_valid"] & masks["realizable"]
+                strict = masks["mined_valid"]
                 checkpoint_ids = {
                     key: provenance["checkpoints"][key]["sha256"]
                     for key in (f"victim_{vname}", f"vae_{class_name}", f"idr_{class_name}")
@@ -152,7 +144,7 @@ def run(*, classes, victims, device, test_limit, epsilon, steps, alpha, stage_a_
                     ),
                     **{k: m.cpu().numpy() for k, m in masks.items()})
                 denom = int(masks["clean_correct"].sum()); cc = masks["clean_correct"]
-                strict = masks["pave_valid"] & masks["mined_valid"] & masks["realizable"]
+                strict = masks["mined_valid"]
                 rate = lambda m: (float((m & cc).sum()) / denom) if denom else float("nan")
                 cell = {"class": class_name, "victim": vname, "seed": seed, "artifact": str(ap),
                         "n_total": len(idx), "n_clean_correct": denom,
@@ -161,9 +153,9 @@ def run(*, classes, victims, device, test_limit, epsilon, steps, alpha, stage_a_
                         "untargeted_asr": rate(masks["evasion"]),
                         "targeted_benign_asr": rate(masks["benign"]),
                         "targeted_strict_valid_asr": rate(masks["benign"] & strict),
-                        "strict_validity": rate(strict), "pave_validity": rate(masks["pave_valid"]),
+                        "strict_validity": rate(strict),
                         "mined_validity": rate(masks["mined_valid"]),
-                        "realizability_aware_validity": rate(masks["realizable"]),
+                        "realizability_aware_validity_diagnostic": rate(masks["realizable"]),
                         "IDR": rate(masks["in_dist"]),
                         "cost_total_mean": float(cost["total"][cc].mean()) if denom else float("nan")}
                 results["cells"].append(cell)

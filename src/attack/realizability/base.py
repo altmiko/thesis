@@ -45,21 +45,41 @@ class FeatureRole(str, Enum):
 
 @dataclass(frozen=True)
 class PrimitiveSpec:
-    """One attacker-controlled primitive.
+    """Frozen contract for one attacker-controlled flow primitive.
 
-    ``identity`` is the value that means "no change" (0 for additive padding, 1 for a
-    multiplicative dilation). ``lower``/``upper`` are absolute hard limits; per-flow feasible
-    bounds are produced by :meth:`DatasetPrimitiveModel.per_flow_bounds`. ``integer`` marks a
-    primitive whose realizable value is discrete (rounded during projection).
+    ``identity`` is the no-op value. Absolute bounds encode the threat-model direction;
+    train-calibrated and per-flow bounds may only narrow them. ``dependencies`` lists every
+    CICFlowMeter feature the canonical transform is allowed to write for this primitive.
+    ``projection_function`` names the final discrete/continuous projection implemented by the
+    dataset model. It is provenance, not an executable callback.
     """
 
     name: str
-    identity: float
-    lower: float
-    upper: float | None
-    integer: bool
-    description: str
     units: str
+    dtype: str
+    direction: str
+    identity: float
+    absolute_lower_bound: float
+    absolute_upper_bound: float | None
+    dependencies: tuple[str, ...]
+    projection_function: str
+    semantic_risk: str
+    description: str
+
+    def __post_init__(self) -> None:
+        if self.dtype not in {"continuous", "discrete_integer"}:
+            raise ValueError(f"unsupported primitive dtype {self.dtype!r}")
+        if self.direction not in {"increase_only", "decrease_only", "bidirectional"}:
+            raise ValueError(f"unsupported primitive direction {self.direction!r}")
+        if self.identity < self.absolute_lower_bound:
+            raise ValueError("primitive identity is below its absolute lower bound")
+        if (
+            self.absolute_upper_bound is not None
+            and self.identity > self.absolute_upper_bound
+        ):
+            raise ValueError("primitive identity is above its absolute upper bound")
+        if not self.dependencies:
+            raise ValueError("primitive dependency set must not be empty")
 
 
 @dataclass(frozen=True)
@@ -78,6 +98,42 @@ class IdentityCheck:
     fn: Callable[[Callable[[str], torch.Tensor]], torch.Tensor]
     atol: float = 1e-3
     rtol: float = 1e-4
+
+
+# --------------------------------------------------------------------------------------
+# Semantic primitive capabilities -- section: "infer semantic capabilities before bounds".
+# A primitive can be *numerically* feasible (inside the train envelope) yet *semantically*
+# unsupported by the source flow: e.g. forward-length augmentation on a flow whose forward
+# direction carries no payload (Total Length of Fwd Packet == 0). Capability inference is a
+# conservative, per-flow gate applied to the bounds BEFORE the optimizer ever sees them, so
+# admissibility means "numerically feasible AND the operation is semantically supported by
+# the source flow", not merely "inside the envelope".
+# --------------------------------------------------------------------------------------
+# Padding (p) capability reason codes.
+PAD_ALLOWED = "PAD_ALLOWED"
+NO_FORWARD_PAYLOAD = "NO_FORWARD_PAYLOAD"          # no forward bytes/mean to augment
+INSUFFICIENT_FWD_PACKETS = "INSUFFICIENT_FWD_PACKETS"  # too few forward packets for evidence
+# Timing (alpha) capability reason codes.
+TIMING_ALLOWED = "TIMING_ALLOWED"
+SINGLE_FWD_PACKET = "SINGLE_FWD_PACKET"            # < 2 forward packets: no fwd IAT sequence
+ZERO_TIMING_HEADROOM = "ZERO_TIMING_HEADROOM"      # forward IAT total is 0: nothing to dilate
+
+
+@dataclass(frozen=True)
+class PrimitiveCapabilities:
+    """Per-flow semantic admissibility of each primitive for a batch of source flows.
+
+    ``pad_allowed`` / ``timing_allowed`` are boolean tensors (shape ``[n]``); a ``False`` entry
+    means the source flow does not provide evidence that the primitive is realizable, so its
+    per-flow cap is forced to the identity (``p_hi = 0`` / ``alpha_hi = 1``). ``pad_reason`` /
+    ``timing_reason`` carry one machine-readable reason code per flow (see the ``*_ALLOWED`` /
+    disable constants above) for auditable artifacts.
+    """
+
+    pad_allowed: torch.Tensor
+    timing_allowed: torch.Tensor
+    pad_reason: list[str]
+    timing_reason: list[str]
 
 
 @runtime_checkable
@@ -109,18 +165,39 @@ class DatasetPrimitiveModel(Protocol):
         """Exact identities the adversarial vector must satisfy (Level-B)."""
         ...
 
-    def active_mask(self, raw: torch.Tensor, primitive: str) -> torch.Tensor:
-        """Per-flow bool mask: where a primitive is meaningful (else clamped to identity).
+    def infer_capabilities(self, raw: torch.Tensor) -> PrimitiveCapabilities:
+        """Per-flow semantic admissibility of each primitive for the source flows.
+
+        Conservative gate applied to the bounds BEFORE optimization: a primitive is admissible
+        only if the source flow provides evidence the operation is realizable (e.g. forward
+        payload present for padding, a forward IAT sequence for timing dilation).
+        """
+        ...
+
+    def active_mask(
+        self, raw: torch.Tensor, primitive: str,
+        capabilities: "PrimitiveCapabilities | None" = None,
+    ) -> torch.Tensor:
+        """Per-flow bool mask: where a primitive is semantically admissible (else identity).
 
         E.g. forward timing dilation is undefined for single-packet flows (``Total Fwd
-        Packet < 2``): there is no forward inter-arrival sequence to dilate.
+        Packet < 2``); forward-length augmentation is unsupported when the source carries no
+        forward payload. ``capabilities`` (from :meth:`infer_capabilities`) may be passed to
+        avoid recomputation; when omitted it is inferred from ``raw``.
         """
         ...
 
     def per_flow_bounds(
-        self, raw: torch.Tensor, config: "Mapping[str, float]"
+        self, raw: torch.Tensor, config: "Mapping[str, float]",
+        capabilities: "PrimitiveCapabilities | None" = None,
     ) -> dict[str, torch.Tensor]:
-        """primitive name -> per-flow upper bound (lower is the identity)."""
+        """primitive name -> per-flow upper bound (lower is the identity).
+
+        Semantic capabilities gate the numeric (train-envelope) caps: an inadmissible
+        primitive gets its cap forced to the identity (``p_hi = 0`` / ``alpha_hi = 1``). The
+        returned dict also exposes ``p_numeric`` / ``alpha_numeric`` (the pre-gate caps) for
+        provenance.
+        """
         ...
 
     def infer_primitives_from_decoded(
@@ -154,9 +231,12 @@ class DatasetPrimitiveModel(Protocol):
         ...
 
     def project_controls(
-        self, raw: torch.Tensor, controls: Mapping[str, torch.Tensor]
+        self,
+        raw: torch.Tensor,
+        controls: Mapping[str, torch.Tensor],
+        bounds: Mapping[str, torch.Tensor],
     ) -> dict[str, torch.Tensor]:
-        """Project continuous controls to their realizable values (used by ``generate``)."""
+        """Project controls to the declared per-flow budget and discrete feasible set."""
         ...
 
 

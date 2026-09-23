@@ -1,0 +1,135 @@
+# EXTRACTOR rules for CICIDS2017 (DistriNet-corrected CICFlowMeter).
+#
+# These are exact algebraic identities the feature extractor imposes by
+# construction (one statistic is defined in terms of others). They are NOT
+# empirically mined -- their provenance is the extractor definition -- but every
+# one was independently VERIFIED on this dataset: 100% support on the full train
+# split (1,456,265 rows) AND the full validation split (312,058 rows) at the
+# stated tolerance. source_type is EXTRACTOR; hardness is HARD (they enter
+# hard_structural_valid).
+#
+# NOTE (unresolved, deliberately NOT encoded as a hard rule):
+#   Fwd/Bwd IAT Total ~= (Fwd/Bwd) IAT Mean * (packet_count - 1) holds at 100%
+#   train+val, but the "count - 1" offset is outside the restricted grammar; it
+#   is documented in docs/cicids2017_feature_reference.md rather than faked.
+#   Bulk (*/Bulk Avg) and Subflow features are CICFlowMeter state-machine
+#   outputs whose exact formulas are NOT reliably reproducible on this release
+#   (Subflow Fwd/Bwd Packets are binary 0/1 here, so subflow==total is FALSE) --
+#   no extractor rule is asserted for them.
+
+dataset: cicids2017_distrinet
+rules:
+  - id: EXT_0001
+    name: packet_variance_eq_std_squared
+    rule_type: square_relation
+    hardness: HARD
+    params: {lhs: "Packet Length Variance", base: "Packet Length Std"}
+    features: ["Packet Length Variance", "Packet Length Std"]
+    tolerance: {absolute: 1.0, relative: 0.001}
+    description: >-
+      Packet Length Variance equals the square of Packet Length Std. Variance is
+      defined as the squared standard deviation of the packet-length sample.
+    provenance:
+      origin: "DistriNet CICFlowMeter feature definition"
+      external_reference: "CICFlowMeter packet-length statistics"
+      automatically_mined: false
+    evidence:
+      train_rows_tested: 1456265
+      train_support: 1.0
+      validation_rows_tested: 312058
+      validation_support: 1.0
+
+  - id: EXT_0002
+    name: average_packet_size_eq_packet_length_mean
+    rule_type: equality
+    hardness: HARD
+    params: {lhs: "Average Packet Size", rhs: "Packet Length Mean"}
+    features: ["Average Packet Size", "Packet Length Mean"]
+    tolerance: {absolute: 0.001, relative: 0.0001}
+    description: >-
+      Average Packet Size equals Packet Length Mean; both are the mean length
+      over all packets of the flow in this extractor release.
+    provenance:
+      origin: "DistriNet CICFlowMeter feature definition"
+      external_reference: "CICFlowMeter average packet size"
+      automatically_mined: false
+    evidence: {train_rows_tested: 1456265, train_support: 1.0, validation_rows_tested: 312058, validation_support: 1.0}
+
+  - id: EXT_0003
+    name: fwd_segment_size_avg_eq_fwd_packet_length_mean
+    rule_type: equality
+    hardness: HARD
+    params: {lhs: "Fwd Segment Size Avg", rhs: "Fwd Packet Length Mean"}
+    features: ["Fwd Segment Size Avg", "Fwd Packet Length Mean"]
+    tolerance: {absolute: 0.001, relative: 0.0001}
+    description: >-
+      Forward Segment Size Avg equals the mean forward packet length; the average
+      segment size is the mean forward payload/packet length.
+    provenance:
+      origin: "DistriNet CICFlowMeter feature definition"
+      external_reference: "CICFlowMeter segment-size average"
+      automatically_mined: false
+    evidence: {train_rows_tested: 1456265, train_support: 1.0, validation_rows_tested: 312058, validation_support: 1.0}
+
+  - id: EXT_0004
+    name: bwd_segment_size_avg_eq_bwd_packet_length_mean
+    rule_type: equality
+    hardness: HARD
+    params: {lhs: "Bwd Segment Size Avg", rhs: "Bwd Packet Length Mean"}
+    features: ["Bwd Segment Size Avg", "Bwd Packet Length Mean"]
+    tolerance: {absolute: 0.001, relative: 0.0001}
+    description: >-
+      Backward Segment Size Avg equals the mean backward packet length.
+    provenance:
+      origin: "DistriNet CICFlowMeter feature definition"
+      external_reference: "CICFlowMeter segment-size average"
+      automatically_mined: false
+    evidence: {train_rows_tested: 1456265, train_support: 1.0, validation_rows_tested: 312058, validation_support: 1.0}
+
+  - id: EXT_0005
+    name: flow_packets_per_s_eq_fwd_plus_bwd
+    rule_type: sum_equality
+    hardness: HARD
+    params: {lhs: "Flow Packets/s", addends: ["Fwd Packets/s", "Bwd Packets/s"]}
+    features: ["Flow Packets/s", "Fwd Packets/s", "Bwd Packets/s"]
+    tolerance: {absolute: 0.1, relative: 0.001}
+    description: >-
+      Overall flow packet rate is the sum of the forward and backward packet
+      rates, since both directions share one flow duration.
+    provenance:
+      origin: "DistriNet CICFlowMeter feature definition"
+      external_reference: "CICFlowMeter directional packet rates"
+      automatically_mined: false
+    evidence: {train_rows_tested: 1456265, train_support: 1.0, validation_rows_tested: 312058, validation_support: 1.0}
+
+  - id: EXT_0006
+    name: total_length_fwd_eq_count_times_mean
+    rule_type: product_equality
+    hardness: HARD
+    params: {lhs: "Total Length of Fwd Packet", factors: ["Total Fwd Packet", "Fwd Packet Length Mean"], k: 1.0}
+    features: ["Total Length of Fwd Packet", "Total Fwd Packet", "Fwd Packet Length Mean"]
+    tolerance: {absolute: 1.0, relative: 0.001}
+    description: >-
+      Total forward bytes equal the forward packet count times the mean forward
+      packet length (sum = count * mean).
+    provenance:
+      origin: "DistriNet CICFlowMeter feature definition"
+      external_reference: "CICFlowMeter total length / mean relationship"
+      automatically_mined: false
+    evidence: {train_rows_tested: 1456265, train_support: 1.0, validation_rows_tested: 312058, validation_support: 1.0}
+
+  - id: EXT_0007
+    name: total_length_bwd_eq_count_times_mean
+    rule_type: product_equality
+    hardness: HARD
+    params: {lhs: "Total Length of Bwd Packet", factors: ["Total Bwd packets", "Bwd Packet Length Mean"], k: 1.0}
+    features: ["Total Length of Bwd Packet", "Total Bwd packets", "Bwd Packet Length Mean"]
+    tolerance: {absolute: 1.0, relative: 0.001}
+    description: >-
+      Total backward bytes equal the backward packet count times the mean
+      backward packet length (sum = count * mean).
+    provenance:
+      origin: "DistriNet CICFlowMeter feature definition"
+      external_reference: "CICFlowMeter total length / mean relationship"
+      automatically_mined: false
+    evidence: {train_rows_tested: 1456265, train_support: 1.0, validation_rows_tested: 312058, validation_support: 1.0}

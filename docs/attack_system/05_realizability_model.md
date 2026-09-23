@@ -23,6 +23,15 @@ payload insertion — so `Fwd Act Data Pkts` is held frozen and flagged a packet
 limitation rather than over-claimed. `alpha >= 1` means the attacker can only **delay**, never
 compress, so duration stays positive and rates stay finite.
 
+**Primitive-realizable, not functionality-verified.** A successful sample here is
+*semantically-admissible primitive-realizable*: the discrete primitives produce internally
+consistent CICFlowMeter features (Levels A + B) **and** each applied primitive is supported by
+evidence in the source flow (§4.1). It is **not** a claim that the modified traffic still
+carries out the malicious behaviour — establishing that requires packet-level replay
+(Level C, §7). Scope claims as *feature-space, semantically-admissible, primitive-realizable
+evasion under a conservative padding+timing threat model* — never universally "real-world
+realizable".
+
 ---
 
 ## 2. Feature roles (`roles()`) — how each feature reacts
@@ -87,22 +96,52 @@ large; rates are small).
 
 ---
 
-## 4. Activity masks & per-flow bounds
+## 4. Semantic capabilities, activity masks & per-flow bounds
 
-`active_mask(raw, primitive)`:
-- `p` meaningful iff `Total Fwd Packet >= 1`;
-- `alpha` meaningful iff `Total Fwd Packet >= 2` (need ≥2 packets for a forward IAT sequence).
-  Single-forward-packet flows have `alpha` clamped to identity **inside the graph**, so the
-  optimizer wastes no effort and reports no learned dilation.
+### 4.1 Semantic capabilities (`infer_capabilities(raw)`)
 
-`per_flow_bounds(raw, config)` computes **data-mined per-flow feasible caps** so padding/dilation
-keeps the flow inside the **train envelope**:
+Numerical feasibility (inside the train envelope) is **necessary but not sufficient**: a
+primitive can be numerically applicable yet unsupported by the source flow. `infer_capabilities`
+is a per-flow, **conservative (fail-closed)** gate applied to the bounds *before the optimizer
+ever sees them*, returning a `PrimitiveCapabilities` object (`pad_allowed`, `timing_allowed`
+bool tensors + one reason code per flow):
+
+- **`p` (forward-length augmentation)** is admissible iff the source has forward packets
+  (`Total Fwd Packet >= MIN_FWD_PACKETS_FOR_PADDING`, default 1) **and** non-zero forward
+  payload (`Total Length of Fwd Packet > 0` **and** `Fwd Packet Length Mean > 0`). A flow with
+  no forward payload (e.g. a single-SYN Recon probe: `Nf=1`, `TL_fwd=0`) has no forward data to
+  augment → `pad_allowed = False` (reason `NO_FORWARD_PAYLOAD`). This is the fix for the
+  pathological case where `p=28` was permitted on a zero-payload flow.
+- **`alpha` (forward timing dilation)** is admissible iff there are ≥2 forward packets (a
+  forward IAT sequence exists; else `SINGLE_FWD_PACKET`) **and** that sequence is non-zero
+  (`Fwd IAT Total > 0`; else `ZERO_TIMING_HEADROOM`).
+
+Aggregate CICFlowMeter features cannot reveal *which* forward packets carry modifiable
+application data, so this is a **conservative feature-level model of primitive realizability**,
+not a packet-semantics claim; ambiguous flows fall to the identity. The rule is
+class-agnostic — a DoS, DDoS, Recon, or BruteForce flow with the same structure is treated
+identically (no per-class special cases).
+
+### 4.2 Activity masks & bounds
+
+`active_mask(raw, primitive, capabilities=None)` returns the capability mask directly
+(`pad_allowed` for `p`, `timing_allowed` for `alpha`); it infers capabilities from `raw` when
+none are passed. Inadmissible primitives are clamped to the identity **inside the graph**, so
+the optimizer wastes no effort and reports no learned effect.
+
+`per_flow_bounds(raw, config, capabilities=None)` computes **data-mined per-flow feasible caps**
+so padding/dilation keeps the flow inside the **train envelope**, then applies the semantic gate:
 
 - `p` headroom = min over the four forward-length features of `(train_env - current)`
   (`Total Length of Fwd Packet` headroom divided by `Nf`), optionally also `mtu_cap - fwd_max`
   if an MTU cap is set; then clamped to `[0, p_max]`.
 - `alpha` headroom = min over `{Fwd IAT Total/Max/Std/Mean}` of `env / current`, plus a
   duration-based cap `(env_dur - dur)/fwd_iat_total + 1`; clamped to `[1, alpha_max]`.
+- **Semantic gate (enforced twice):** `p_hi := p_hi · pad_allowed` (→ 0 where inadmissible)
+  and `alpha_hi := 1` where `~timing_allowed`. So `p_hi^semantic(x) = p_hi^envelope(x) · m_p(x)`
+  with `m_p(x) ∈ {0,1}`. The pre-gate caps are also returned as `p_numeric` / `alpha_numeric`
+  so artifacts record both the numeric feasibility *and* the semantic decision (the NPZ stores
+  `p_hi_numeric` vs `p_hi_semantic`, `pad_semantic_allowed`, and `pad_disable_reason`).
 
 `train_envelope(raw_train, i)` (in the runner) mines the caps as the **train max** of the
 controlled forward length/timing features — leakage-safe (train only).

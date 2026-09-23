@@ -21,12 +21,57 @@ p     = p_hi     * sigmoid(u) * pad_active            # in [0, p_hi]
 alpha = 1.0 + (alpha_hi - 1.0) * sigmoid(v) * timing_active   # in [1, alpha_hi]
 ```
 
-- `p_hi`, `alpha_hi` are the **per-flow feasible caps** from `model.per_flow_bounds` (train
-  envelope, doc 05 §4).
-- `pad_active`, `timing_active` = `model.active_mask(raw, ·)` — timing dilation is disabled at
-  optimization time for single-forward-packet flows so the optimizer wastes no effort.
+- `p_hi`, `alpha_hi` are the **per-flow feasible caps** from `model.per_flow_bounds` — the
+  train envelope caps **after the semantic gate** (doc 05 §4), so `p_hi = 0` where padding is
+  inadmissible and `alpha_hi = 1` where timing dilation is inadmissible.
+- `pad_active`, `timing_active` come from `model.infer_capabilities(raw)` (`caps.pad_allowed` /
+  `caps.timing_allowed`) — forward padding is disabled for flows with no forward payload and
+  timing dilation for single-forward-packet / zero-IAT flows, so the optimizer wastes no effort.
+  Admissibility is enforced **twice** (control range *and* cap) so the artifacts agree.
 - Init `u = v ≈ -2.0` ⇒ `sigmoid ≈ 0.12`, so both primitives start near identity; `init_noise`
   (default 0.5) adds a random PGD-style start that escapes the `relu(0)`/dead region.
+
+## 1.1 Semantic primitive capabilities (`infer_capabilities`)
+
+Numerical feasibility (inside the train envelope) is **necessary but not sufficient**: a
+primitive can be numerically applicable yet unsupported by the source flow. Before any
+optimization, `model.infer_capabilities(raw)` computes a per-flow, **conservative (fail-closed)**
+admissibility gate (`PrimitiveCapabilities`: `pad_allowed`, `timing_allowed` bool tensors + one
+machine-readable reason code per flow):
+
+```python
+has_fwd_packets = Total Fwd Packet >= MIN_FWD_PACKETS_FOR_PADDING   # default 1
+has_fwd_payload = (Total Length of Fwd Packet > 0) & (Fwd Packet Length Mean > 0)
+pad_allowed     = has_fwd_packets & has_fwd_payload                 # else NO_FORWARD_PAYLOAD
+timing_allowed  = (Total Fwd Packet >= 2) & (Fwd IAT Total > 0)     # else SINGLE_FWD_PACKET / ZERO_TIMING_HEADROOM
+```
+
+- **Why:** aggregate CICFlowMeter features never reveal *which* forward packets carry
+  modifiable application data, so the gate keys on the strongest evidence they do — forward
+  payload presence for `p`, a non-zero forward IAT sequence for `alpha`. It is a **feature-level
+  model of primitive realizability**, not a packet-semantics claim; ambiguous flows fall to the
+  identity. The rule is **class-agnostic** — a DoS, DDoS, Recon, or BruteForce flow with the
+  same structure is treated identically (no per-class special cases).
+- **The Recon pathology it fixes:** a single-SYN probe (`Nf=1`, `TL_fwd=0`, `Fwd mean=0`)
+  previously admitted `p=28` because `pad_active` only asked whether padding was *numerically*
+  applicable. It now returns `pad_allowed=False` (`NO_FORWARD_PAYLOAD`) and `timing_allowed=False`
+  (`SINGLE_FWD_PACKET`), so `A(x) = {identity}` and the flow is correctly left unmodified.
+- **Enforced twice.** `per_flow_bounds` folds the gate into the caps
+  (`p_hi := p_hi·pad_allowed`, `alpha_hi := 1` where `~timing_allowed`) — so
+  `p_hi^semantic(x) = p_hi^envelope(x)·m_p(x)`, `m_p ∈ {0,1}` — *and* `optimize_primitives`
+  multiplies the control range by the same masks. Belt-and-suspenders: the saved artifacts
+  agree instead of one mechanism silently disabling a numerically-`>0` cap. The pre-gate caps
+  are retained as `p_numeric` / `alpha_numeric` for auditing.
+- **Terminology.** A "successful" sample here is **semantically-admissible primitive-realizable**
+  (Levels A+B *and* every applied primitive supported by source-flow evidence), **not**
+  functionality-verified — establishing that the traffic still performs the malicious behaviour
+  needs packet-level replay (Level C, doc 05 §7).
+
+**Attackable-source rate.** A flow with no admissible primitive can never be perturbed under
+this threat model. Such flows stay in the clean-correct denominator (ASR is *not* inflated by
+dropping hard/unmodifiable examples); each cell additionally reports `attackable_rate`
+(`pad ∨ timing` over clean-correct), `pad_admissible_rate`, and `timing_admissible_rate`, which
+explain category-level ASR variation without blaming the optimizer.
 
 ## 2. The objective (`optimize_primitives`)
 
@@ -142,9 +187,67 @@ replacement). It writes `run_manifest.json` (full provenance, doc 09), `attack_r
 (all cells), and per-cell `attack_artifacts/<class>_<victim>_seed<seed>.npz` containing clean
 & adversarial raw/scaled vectors, the realized and continuous `(p, alpha)`, the per-flow caps
 `(p_hi, alpha_hi)`, clean/adv predictions and logits, the cost decomposition, every per-sample
-mask, and full provenance arrays (row IDs, checkpoint SHA-256s, run id). Everything needed to
-recompute every rate and confidence interval offline is in the NPZ — the printed JSON is only
-a convenience summary.
+mask, and full provenance arrays (row IDs, checkpoint SHA-256s, run id). It also records the
+**semantic-capability provenance** per flow: `pad_semantic_allowed` / `timing_semantic_allowed`
+(bool), `pad_disable_reason` / `timing_disable_reason` (reason codes), `attackable`
+(`pad ∨ timing`), and both the numeric and semantic caps (`p_hi_numeric`/`p_hi_semantic`,
+`alpha_hi_numeric`/`alpha_hi_semantic`) — so you can report e.g. "padding available for 62% of
+DDoS sources vs 3% of Recon sources". Everything needed to recompute every rate and confidence
+interval offline is in the NPZ — the printed JSON is only a convenience summary.
+
+**Attackable-source rate.** Because a flow with no admissible primitive (`A(x) = {identity}`)
+can never be perturbed under this threat model, each cell reports `attackable_rate` (and
+`pad_admissible_rate` / `timing_admissible_rate`) alongside ASR. Such flows stay in the
+clean-correct denominator (ASR is not inflated by dropping hard/unmodifiable examples); the
+separate attackable-source rate explains category-level ASR variation without blaming the
+optimizer.
+
+## 7.1 Results & plausibility (semantic-gated rerun)
+
+Canonical run: 4 classes × 4 victims (`mlp/cnn/lstm/serial`) × 3 seeds (42,43,44),
+`test-limit=1024`, CPU, `outputs/cicids2017_primitive_attack/`. All rates are the mean over the
+12 (victim × seed) cells per class, in **percent of clean-correct** malicious test rows.
+
+| class | Untgt ASR | Tgt-Benign ASR | Tgt strict-valid ASR | strict-valid | IDR | **true-IDSR** | **Attackable** | pad-adm | timing-adm |
+|---|---|---|---|---|---|---|---|---|---|
+| DoS | 65.0 | 65.0 | 65.0 | 99.8 | 30.1 | **25.4** | 100.0 | 100.0 | 99.9 |
+| DDoS | 98.0 | 72.8 | 72.8 | 100.0 | 0.0 | **0.0** | 100.0 | 100.0 | 100.0 |
+| Recon | 0.7 | 0.6 | 0.6 | 100.0 | 16.1 | **0.0** | **0.7** | **0.1** | 0.7 |
+| BruteForce | 77.0 | 77.0 | 77.0 | 100.0 | 0.0 | **0.0** | 100.0 | 100.0 | 100.0 |
+
+Best per-victim targeted-benign ASR: DDoS/lstm 100.0, BruteForce/lstm 99.5, DDoS/serial 99.3,
+DoS/lstm 98.2, DoS/serial 98.1; the MLP victim is hardest everywhere (DoS 16.2, DDoS 16.1,
+BruteForce 42.8). Realizability + strict validity are ~100% across all 48 cells and every cell
+passes the frozen-feature byte-identity assertion.
+
+**These numbers are plausible and internally consistent** — the three surprising figures each
+have a concrete, evidence-backed cause (not a bug):
+
+| class | clean in-dist | adv in-dist | p median | α median | untargeted-success routing |
+|---|---|---|---|---|---|
+| DoS | 95.9% | 30.1% | 743 B | 19.5 | Benign 100% |
+| DDoS | 95.5% | **0.0%** | 333 B | 1.79 | Benign 74%, **DoS 26%** |
+| BruteForce | 88.9% | **0.0%** | 492 B | 2.87 | Benign 100% |
+| Recon | 16.1% | 16.1% | 0 B | 1.00 | Benign 88%, DoS 11%, BF 1% |
+
+- **IDR = 0% for DDoS/BruteForce is real off-manifold movement, not a broken gate.** Clean
+  malicious flows pass their *own* class VAE gate ~90–96%, so the gate is well-calibrated; adv
+  IDR collapses to 0 because the successful attack adds hundreds of bytes/forward-packet
+  (`p` median 333–492 B), pushing flows far off the class manifold in latent space. The
+  adversarials are **primitive-realizable but not realistic** — precisely the tension the IDR
+  gate exists to catch. Consequently the **trustworthy "realistic evasion" metric is true-IDSR,
+  and only DoS delivers it (25.4%)**; DDoS/BruteForce true-IDSR are 0.
+- **Untgt ASR > Tgt-Benign ASR for DDoS is class routing, not noise.** 26% of DDoS evasions land
+  in the adjacent **DoS** class rather than Benign; DoS/BruteForce route 100% to Benign, so their
+  `Untgt == Tgt-Benign` exactly — a consistency signal.
+- **Recon** clean and adv in-dist are identical (16.1%) because ~99% of Recon rows are the
+  identity (unchanged), so realism status cannot change — matching the capability story (§1.1).
+
+**Honest caveats.** (1) High DDoS/BruteForce ASR is *feature-realizable* evasion only; report
+true-IDSR for realistic success. (2) These are **not cheap** attacks — sub-MTU paddings of
+hundreds of bytes/packet (within the mined `p_max=1460` envelope) drive `cost_total_mean` ≈ 2–3.
+(3) DoS is timing-heavy (`α` median ≈ 19.5), the others padding-heavy — consistent with the
+per-class flow structure.
 
 ## 8. Relationship to the other primitive-domain methods
 

@@ -126,7 +126,7 @@ requirement, `attack/realizability/validator.py` docstring lines 16-18).
 | PAVE validator | `src/evaluation/pave_style_validator.py` |
 | Structural validator (CICIoT) | `src/attack/validator.py` |
 | Constraint engine / layers | `src/constraints/{engine,layer0,layer1,layer2,base,registry}.py` |
-| Mined Layer-2 rules | `constraints/cicids2017_distrinet/mined.json` |
+| Mined Layer-2 rules | `old_constraints/cicids2017_distrinet/mined.json` |
 | Perturbation masks | `src/attack/masks/{base,cicids2017_distrinet}.py` |
 | CFF | `src/preprocessing/conditional_feature_freedom.py` |
 | Ablation ladder A0–A6 | `src/experiments/ablations.py` |

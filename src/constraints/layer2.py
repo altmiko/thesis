@@ -3,7 +3,7 @@
 Layer 2 rules are data/extractor-specific and are supplied as a serializable rule
 set (JSON/dict), not baked into the VAE. Each entry is ``{"type", "name", "params"}``
 and is rebuilt via the registry. An automatic constraint-mining script can later emit
-this exact format (e.g. ``constraints/ciciot2023/mined.json``) with no code changes.
+this exact format (e.g. ``old_constraints/ciciot2023/mined.json``) with no code changes.
 """
 from __future__ import annotations
 

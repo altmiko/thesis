@@ -5,9 +5,9 @@ is collapsed into the realizable primitives (p, alpha) and passed through the SA
 realizability layer used by the direct primitive baseline. Success is measured AFTER discrete
 projection. Separate output tree from the primitive baseline (never mixed).
 
-Realism note (Part L): the attack VAE and the IDR/Mahalanobis gate are the SAME per-class VAE,
-so the IDR score here is *generator-relative*, not independent evidence. PAVE (Level-A), the
-mined density engine, and the internal realizability validator remain independent evaluators.
+Realism note: the attack VAE and the IDR/Mahalanobis gate are the SAME per-class VAE,
+so the IDR score here is generator-relative, not independent evidence. Structural validity
+is validator_v2 ``hybrid_valid`` only; realizability checks are diagnostic.
 """
 from __future__ import annotations
 
@@ -19,16 +19,15 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from attack.primattack_budget import BUDGET_NAMES, class_calibration, load_calibration
 from attack.realizability.cicids2017 import CICIDS2017PrimitiveModel, SCALER_ATOL
 from attack.realizability.validator import RealizabilityValidator
 from attack.run_cicids2017_primitive_attack import (
-    VICTIMS, _class_rows, evaluate_cell, train_envelope,
+    VICTIMS, _class_rows, evaluate_cell,
     _LENGTH_COLS, _TIMING_COLS, _RATE_COLS,
 )
 from attack.vae_latent_primitive import LatentAttackConfig, LatentPrimitiveAttack
 from datasets.cicids2017 import CICIDS2017Adapter
-from evaluation.pave_style_validator import PAVEStyleValidator
-from experiments.ablations import build_ablation
 from experiments.provenance import (
     artifact_provenance_arrays,
     build_provenance,
@@ -57,7 +56,7 @@ def _load_realism(idr_path: Path, device: str) -> dict[str, torch.Tensor]:
             "threshold_sq": torch.tensor(float(s["threshold_sq"]), dtype=torch.float32, device=device)}
 
 
-def run(*, classes, victims, device, test_limit, cost_weight, p_max, alpha_max, mtu_cap,
+def run(*, classes, victims, device, test_limit, cost_weight, calibration_path, budget_name,
         stage_a_dir, output_dir, seeds, config: LatentAttackConfig, variant="full"):
     adapter = CICIDS2017Adapter()
     repo = adapter.repo_root
@@ -73,26 +72,20 @@ def run(*, classes, victims, device, test_limit, cost_weight, p_max, alpha_max, 
 
     test = adapter.load_split("test")
     raw_test = np.load(adapter._processed / "X_test_pristine.npy", mmap_mode="r")
-    raw_train = np.load(adapter._processed / "X_train_pristine.npy", mmap_mode="r")
-    layer1_fit = np.ascontiguousarray(raw_train[:200000], dtype=np.float32)
-    layer2_path = repo / "constraints" / adapter.name / "mined.json"
+    calibration = load_calibration(calibration_path)
     stage_a_dir = stage_a_dir or (repo / "outputs" / "cicids2017_vae_stage_a")
     victim_dir = repo / "outputs" / "cicids2017distrinet" / "models"
-
-    pave = PAVEStyleValidator(integer_tolerance=SCALER_ATOL, range_tolerance=SCALER_ATOL).fit(
-        np.asarray(raw_train, dtype=np.float64), manifest.names, schema=manifest)
-    envelope = train_envelope(raw_train, model.i)
-    bounds_cfg = {"p_max": p_max, "alpha_max": alpha_max, "mtu_cap": mtu_cap,
-                  **{f"env_{k}": v for k, v in envelope.items()}}
     method_id = "vae_latent_primitive" if variant == "full" else f"vae_latent_primitive_{variant}"
-    run_config = {**config.__dict__, "test_limit_per_class": test_limit, "p_max": p_max,
-                  "alpha_max": alpha_max, "mtu_cap": mtu_cap, "seeds": seeds,
+    run_config = {**config.__dict__, "test_limit_per_class": test_limit,
+                  "budget_name": budget_name, "calibration_path": str(calibration_path),
+                  "calibration_fit_split": calibration["fit_split"], "seeds": seeds,
                   "attack_batch_size_per_class": test_limit,
                   "alpha_mapping": "exp(relu(mean_log_timing_ratio))"}
     checkpoint_paths = {
         **{f"victim_{name}": victim_dir / f"{name}_category.pt" for name in victims},
         **{f"vae_{name}": stage_a_dir / f"vae_{name}.pt" for name in classes},
         **{f"idr_{name}": stage_a_dir / f"idr_{name}.npz" for name in classes},
+        "budget_calibration": calibration_path,
     }
     provenance = build_provenance(
         repo_root=repo, dataset=adapter.name, method_id=method_id, config=run_config,
@@ -113,7 +106,7 @@ def run(*, classes, victims, device, test_limit, cost_weight, p_max, alpha_max, 
         "denominator": "clean-correct malicious test rows per (class, victim)",
         "vae_role": "GENERATOR (encoder+decoder in the classifier-gradient path); realism gate is "
                     "the same VAE -> IDR is generator-relative, not independent",
-        "strict_valid_definition": "PAVE & mined & primitive-realizability evaluator",
+        "strict_valid_definition": "validator_v2 (hybrid_valid) only",
         "config": run_config,
         "provenance": provenance,
         "feature_roles": {n: {"role": r.tag, "reason": why} for n, (r, why) in model.roles().items()},
@@ -122,6 +115,7 @@ def run(*, classes, victims, device, test_limit, cost_weight, p_max, alpha_max, 
 
     for class_name in classes:
         cid = mapping.name_to_id[class_name]
+        class_cfg = class_calibration(calibration, class_name, budget_name)
         idx = _class_rows(test.y, cid, test_limit, 42 + cid)
         raw_np = np.ascontiguousarray(np.asarray(raw_test[idx]), dtype=np.float32)
         raw = torch.tensor(raw_np, device=device)
@@ -131,9 +125,7 @@ def run(*, classes, victims, device, test_limit, cost_weight, p_max, alpha_max, 
         )
         idr_path = stage_a_dir / f"idr_{class_name}.npz"
         realism = _load_realism(idr_path, device)
-        engine = build_ablation("A4", adapter, encoder_input_transform="asinh",
-                                layer1_fit_x_raw=layer1_fit, layer2_path=layer2_path).engine
-        bounds = model.per_flow_bounds(raw, bounds_cfg)
+        bounds = model.per_flow_bounds(raw, class_cfg.bounds_config())
         for vname in victims:
             victim = load_category_victim(
                 victim_dir / f"{vname}_category.pt", adapter=adapter,
@@ -147,10 +139,10 @@ def run(*, classes, victims, device, test_limit, cost_weight, p_max, alpha_max, 
                 fidx = torch.tensor([model.i[n] for n in val.frozen_names], device=device)
                 assert torch.allclose(adv_raw[:, fidx], raw[:, fidx], atol=SCALER_ATOL, rtol=1e-4), \
                     "frozen feature changed in latent attack realization"
-                masks, cost, yc, ya = evaluate_cell(model, val, victim, vae, engine, pave, raw,
+                masks, cost, yc, ya = evaluate_cell(model, val, victim, vae, raw,
                                                     adv_raw, center, scale, cid, idr_path, groups_idx)
                 ap = artifact_dir / f"{class_name}_{vname}_seed{seed}.npz"
-                strict = masks["pave_valid"] & masks["mined_valid"] & masks["realizable"]
+                strict = masks["domain_valid"]
                 checkpoint_ids = {
                     key: provenance["checkpoints"][key]["sha256"]
                     for key in (f"victim_{vname}", f"vae_{class_name}", f"idr_{class_name}")
@@ -184,7 +176,7 @@ def run(*, classes, victims, device, test_limit, cost_weight, p_max, alpha_max, 
                     cost_total=cost["total"].cpu().numpy().astype(np.float32),
                     cost_padding=cost["padding"].cpu().numpy().astype(np.float32),
                     cost_timing=cost["timing"].cpu().numpy().astype(np.float32),
-                    target_success_flag=masks["benign"].cpu().numpy(),
+                    target_success_flag=masks["targeted_success"].cpu().numpy(),
                     strict_valid=strict.cpu().numpy(),
                     **artifact_provenance_arrays(
                         provenance, row_ids=all_row_ids[idx], class_name=class_name,
@@ -194,20 +186,22 @@ def run(*, classes, victims, device, test_limit, cost_weight, p_max, alpha_max, 
                     **{k: m.cpu().numpy() for k, m in masks.items()},
                 )
                 denom = int(masks["clean_correct"].sum()); cc = masks["clean_correct"]
-                strict = masks["pave_valid"] & masks["mined_valid"] & masks["realizable"]
+                strict = masks["domain_valid"]
                 rate = lambda m: (float((m & cc).sum()) / denom) if denom else float("nan")
                 ll = res.latent_l2.cpu().numpy()[cc.cpu().numpy()]
                 cell = {
                     "class": class_name, "victim": vname, "seed": seed, "variant": variant,
                     "artifact": str(ap), "n_total": len(idx), "n_clean_correct": denom,
-                    "n_targeted_benign_success": int((masks["benign"] & cc).sum()),
-                    "n_targeted_strict_valid": int((masks["benign"] & strict & cc).sum()),
+                    "n_targeted_benign_success": int((masks["targeted_success"] & cc).sum()),
+                    "n_targeted_strict_valid": int((masks["targeted_success"] & strict & cc).sum()),
                     "untargeted_asr": rate(masks["evasion"]),
-                    "targeted_benign_asr": rate(masks["benign"]),
-                    "targeted_strict_valid_asr": rate(masks["benign"] & strict),
-                    "strict_validity": rate(strict), "pave_validity": rate(masks["pave_valid"]),
-                    "mined_validity": rate(masks["mined_valid"]),
-                    "realizability_aware_validity": rate(masks["realizable"]),
+                    "targeted_benign_asr": rate(masks["targeted_success"]),
+                    "targeted_strict_valid_asr": rate(masks["targeted_success"] & strict),
+                    "strict_validity": rate(strict),
+                    "mined_validity": rate(masks["domain_valid"]),
+                    "realizability_aware_validity_diagnostic": rate(
+                        masks["primitive_transform_consistent"]
+                    ),
                     "IDR_generator_relative": rate(masks["in_dist"]),
                     "cost_total_mean": float(cost["total"][cc].mean()) if denom else float("nan"),
                     "latent_l2_mean": float(np.mean(ll)) if ll.size else float("nan"),
@@ -241,9 +235,9 @@ def main() -> None:
     ap.add_argument("--lambda-latent", type=float, default=0.005)
     ap.add_argument("--lambda-cost", type=float, default=0.05)
     ap.add_argument("--lambda-realism", type=float, default=0.001)
-    ap.add_argument("--p-max", type=float, default=1460.0)
-    ap.add_argument("--alpha-max", type=float, default=100.0)
-    ap.add_argument("--mtu-cap", type=float, default=0.0)
+    ap.add_argument("--calibration", type=Path,
+                    default=Path("artifacts/primattack/budget_calibration.json"))
+    ap.add_argument("--budget", choices=BUDGET_NAMES, default="maximum-evaluated")
     ap.add_argument("--cost-weight", type=float, default=0.01)
     ap.add_argument("--seeds", default="42,43,44")
     ap.add_argument("--variant", default="full", choices=list(VARIANTS))
@@ -261,8 +255,9 @@ def main() -> None:
     victims = [x.strip() for x in a.victims.split(",") if x.strip()]
     seeds = [int(x) for x in str(a.seeds).split(",") if str(x).strip()]
     run(classes=classes, victims=victims, device=a.device, test_limit=a.test_limit,
-        cost_weight=a.cost_weight, p_max=a.p_max, alpha_max=a.alpha_max, mtu_cap=a.mtu_cap,
-        stage_a_dir=a.stage_a_dir, output_dir=a.output_dir, seeds=seeds, config=cfg, variant=a.variant)
+        cost_weight=a.cost_weight, calibration_path=a.calibration, budget_name=a.budget,
+        stage_a_dir=a.stage_a_dir, output_dir=a.output_dir, seeds=seeds, config=cfg,
+        variant=a.variant)
 
 
 if __name__ == "__main__":

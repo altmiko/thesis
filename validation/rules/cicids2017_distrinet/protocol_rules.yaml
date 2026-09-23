@@ -1,0 +1,1682 @@
+dataset: cicids2017_distrinet
+note: 'Minimal, domain-justified PROTOCOL layer: a single principled template (non-negativity)
+  instantiated per feature. Not hand-invented per feature; verified to hold on train
+  and validation.'
+rules:
+- id: PROTO_0001
+  name: nonnegative::Src Port
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Src Port
+  features:
+  - Src Port
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Src Port is non-negative: CICFlowMeter flow statistics (counts, sizes,
+    durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0002
+  name: nonnegative::Dst Port
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Dst Port
+  features:
+  - Dst Port
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Dst Port is non-negative: CICFlowMeter flow statistics (counts, sizes,
+    durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0003
+  name: nonnegative::Protocol
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Protocol
+  features:
+  - Protocol
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Protocol is non-negative: CICFlowMeter flow statistics (counts, sizes,
+    durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0004
+  name: nonnegative::Flow Duration
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Flow Duration
+  features:
+  - Flow Duration
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Flow Duration is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0005
+  name: nonnegative::Total Fwd Packet
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Total Fwd Packet
+  features:
+  - Total Fwd Packet
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Total Fwd Packet is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0006
+  name: nonnegative::Total Bwd packets
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Total Bwd packets
+  features:
+  - Total Bwd packets
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Total Bwd packets is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0007
+  name: nonnegative::Total Length of Fwd Packet
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Total Length of Fwd Packet
+  features:
+  - Total Length of Fwd Packet
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Total Length of Fwd Packet is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0008
+  name: nonnegative::Total Length of Bwd Packet
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Total Length of Bwd Packet
+  features:
+  - Total Length of Bwd Packet
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Total Length of Bwd Packet is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0009
+  name: nonnegative::Fwd Packet Length Max
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd Packet Length Max
+  features:
+  - Fwd Packet Length Max
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd Packet Length Max is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0010
+  name: nonnegative::Fwd Packet Length Min
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd Packet Length Min
+  features:
+  - Fwd Packet Length Min
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd Packet Length Min is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0011
+  name: nonnegative::Fwd Packet Length Mean
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd Packet Length Mean
+  features:
+  - Fwd Packet Length Mean
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd Packet Length Mean is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0012
+  name: nonnegative::Fwd Packet Length Std
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd Packet Length Std
+  features:
+  - Fwd Packet Length Std
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd Packet Length Std is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0013
+  name: nonnegative::Bwd Packet Length Max
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd Packet Length Max
+  features:
+  - Bwd Packet Length Max
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd Packet Length Max is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0014
+  name: nonnegative::Bwd Packet Length Min
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd Packet Length Min
+  features:
+  - Bwd Packet Length Min
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd Packet Length Min is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0015
+  name: nonnegative::Bwd Packet Length Mean
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd Packet Length Mean
+  features:
+  - Bwd Packet Length Mean
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd Packet Length Mean is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0016
+  name: nonnegative::Bwd Packet Length Std
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd Packet Length Std
+  features:
+  - Bwd Packet Length Std
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd Packet Length Std is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0017
+  name: nonnegative::Flow Bytes/s
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Flow Bytes/s
+  features:
+  - Flow Bytes/s
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Flow Bytes/s is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0018
+  name: nonnegative::Flow Packets/s
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Flow Packets/s
+  features:
+  - Flow Packets/s
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Flow Packets/s is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0019
+  name: nonnegative::Flow IAT Mean
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Flow IAT Mean
+  features:
+  - Flow IAT Mean
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Flow IAT Mean is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0020
+  name: nonnegative::Flow IAT Std
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Flow IAT Std
+  features:
+  - Flow IAT Std
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Flow IAT Std is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0021
+  name: nonnegative::Flow IAT Max
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Flow IAT Max
+  features:
+  - Flow IAT Max
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Flow IAT Max is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0022
+  name: nonnegative::Flow IAT Min
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Flow IAT Min
+  features:
+  - Flow IAT Min
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Flow IAT Min is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0023
+  name: nonnegative::Fwd IAT Total
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd IAT Total
+  features:
+  - Fwd IAT Total
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd IAT Total is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0024
+  name: nonnegative::Fwd IAT Mean
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd IAT Mean
+  features:
+  - Fwd IAT Mean
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd IAT Mean is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0025
+  name: nonnegative::Fwd IAT Std
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd IAT Std
+  features:
+  - Fwd IAT Std
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd IAT Std is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0026
+  name: nonnegative::Fwd IAT Max
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd IAT Max
+  features:
+  - Fwd IAT Max
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd IAT Max is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0027
+  name: nonnegative::Fwd IAT Min
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd IAT Min
+  features:
+  - Fwd IAT Min
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd IAT Min is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0028
+  name: nonnegative::Bwd IAT Total
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd IAT Total
+  features:
+  - Bwd IAT Total
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd IAT Total is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0029
+  name: nonnegative::Bwd IAT Mean
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd IAT Mean
+  features:
+  - Bwd IAT Mean
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd IAT Mean is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0030
+  name: nonnegative::Bwd IAT Std
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd IAT Std
+  features:
+  - Bwd IAT Std
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd IAT Std is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0031
+  name: nonnegative::Bwd IAT Max
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd IAT Max
+  features:
+  - Bwd IAT Max
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd IAT Max is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0032
+  name: nonnegative::Bwd IAT Min
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd IAT Min
+  features:
+  - Bwd IAT Min
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd IAT Min is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0033
+  name: nonnegative::Fwd PSH Flags
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd PSH Flags
+  features:
+  - Fwd PSH Flags
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd PSH Flags is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0034
+  name: nonnegative::Bwd PSH Flags
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd PSH Flags
+  features:
+  - Bwd PSH Flags
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd PSH Flags is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0035
+  name: nonnegative::Fwd URG Flags
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd URG Flags
+  features:
+  - Fwd URG Flags
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd URG Flags is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0036
+  name: nonnegative::Bwd URG Flags
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd URG Flags
+  features:
+  - Bwd URG Flags
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd URG Flags is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0037
+  name: nonnegative::Fwd Header Length
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd Header Length
+  features:
+  - Fwd Header Length
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd Header Length is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0038
+  name: nonnegative::Bwd Header Length
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd Header Length
+  features:
+  - Bwd Header Length
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd Header Length is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0039
+  name: nonnegative::Fwd Packets/s
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd Packets/s
+  features:
+  - Fwd Packets/s
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd Packets/s is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0040
+  name: nonnegative::Bwd Packets/s
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd Packets/s
+  features:
+  - Bwd Packets/s
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd Packets/s is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0041
+  name: nonnegative::Packet Length Min
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Packet Length Min
+  features:
+  - Packet Length Min
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Packet Length Min is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0042
+  name: nonnegative::Packet Length Max
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Packet Length Max
+  features:
+  - Packet Length Max
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Packet Length Max is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0043
+  name: nonnegative::Packet Length Mean
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Packet Length Mean
+  features:
+  - Packet Length Mean
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Packet Length Mean is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0044
+  name: nonnegative::Packet Length Std
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Packet Length Std
+  features:
+  - Packet Length Std
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Packet Length Std is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0045
+  name: nonnegative::Packet Length Variance
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Packet Length Variance
+  features:
+  - Packet Length Variance
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Packet Length Variance is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0046
+  name: nonnegative::FIN Flag Count
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: FIN Flag Count
+  features:
+  - FIN Flag Count
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'FIN Flag Count is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0047
+  name: nonnegative::SYN Flag Count
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: SYN Flag Count
+  features:
+  - SYN Flag Count
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'SYN Flag Count is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0048
+  name: nonnegative::RST Flag Count
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: RST Flag Count
+  features:
+  - RST Flag Count
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'RST Flag Count is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0049
+  name: nonnegative::PSH Flag Count
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: PSH Flag Count
+  features:
+  - PSH Flag Count
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'PSH Flag Count is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0050
+  name: nonnegative::ACK Flag Count
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: ACK Flag Count
+  features:
+  - ACK Flag Count
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'ACK Flag Count is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0051
+  name: nonnegative::URG Flag Count
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: URG Flag Count
+  features:
+  - URG Flag Count
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'URG Flag Count is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0052
+  name: nonnegative::CWR Flag Count
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: CWR Flag Count
+  features:
+  - CWR Flag Count
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'CWR Flag Count is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0053
+  name: nonnegative::ECE Flag Count
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: ECE Flag Count
+  features:
+  - ECE Flag Count
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'ECE Flag Count is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0054
+  name: nonnegative::Down/Up Ratio
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Down/Up Ratio
+  features:
+  - Down/Up Ratio
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Down/Up Ratio is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0055
+  name: nonnegative::Average Packet Size
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Average Packet Size
+  features:
+  - Average Packet Size
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Average Packet Size is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0056
+  name: nonnegative::Fwd Segment Size Avg
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd Segment Size Avg
+  features:
+  - Fwd Segment Size Avg
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd Segment Size Avg is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0057
+  name: nonnegative::Bwd Segment Size Avg
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd Segment Size Avg
+  features:
+  - Bwd Segment Size Avg
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd Segment Size Avg is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0058
+  name: nonnegative::Fwd Bytes/Bulk Avg
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd Bytes/Bulk Avg
+  features:
+  - Fwd Bytes/Bulk Avg
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd Bytes/Bulk Avg is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0059
+  name: nonnegative::Fwd Packet/Bulk Avg
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd Packet/Bulk Avg
+  features:
+  - Fwd Packet/Bulk Avg
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd Packet/Bulk Avg is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0060
+  name: nonnegative::Fwd Bulk Rate Avg
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd Bulk Rate Avg
+  features:
+  - Fwd Bulk Rate Avg
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd Bulk Rate Avg is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0061
+  name: nonnegative::Bwd Bytes/Bulk Avg
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd Bytes/Bulk Avg
+  features:
+  - Bwd Bytes/Bulk Avg
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd Bytes/Bulk Avg is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0062
+  name: nonnegative::Bwd Packet/Bulk Avg
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd Packet/Bulk Avg
+  features:
+  - Bwd Packet/Bulk Avg
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd Packet/Bulk Avg is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0063
+  name: nonnegative::Bwd Bulk Rate Avg
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd Bulk Rate Avg
+  features:
+  - Bwd Bulk Rate Avg
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd Bulk Rate Avg is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0064
+  name: nonnegative::Subflow Fwd Packets
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Subflow Fwd Packets
+  features:
+  - Subflow Fwd Packets
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Subflow Fwd Packets is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0065
+  name: nonnegative::Subflow Fwd Bytes
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Subflow Fwd Bytes
+  features:
+  - Subflow Fwd Bytes
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Subflow Fwd Bytes is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0066
+  name: nonnegative::Subflow Bwd Packets
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Subflow Bwd Packets
+  features:
+  - Subflow Bwd Packets
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Subflow Bwd Packets is non-negative: CICFlowMeter flow statistics
+    (counts, sizes, durations, rates, ratios, ports/protocol codes) cannot be negative
+    by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0067
+  name: nonnegative::Subflow Bwd Bytes
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Subflow Bwd Bytes
+  features:
+  - Subflow Bwd Bytes
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Subflow Bwd Bytes is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0068
+  name: nonnegative::FWD Init Win Bytes
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: FWD Init Win Bytes
+  features:
+  - FWD Init Win Bytes
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'FWD Init Win Bytes is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0069
+  name: nonnegative::Bwd Init Win Bytes
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Bwd Init Win Bytes
+  features:
+  - Bwd Init Win Bytes
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Bwd Init Win Bytes is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0070
+  name: nonnegative::Fwd Act Data Pkts
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd Act Data Pkts
+  features:
+  - Fwd Act Data Pkts
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd Act Data Pkts is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0071
+  name: nonnegative::Fwd Seg Size Min
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Fwd Seg Size Min
+  features:
+  - Fwd Seg Size Min
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Fwd Seg Size Min is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0072
+  name: nonnegative::Active Mean
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Active Mean
+  features:
+  - Active Mean
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Active Mean is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0073
+  name: nonnegative::Active Std
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Active Std
+  features:
+  - Active Std
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Active Std is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0074
+  name: nonnegative::Active Max
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Active Max
+  features:
+  - Active Max
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Active Max is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0075
+  name: nonnegative::Active Min
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Active Min
+  features:
+  - Active Min
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Active Min is non-negative: CICFlowMeter flow statistics (counts,
+    sizes, durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0076
+  name: nonnegative::Idle Mean
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Idle Mean
+  features:
+  - Idle Mean
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Idle Mean is non-negative: CICFlowMeter flow statistics (counts, sizes,
+    durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0077
+  name: nonnegative::Idle Std
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Idle Std
+  features:
+  - Idle Std
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Idle Std is non-negative: CICFlowMeter flow statistics (counts, sizes,
+    durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0078
+  name: nonnegative::Idle Max
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Idle Max
+  features:
+  - Idle Max
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Idle Max is non-negative: CICFlowMeter flow statistics (counts, sizes,
+    durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
+- id: PROTO_0079
+  name: nonnegative::Idle Min
+  source_type: PROTOCOL
+  rule_type: nonnegative
+  hardness: PROTOCOL
+  params:
+    feature: Idle Min
+  features:
+  - Idle Min
+  tolerance:
+    absolute: 1.0e-06
+    relative: 0.0
+  description: 'Idle Min is non-negative: CICFlowMeter flow statistics (counts, sizes,
+    durations, rates, ratios, ports/protocol codes) cannot be negative by construction.'
+  provenance:
+    origin: networking / extractor domain knowledge
+    external_reference: non-negativity of flow statistics
+    automatically_mined: false
+  evidence:
+    train_support_full: 1.0
+    validation_support_full: 1.0
