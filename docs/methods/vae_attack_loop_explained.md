@@ -221,7 +221,7 @@ best tracked by (success ∧ min latent-L2). Multi-restart via GMM/jitter seeds;
   mask → reimpose protocol). This is the "decoder physics without the decoder" ablation.
 
 ## C.5 Orchestration (`run_all_models_attack_rerun.py`, canonical)
-For each neural classifier (`SimpleMLP, CNNOnly, LSTMOnly, SerialCNNLSTM`) × each source class
+For each active neural classifier (`SimpleMLP`, `CNNOnly`) × each source class
 (all except Benign), select 100 correctly-classified test samples, run
 `latent-pgd, latent-cw, input-pgd, input-cw`, and score:
 `ASR_raw`, protocol validity, mask compliance, raw G1–G8 validity, joint validity, IDR

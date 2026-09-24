@@ -215,11 +215,10 @@ Recon cluster) — confirming the random within-cluster pick loses nothing.
 
 ## 6. Sensitivity study (spec §7.5 — DONE)
 
-`python -m src.preprocessing.ciciot2023.reports sensitivity --device cuda --epochs 4`. Trains the four
-gradient-attackable classifiers (`mlp,cnn,lstm,dualpath`) on the 17
-shard-splittable classes twice — **row-level shuffled** vs **forward-chaining
-temporal** split — holding cleaning, scaler, per-class train cap (20k), and
-epochs identical, so the split's temporal discipline is the only variable.
+`python -m src.preprocessing.ciciot2023.reports sensitivity --device cuda --epochs 4` compares
+the active `mlp` and `cnn` classifiers on the 17 shard-splittable classes under row-level
+shuffling versus forward-chaining temporal splitting, while holding cleaning, scaling,
+per-class train cap (20k), and epochs constant.
 
 **Result — measured cost of temporal leakage (test accuracy):**
 
@@ -227,14 +226,11 @@ epochs identical, so the split's temporal discipline is the only variable.
 |---|---:|---:|---:|
 | mlp | 0.6942 | 0.7256 | +0.0314 |
 | cnn | 0.6166 | 0.6536 | +0.0370 |
-| lstm | 0.7220 | 0.7500 | +0.0280 |
-| dualpath | 0.6742 | 0.7382 | +0.0640 |
-| **mean** | | | **+0.0401** |
+| **mean** | | | **+0.0342** |
 
-So a leakage-blind (shuffled) split inflates accuracy by **≈4 points** on
-average. Thesis wording (spec §7.5): temporal leakage inflated accuracy by ~4
-points on the classes where the comparison was possible; treat the 15
-single-shard classes' figures as an upper bound. (`sensitivity_study.json`.)
+For the active roster, a leakage-blind shuffled split inflated accuracy by about **3.4
+percentage points** on the classes where comparison was possible. Treat figures for the 15
+single-shard classes as an upper bound. (`sensitivity_study.json`.)
 
 > Windows note: `torch` MUST be imported **after** `pyarrow` (the script does
 > this) — the reverse order crashes with a DLL access violation.

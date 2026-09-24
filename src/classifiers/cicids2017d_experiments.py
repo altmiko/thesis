@@ -47,14 +47,14 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from config.paths import SEED
 from src.classifiers.models import get_model
+from src.classifiers.ft_transformer import default_ft_transformer_kwargs
 
-NN_MODELS = ("mlp", "cnn", "lstm", "serial")
+NN_MODELS = ("mlp", "cnn", "ft_transformer")
 EFFECTIVE_NUMBER_BETA = 0.999
 DISPLAY_NAMES = {
     "mlp": "SimpleMLP",
     "cnn": "CNNOnly",
-    "lstm": "LSTMOnly",
-    "serial": "SerialCNNLSTM",
+    "ft_transformer": "FTTransformer",
 }
 
 
@@ -110,11 +110,28 @@ def parse_args() -> argparse.Namespace:
         default="balanced",
         help="Train-only loss weighting. Balanced is inverse-frequency weighting.",
     )
+    parser.add_argument(
+        "--ft-learning-rate",
+        type=float,
+        default=1e-4,
+        help="AdamW learning rate for ft_transformer (literature default 1e-4).",
+    )
+    parser.add_argument(
+        "--ft-weight-decay",
+        type=float,
+        default=1e-5,
+        help="AdamW weight decay for ft_transformer (decoupled; excludes tokenizer/CLS/bias/norm).",
+    )
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--limit-train", type=int, default=None, help="Category-stratified smoke cap.")
     parser.add_argument("--limit-val", type=int, default=None, help="Category-stratified smoke cap.")
     parser.add_argument("--limit-test", type=int, default=None, help="Category-stratified smoke cap.")
+    parser.add_argument(
+        "--tasks",
+        default="all",
+        help="Comma-separated task heads to train ('binary','category') or 'all'.",
+    )
     return parser.parse_args()
 
 
@@ -371,12 +388,8 @@ def model_kwargs(model_type: str) -> dict[str, Any]:
         return {**common, "hidden_dims": (256, 128, 64)}
     if model_type == "cnn":
         return {**common, "pool_size": 8}
-    if model_type == "lstm":
-        return {
-            **common,
-            "feature_sequence": True,
-            "feature_embedding_dim": 16,
-        }
+    if model_type == "ft_transformer":
+        return {**common, **default_ft_transformer_kwargs()}
     return common
 
 
@@ -460,6 +473,30 @@ def compute_metrics(
     }
 
 
+def build_optimizer(
+    model: nn.Module,
+    model_type: str,
+    config: RunConfig,
+    args: argparse.Namespace,
+) -> tuple[torch.optim.Optimizer, dict[str, Any]]:
+    """Per-model optimizer. FT-Transformer uses AdamW with reference no-decay groups.
+
+    The active mlp/cnn victims keep their Adam(lr=config.learning_rate) contract unchanged;
+    ft_transformer uses AdamW with decoupled weight decay that excludes
+    tokenizer/CLS/bias/LayerNorm parameters (task §13).
+    """
+    if model_type == "ft_transformer":
+        lr = float(args.ft_learning_rate)
+        weight_decay = float(args.ft_weight_decay)
+        optimizer = torch.optim.AdamW(
+            model.optimization_param_groups(weight_decay), lr=lr
+        )
+        return optimizer, {"optimizer": "AdamW", "learning_rate": lr, "weight_decay": weight_decay}
+    lr = float(config.learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    return optimizer, {"optimizer": "Adam", "learning_rate": lr, "weight_decay": 0.0}
+
+
 def train_nn(
     model_type: str,
     task: TaskSpec,
@@ -470,12 +507,15 @@ def train_nn(
     device: torch.device,
     output_dir: Path,
     logger: logging.Logger,
+    feature_names: list[str] | None = None,
+    schema_sha256: str | None = None,
+    dataset_id: str = "cicids2017_distrinet",
 ) -> dict[str, Any]:
     set_seed(config.seed)
     num_features = int(tensors["x_train"].shape[1])
     model = build_nn(model_type, num_features, task.num_classes).to(device)
     criterion = nn.CrossEntropyLoss(weight=torch.tensor(class_weights, device=device))
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
+    optimizer, optim_meta = build_optimizer(model, model_type, config, args)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="max", patience=1, factor=0.5
     )
@@ -583,12 +623,44 @@ def train_nn(
 
     stem = f"{model_type}_{task.name}"
     model_path = output_dir / "models" / f"{stem}.pt"
+    arch_version = (
+        model.architecture_config().get("architecture_version")
+        if hasattr(model, "architecture_config")
+        else None
+    )
     checkpoint = {
         "state_dict": best_state,
         "model_type": model_type,
         "model_kwargs": model_kwargs(model_type),
         "num_features": num_features,
         "num_classes": task.num_classes,
+        "metadata": {
+            "model_type": model_type,
+            "display_name": DISPLAY_NAMES[model_type],
+            "architecture_version": arch_version,
+            "input_feature_count": num_features,
+            "feature_names": list(feature_names) if feature_names is not None else None,
+            "n_classes": task.num_classes,
+            "class_names": list(task.class_names),
+            "label_mapping": {name: idx for idx, name in enumerate(task.class_names)},
+            "task": task.name,
+            "model_kwargs": model_kwargs(model_type),
+            "optimizer": optim_meta["optimizer"],
+            "learning_rate": optim_meta["learning_rate"],
+            "weight_decay": optim_meta["weight_decay"],
+            "seed": config.seed,
+            "batch_size": config.batch_size,
+            "epochs_requested": config.epochs,
+            "epochs_completed": len(history),
+            "best_epoch": best_epoch,
+            "best_val_macro_f1": float(best_val_macro_f1),
+            "class_weighting": config.class_weighting,
+            "gradient_clip_norm": 5.0,
+            "scaler": "RobustScaler(scaler.pkl)",
+            "dataset": dataset_id,
+            "split_identifier": "CICIDS_2017_Distrinet/X_{train,val,test}.npy",
+            "preprocessing_manifest_sha256": schema_sha256,
+        },
     }
     torch.save(checkpoint, model_path)
     history_path = output_dir / "histories" / f"{stem}_history.json"
@@ -618,9 +690,10 @@ def train_nn(
             "epochs_completed": len(history),
             "best_epoch": best_epoch,
             "batch_size": config.batch_size,
-            "learning_rate": config.learning_rate,
+            "learning_rate": optim_meta["learning_rate"],
+            "weight_decay": optim_meta["weight_decay"],
             "early_stopping_patience": config.early_stopping_patience,
-            "optimizer": "Adam",
+            "optimizer": optim_meta["optimizer"],
             "loss": f"{config.class_weighting} weighted CrossEntropyLoss",
             "checkpoint_selection": "validation macro-F1; validation loss tie-break",
             "parameters": int(sum(parameter.numel() for parameter in model.parameters())),
@@ -1029,7 +1102,12 @@ def main() -> None:
 
     tensors = make_tensor_data(data)
     results: list[dict[str, Any]] = []
-    for task in TASKS:
+    feature_names = list(data["preprocessing_manifest"]["modelling_feature_names"])
+    schema_sha256 = sha256_file(processed_dir / "preprocessing_manifest.json")
+    selected_tasks = TASKS if args.tasks == "all" else tuple(
+        TASK_BY_NAME[name] for name in args.tasks.split(",") if name.strip()
+    )
+    for task in selected_tasks:
         for model_type in models:
             result = train_nn(
                 model_type,
@@ -1041,6 +1119,9 @@ def main() -> None:
                 device,
                 output_dir,
                 logger,
+                feature_names=feature_names,
+                schema_sha256=schema_sha256,
+                dataset_id="cicids2017_distrinet",
             )
             save_model_outputs(result, data, output_dir)
             plot_confusion(result, output_dir)

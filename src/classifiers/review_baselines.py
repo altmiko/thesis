@@ -42,13 +42,11 @@ if str(ROOT) not in sys.path:
 from src.classifiers.models import get_model
 
 
-NN_MODEL_TYPES: Tuple[str, ...] = ("mlp", "cnn", "lstm", "serial")
+NN_MODEL_TYPES: Tuple[str, ...] = ("mlp", "cnn")
 MODEL_TYPES: Tuple[str, ...] = NN_MODEL_TYPES
 MODEL_DISPLAY_NAMES: Dict[str, str] = {
     "mlp": "MLP",
     "cnn": "CNN",
-    "lstm": "LSTM",
-    "serial": "CNN-LSTM",
 }
 
 

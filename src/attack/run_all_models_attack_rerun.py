@@ -59,8 +59,6 @@ SOURCE_CLASSES = [name for name in CLASSES if name != "Benign"]
 MODEL_SPECS = [
     {"tag": "mlp", "label": "MLP", "checkpoint": "mlp_8class.pt"},
     {"tag": "cnn", "label": "CNN", "checkpoint": "cnn_8class.pt"},
-    {"tag": "lstm", "label": "LSTM", "checkpoint": "lstm_8class.pt"},
-    {"tag": "serial", "label": "CNN-LSTM", "checkpoint": "serial_8class.pt"},
 ]
 ATTACK_ORDER = ["latent-pgd", "latent-cw", "input-pgd", "input-cw"]
 SUMMARY_COLUMNS = [

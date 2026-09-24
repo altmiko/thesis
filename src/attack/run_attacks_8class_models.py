@@ -1,5 +1,5 @@
 """
-Run 8-class adversarial attacks across MLP, LSTM, and CNN-LSTM (serial) models.
+Run 8-class adversarial attacks across the active MLP and CNN models.
 
 This script supports multi-restart evaluation for PGD and CW. FGSM is executed
 as a single-run baseline.
@@ -35,15 +35,9 @@ MODEL_CONFIGS = [
         "num_classes": 8,
     },
     {
-        "model_tag": "lstm",
-        "label": "LSTM",
-        "checkpoint": "lstm_8class.pt",
-        "num_classes": 8,
-    },
-    {
-        "model_tag": "serial",
-        "label": "CNN-LSTM",
-        "checkpoint": "serial_8class.pt",
+        "model_tag": "cnn",
+        "label": "CNN",
+        "checkpoint": "cnn_8class.pt",
         "num_classes": 8,
     },
 ]
@@ -92,8 +86,7 @@ def _ensure_requirements() -> None:
         DATA_DIR / "X_test.npy",
         DATA_DIR / "y_test_cat.npy",
         MODELS_DIR / "mlp_8class.pt",
-        MODELS_DIR / "lstm_8class.pt",
-        MODELS_DIR / "serial_8class.pt",
+        MODELS_DIR / "cnn_8class.pt",
     ]
     missing = [p for p in needed if not p.exists()]
     if missing:
@@ -101,7 +94,7 @@ def _ensure_requirements() -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run 8-class attacks for MLP/LSTM/CNN-LSTM with restart support.")
+    parser = argparse.ArgumentParser(description="Run 8-class attacks for active MLP/CNN victims.")
     parser.add_argument("--device", default="cuda", help="Device: cuda or cpu")
     parser.add_argument("--batch-size", type=int, default=1024)
     parser.add_argument("--sample-size", type=int, default=25000)

@@ -136,9 +136,9 @@ All five headers match exactly: **84 columns**.
 - Label: `Label`.
 - Numeric modelling candidates: **79 columns**.
 
-The five non-model fields are removed from the CNN/LSTM/VAE feature matrix. The
-pipeline adds further metadata—source filename/day/row, stable sample ID, parsed
-time, original/fine/binary labels—but keeps all of it outside `X_*`.
+The five non-model fields are removed from the model/VAE feature matrix. The pipeline adds
+further metadata—source filename/day/row, stable sample ID, parsed time, original/fine/binary
+labels—but keeps all of it outside `X_*`.
 
 ### 4.2 Differences from the original eight-file release
 
@@ -771,17 +771,14 @@ Verified conditions:
 
 ### 13.1 Regenerated classifier and confusion-matrix audit
 
-After correcting the split boundary, all four architectures were retrained for both
-the binary and five-category heads. All eight checkpoints, prediction files, numeric
-confusion matrices, and PNG confusion plots were regenerated from the corrected
-312,056-row test split.
+After correcting the split boundary, the active MLP and CNN architectures were retrained for
+both the binary and five-category heads. Their checkpoints, prediction files, numeric confusion
+matrices, and PNG confusion plots were regenerated from the corrected 312,056-row test split.
 
 | Category model | Accuracy | Balanced accuracy | Macro F1 | DoS recall | DDoS recall |
 |---|---:|---:|---:|---:|---:|
 | SimpleMLP | 98.448% | 99.031% | 97.725% | 99.417% | 99.846% |
 | CNNOnly | 98.433% | 98.914% | 97.528% | 99.250% | 99.853% |
-| LSTMOnly | 98.387% | 98.696% | 97.241% | 98.306% | 99.853% |
-| SerialCNNLSTM | 98.426% | 98.907% | 97.622% | 99.339% | 99.853% |
 
 The corrected matrices do **not** show material DoS↔DDoS confusion:
 
@@ -789,8 +786,6 @@ The corrected matrices do **not** show material DoS↔DDoS confusion:
 |---|---:|---:|---:|---:|---:|---:|
 | SimpleMLP | 25,583 | 0 | 150 | 14,243 | 0 | 12 |
 | CNNOnly | 25,540 | 0 | 193 | 14,244 | 0 | 21 |
-| LSTMOnly | 25,297 | 1 | 435 | 14,244 | 0 | 21 |
-| SerialCNNLSTM | 25,563 | 0 | 170 | 14,244 | 0 | 9 |
 
 The strongest category checkpoint, SimpleMLP, produced:
 

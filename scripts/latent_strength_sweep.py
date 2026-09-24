@@ -35,8 +35,7 @@ SWEEPS = {
     "lr_schedule": ["constant", "cosine"],
 }
 
-REPRESENTATIVE = [("DoS", "lstm"), ("DoS", "serial"), ("DDoS", "cnn"), ("DDoS", "mlp"),
-                  ("Recon", "mlp"), ("BruteForce", "serial")]
+REPRESENTATIVE = [("DDoS", "cnn"), ("DDoS", "mlp"), ("Recon", "mlp")]
 
 
 def _pool(cells):
@@ -73,7 +72,7 @@ def _run_cfg(overrides, *, classes, victims, seed, test_limit, scratch, log_grad
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--classes", default="DoS,DDoS,Recon,BruteForce")
-    ap.add_argument("--victims", default="mlp,cnn,lstm,serial")
+    ap.add_argument("--victims", default="mlp,cnn")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--test-limit", type=int, default=256)
     ap.add_argument("--output-dir", type=Path, default=Path("outputs/latent_strength_sweep"))

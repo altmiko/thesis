@@ -1,0 +1,223 @@
+# 4. Statistical Evaluation (MAXIMUM DETAIL)
+
+Two statistical engines exist. The **thesis-critical** one for the PrimAttack
+budget/mode sweep is `scripts/analyze_primattack_experiments.py`; a second engine,
+`src/evaluation/paired_validity_gap.py`, provides the exact McNemar/Holm primitives it
+imports and separately computes the raw-vs-valid ASR gap with effect sizes and CIs.
+
+### Source files & outputs
+| Concern | File / artifact |
+|---|---|
+| Sweep paired tests (Cochran/McNemar/Friedman/Wilcoxon/Holm) | `scripts/analyze_primattack_experiments.py` |
+| McNemar rule + Holm + Newcombe CI + contingency | `src/evaluation/paired_validity_gap.py` |
+| Report renderer | `scripts/build_primattack_budget_report.py` → `docs/primattack_budget_results.md` |
+| Committed test output | `outputs/primattack_budget_sensitivity_full/paired_statistics.json` |
+| Pairing-integrity check | `outputs/primattack_budget_sensitivity_full/source_id_consistency.json` |
+| Legacy bootstrap + statsmodels McNemar (latent PGD vs C&W, CICIoT) | `src/attack/statistical_analysis.py` |
+
+---
+
+## 4.1 From attack rows to statistics (dataflow)
+
+```
+attack_artifacts/*/*/*.npz   (72 files: mode/budget/{class}_{victim}_seed42.npz)
+   │  load_rows()  (:23-49)
+per-sample DataFrame with columns:
+   sample_id, attack_class, victim_model, seed, budget_name, primitive_mode,
+   eligible(=clean_correct), targeted_success, sp_success,
+   relative_duration_change, relative_byte_change, rate_retention
+   │  analyze()  (:172-197): keep eligible only; group by fixed axis
+pivot to matched matrix on _KEY = [sample_id, attack_class, victim_model, seed]
+   │
+binary outcomes  → Cochran's Q (omnibus) + pairwise exact/asymptotic McNemar + Holm
+continuous outcomes → Friedman (omnibus) + pairwise Wilcoxon(Pratt) + Holm
+   │
+paired_statistics.json  →  build_primattack_budget_report.py  →  results tables
+```
+
+- **Sample IDs**: `sample_id` is the canonical `"<file>:<row>"` from preprocessing,
+  carried through the attack npz. It is the *pairing key* that guarantees the same source
+  flow is compared across conditions.
+- **Pairing keys**: `_KEY = [sample_id, attack_class, victim_model, seed]` (`:20`). The
+  *matched condition axis* is either `primitive_mode` (fixing `budget_name`) or
+  `budget_name` (fixing `primitive_mode`) — `analyze()` runs both families (`:175-196`).
+- **Matched matrix**: `_paired_matrix` (`:52-56`) pivots to one row per `_KEY` and one
+  column per condition, `dropna()` so only fully-paired units enter the test.
+- **Outcome variables**: binary `targeted_success` (adv_pred==Benign) and `sp_success`
+  (targeted ∧ domain_valid ∧ primitive_feasible ∧ semantic PASS, `:37-42`); continuous
+  `relative_duration_change`, `relative_byte_change`, `rate_retention`.
+- Only `eligible` (clean-correct) rows are analyzed (`analyze :173`).
+
+`source_id_consistency.json` confirms `identical_across_all_configurations = true` over
+8 class/victim/seed cells — the same source IDs appear in every condition, so the paired
+design is valid *within a victim*.
+
+---
+
+## 4.2 Binary outcomes
+
+### Cochran's Q (omnibus across ≥2 matched conditions)
+`_cochrans_q` (`:57-72`) on the N×K matched binary matrix:
+$$Q=\frac{(K-1)\left(K\sum_j C_j^{2}-\left(\sum_j C_j\right)^2\right)}{K\sum_i R_i-\sum_i R_i^{2}}$$
+with `C_j` column (condition) totals, `R_i` row (unit) totals, `K` conditions;
+`p = χ²_{K−1}.sf(Q)`; if the denominator is 0 → `(0, 1)`.
+- **H₀**: the K matched conditions have equal success proportions (marginal
+  homogeneity across conditions).
+- **Why appropriate**: same units measured under K binary conditions (matched, repeated
+  measures) — Cochran's Q is the standard omnibus for that design.
+- **Data passed**: the pivoted N×K boolean matrix for one fixed axis value and one
+  outcome (e.g. modes {joint, padding-only, timing-only} at budget=intermediate).
+- **Interpretation**: significant Q ⇒ at least one condition's success rate differs;
+  follow with pairwise McNemar.
+
+### Exact McNemar (pairwise)
+`mcnemar_test(b, c)` (`paired_validity_gap.py:428-446`), called from
+`_binary_family` with `b = (x ∧ ¬y).sum()`, `c = (¬x ∧ y).sum()` (`:86-88`):
+- **discordant pairs**: `b` = units where left succeeds and right fails; `c` = the
+  reverse. Concordant pairs (both succeed / both fail) are ignored — McNemar conditions
+  on the discordants.
+- **Rule**: if `b+c < 25` → **exact two-sided binomial**:
+  $$p=\min\!\Big(1,\;2\!\cdot\!\mathrm{Binom}(b+c,0.5).\mathrm{cdf}(\min(b,c))\Big),\quad
+  p=1\text{ if }b+c=0;$$
+  else **asymptotic continuity-corrected** $\chi^2_1$ statistic $\frac{(|b-c|-1)^2}{b+c}$.
+- **H₀**: `b` and `c` are drawn symmetrically, i.e. the two conditions have equal
+  success probability on discordant pairs (`P(left>right)=P(right>left)`).
+- **Why appropriate**: paired binary comparison of two conditions on the same units;
+  exact variant avoids χ² asymptotics when discordants are few (which they are here).
+- **Interpretation**: small p ⇒ one condition beats the other on the units where they
+  disagree.
+
+### Holm correction
+`holm_adjust` (`paired_validity_gap.py:449-461`): step-down family-wise error control.
+Sort p ascending; adjusted `p_(k) = min(1, max over ≤k of (m−rank)·p)` (monotone). Applied
+within each family of the 3 pairwise mode/budget comparisons (`_binary_family :101-102`).
+- **H₀ (family)**: control the family-wise error rate across the pairwise tests at α.
+- **Why appropriate**: 3 correlated pairwise comparisons per omnibus → Holm is a uniformly
+  more-powerful-than-Bonferroni FWER method with no independence assumption.
+
+### Observed binary results (`paired_statistics.json`, `docs/primattack_budget_results.md`)
+Because raw ASR ≈ 0, most tables are degenerate: `b=c=0`, exact McNemar `p=1.0`,
+Holm `p=1.0`, Cochran Q `=0`. The **only** non-trivial binary finding is at
+**maximum-evaluated** budget: primitive mode affects targeted success (Cochran Q
+`p=4.54e-5`); pairwise padding-only and joint each exceed timing-only (Holm
+`p=0.00586`); joint vs padding-only identical (Holm `p=1.0`). For joint mode,
+maximum-evaluated > intermediate budget (Holm `p=0.00586`).
+
+---
+
+## 4.3 Continuous outcomes
+
+### Friedman (omnibus)
+`_continuous_family` (`:118-127`): if all condition columns are identical → `(0,1)`,
+else `scipy.stats.friedmanchisquare(*columns)`.
+- **H₀**: the K matched conditions have the same distribution (equal rank sums) of the
+  continuous outcome.
+- **Why appropriate**: non-parametric repeated-measures omnibus for K matched conditions
+  on skewed data (duration/byte/rate ratios are heavy-tailed → medians, not means).
+
+### Wilcoxon signed-rank with Pratt zeros (pairwise)
+`wilcoxon(x, y, zero_method="pratt", alternative="two-sided")` (`:137`). If `x==y`
+exactly → `(0,1)`; non-finite p → `(0,1)`; `ValueError` (all-zero differences) → `(0,1)`.
+- **Pratt zero handling**: zero differences are *ranked* (kept in the ranking) then
+  *dropped* from the test statistic — less biased than Wilcoxon's default "drop zeros
+  before ranking" when many pairs tie (common here, since many flows are unaffected by a
+  given primitive).
+- **H₀**: the median of paired differences `x−y` is 0 (symmetric distribution about 0).
+- **Why appropriate**: paired, non-parametric, robust to the skew; Pratt is the right
+  zero policy given heavy tie mass.
+- **Holm**: applied across the 3 pairwise comparisons (`:155-156`).
+
+### Observed continuous results
+Highly significant (e.g. duration change joint vs padding-only Wilcoxon `p≈0`), but this
+is **mechanical**: timing dilation changes duration/rates and padding changes bytes *by
+construction*, so the distributions differ trivially. These confirm the primitives do
+what they claim, not that an interesting behavioral effect exists.
+
+---
+
+## 4.4 Observational unit, paired design, and the pooling problem
+
+- **Observational unit as coded**: one **(source flow × attack_class × victim × seed)**
+  evaluation — i.e. a *sample-victim evaluation*, **not** a unique network flow. `_KEY`
+  includes `victim_model`.
+- **Matched design**: correct *within* the condition axis — the same units are compared
+  across modes/budgets, verified by `source_id_consistency.json`.
+- **Same-source verification**: the pivot on `_KEY` + `dropna()` guarantees each tested
+  row is the identical source flow across conditions.
+
+### Pseudoreplication audit (pool MLP+CNN) — **flag this**
+`analyze()` groups only by `budget_name` (or `primitive_mode`) and **pools all victims**
+into a single test (`:175-185`). The committed sweep has victims **{mlp, cnn}**, so each
+unique source flow contributes **two** rows (one per victim) treated as independent. The
+pooled omnibus N = **4064 = 2 victims × ~2032 eligible flows**.
+
+**Consequences**:
+- N is inflated ≈2× → standard errors understated, p-values anti-conservative.
+- MLP and CNN successes on the *same* flow are correlated (shared input, similar
+  boundary), violating the independence McNemar/Cochran assume on the row axis.
+- This is textbook **pseudoreplication / non-independence** (repeated measurements of the
+  same flow entered as independent observations).
+
+**Recommended safer thesis presentation** (state explicitly):
+1. **Per-victim tests** — run `_binary_family`/`_continuous_family` separately for MLP
+   and for CNN (filter the frame by `victim_model` before pooling) and report both
+   columns; do not pool. This is the primary fix and matches the matched-pairs
+   assumption.
+2. If a pooled statement is wanted, treat **victim as a blocking factor** (stratified /
+   mixed model with flow as a random effect), or report the *minimum* significance across
+   victims. Given the near-zero ASR, per-victim tests will simply confirm the same
+   degenerate result without the inflated N.
+
+---
+
+## 4.5 The second engine: raw-vs-valid gap (`paired_validity_gap.py`)
+
+Used for the targeted-validity-gap analysis (raw vs *valid* success on the same rows),
+this engine is more complete and worth citing for methodology even where it is not the
+sweep's engine:
+- **`contingency`** (`:464-518`) builds the 2×2 raw×valid table with the **structural
+  assertion `c=0`** (valid_success ⊆ raw_success; asserts if violated), and computes
+  raw/valid ASR, `Δ = (b−c)/n`, Newcombe paired CI, McNemar, and both a literal OR
+  (`b/c`, infinite when `c=0,b>0`) and a finite Haldane–Anscombe OR `(b+0.5)/(c+0.5)`.
+- **`newcombe_paired_ci`** (`:383-425`): Newcombe "square-and-add" (method 10) CI for the
+  paired proportion difference — the effect-size CI the sweep engine lacks.
+- Holm families are declared explicitly (`_apply_holm :541-545`; primary vs
+  diagnostic/secondary families, `:557-573`), α=0.05.
+- Predeclared McNemar rule (report text, `:829`): exact binomial when `b+c<25`, else
+  continuity-corrected χ²₁; every table records the variant.
+
+`src/attack/statistical_analysis.py` is a **separate, older** engine (bootstrap CIs +
+statsmodels McNemar, exact when `b+c<25`) built for *latent PGD vs C&W on CICIoT2023*;
+not part of the CICIDS2017 PrimAttack results.
+
+---
+
+## 4.6 What is and is not defensible
+
+**Missing effect sizes**: the sweep engine (`analyze_primattack_experiments.py`) emits
+only test statistics + p + Holm — **no** Cochran/Cohen effect size, no rank-biserial for
+Wilcoxon, no Cramér-type measure. (The *other* engine does compute CIs/OR, but for a
+different analysis.) Add effect sizes for the one non-trivial binary comparison.
+
+**Missing confidence intervals**: no CI on any sweep proportion or on the mode/budget
+differences. Report Wilson/Newcombe CIs alongside the 10/4064 point estimates.
+
+**Single-seed implications**: all artifacts are `seed=42`; there is no across-seed
+variance, so no test treats seed as a random factor. State every result as *single-run*;
+do not claim seed robustness or generalization across initializations.
+
+**Degeneracy**: with raw ASR ≈ 0, binary tests are mostly `p=1.0`; continuous tests are
+significant by construction. The substantive statistical claim reduces to: *at the
+maximum-evaluated budget, padding/joint produce a few (10/4064) more targeted successes
+than timing-only (Cochran Q p=4.54e-5, Holm p=5.9e-3), and none survive the semantic
+proxy.*
+
+**Defensible claims**: (i) a correctly matched paired design with verified identical
+source IDs across conditions; (ii) appropriate omnibus+pairwise tests with FWER control;
+(iii) the qualitative ordering padding≈joint > timing at the largest budget; (iv) that
+budgeted PrimAttack effectively fails against MLP/CNN.
+
+**Not defensible**: (i) any inference that pools MLP+CNN as independent (pseudoreplication
+— re-run per victim); (ii) effect-size or CI statements the sweep engine never produced;
+(iii) seed-robustness or generalization; (iv) reading mechanical continuous significance
+as a behavioral finding.

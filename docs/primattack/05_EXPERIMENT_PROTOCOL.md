@@ -29,7 +29,7 @@ adversarial success.
 ```text
 PYTHONPATH=".;src" python -m attack.run_cicids2017_primitive_attack \
   --classes DoS,DDoS,Recon,BruteForce \
-  --victims mlp,cnn,lstm,serial \
+  --victims mlp,cnn \
   --budget maximum-evaluated \
   --primitive-mode joint \
   --optimizer optimized \
@@ -44,11 +44,11 @@ The victim checkpoints and train-fitted scaler are reused. No model retraining o
 ```text
 PYTHONPATH=".;src" python scripts/budget_sweep_primitive.py \
   --classes DoS,DDoS,Recon,BruteForce \
-  --victims mlp,cnn,lstm,serial \
+  --victims mlp,cnn \
   --test-limit 512 \
   --steps 40 \
   --seeds 42 \
-  --output-dir outputs/primattack_budget_sensitivity
+  --output-dir outputs/primattack_budget_sensitivity_full
 ```
 
 This executes the Cartesian product:
@@ -70,7 +70,7 @@ semantic rules:
 
 ```text
 PYTHONPATH=".;src" python -m attack.run_cicids2017_primitive_attack \
-  --classes DoS,DDoS,Recon,BruteForce --victims mlp,cnn,lstm,serial \
+  --classes DoS,DDoS,Recon,BruteForce --victims mlp,cnn \
   --budget maximum-evaluated --primitive-mode joint \
   --optimizer random-feasible --seeds 42 \
   --output-dir outputs/primattack_random_control
@@ -80,7 +80,11 @@ PYTHONPATH=".;src" python -m attack.run_cicids2017_primitive_attack \
 
 ```text
 PYTHONPATH=".;src" python scripts/analyze_primattack_experiments.py \
-  --input-dir outputs/primattack_budget_sensitivity
+  --input-dir outputs/primattack_budget_sensitivity_full
+
+PYTHONPATH=".;src" python scripts/build_primattack_budget_report.py \
+  --input-dir outputs/primattack_budget_sensitivity_full \
+  --output docs/primattack_budget_results.md
 ```
 
 The analyzer enforces pairing by `sample_id × attack_class × victim_model × seed`.

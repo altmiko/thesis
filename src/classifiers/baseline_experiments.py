@@ -486,7 +486,7 @@ def main() -> None:
         type=Path,
         default=Path("outputs") / "ciciot2023_fixed" / "classifier_results",
     )
-    parser.add_argument("--models", default="all", help="all or comma-separated: mlp,cnn,lstm,serial")
+    parser.add_argument("--models", default="all", help="all or comma-separated: mlp,cnn")
     parser.add_argument("--tasks", default="all", help="all or comma-separated: binary,8class,34class")
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=2048)
@@ -511,7 +511,7 @@ def main() -> None:
     if args.lr <= 0:
         parser.error("lr must be positive")
 
-    valid_models = ("mlp", "cnn", "lstm", "serial")
+    valid_models = ("mlp", "cnn")
     valid_tasks = ("binary", "8class", "34class")
     try:
         model_types = _parse_selection(args.models, valid_models, "models")

@@ -26,3 +26,4 @@ outputs/*
 .vscode
 data.zip
 hostspace/ConCap
+./old_root_files

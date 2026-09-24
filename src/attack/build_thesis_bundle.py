@@ -1,6 +1,6 @@
 """Assemble the .npz bundle consumed by ``src/thesis_visualizations.py``.
 
-Runs latent-PGD and latent-CW for all four classifiers (MLP, CNN, LSTM, Serial)
+Runs latent-PGD and latent-CW for the active MLP and CNN classifiers
 on a stratified sample of the 8-class test split, harvests the
 corresponding input-space PGD/CW arrays from existing
 ``results/attacks/attack_<model>_8class_{pgd,cw}_*.npz`` files, validates
@@ -8,7 +8,7 @@ every adversarial variant with the protocol validator, and writes a single
 ``.npz`` to ``results/attacks/thesis_bundle.npz``.
 
 Per-sample arrays (X_*, z_*, evasion_mask_*, protocol_valid_*) belong to a
-designated PRIMARY model (default: ``mlp``). The four-model multi-metric and
+designated PRIMARY model (default: ``mlp``). The active-model multi-metric and
 per-category ASR tables are stored as picklable arrays under the keys
 ``multimetric_table`` and ``category_asr_table`` (and also dumped to sibling
 CSVs for human inspection).
@@ -51,10 +51,10 @@ from attack.latent_pgd import latent_pgd_attack  # noqa: E402
 from preprocessing.schema import FEATURE_NAMES  # noqa: E402
 from vae.config import CLASSES, ID_TO_CLASS  # noqa: E402
 
-MODEL_KEYS = ["mlp", "cnn", "lstm", "serial"]
+MODEL_KEYS = ["mlp", "cnn"]
 MODEL_LABELS = {
-    "mlp": "MLP", "cnn": "CNN", "lstm": "LSTM",
-    "serial": "CNN-LSTM",
+    "mlp": "MLP",
+    "cnn": "CNN",
 }
 
 

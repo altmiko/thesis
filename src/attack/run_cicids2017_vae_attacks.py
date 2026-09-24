@@ -26,7 +26,7 @@ from src.classifiers.cicids2017d_victims import load_category_victim
 from vae.cicids2017_stage_a import ATTACK_CLASSES, load_stage_a
 
 ABLATIONS = ("A1", "A2", "A3", "A4", "A5", "A6")
-VICTIMS = ("mlp", "cnn", "lstm", "serial")
+VICTIMS = ("mlp", "cnn", "ft_transformer")
 
 
 def _seed(seed: int = 42) -> None:

@@ -60,7 +60,7 @@ def main() -> None:
     a = ap.parse_args()
     direct, latent, inp = _cells(DIRECT), _cells(LATENT), _cells(INPUT)
     classes = list(dict.fromkeys(c["class"] for c in latent)) or ["DoS", "DDoS", "Recon", "BruteForce"]
-    victims = list(dict.fromkeys(c["victim"] for c in latent)) or ["mlp", "cnn", "lstm", "serial"]
+    victims = list(dict.fromkeys(c["victim"] for c in latent)) or ["mlp", "cnn"]
     L = ["# Attack comparison — CICIDS2017-DistriNet\n",
          "Denominator: clean-correct malicious test rows per (class,victim). Target: Benign. "
          "strict = validator_v2 hybrid_valid. Cost = mean normalized L1 (physical/primitive space).\n"]

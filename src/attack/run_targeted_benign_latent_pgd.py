@@ -53,8 +53,6 @@ SOURCE_CLASSES = [name for name in CLASSES if name != TARGET_CLASS_NAME]
 MODEL_SPECS = [
     {"tag": "mlp", "label": "MLP", "checkpoint": "mlp_8class.pt"},
     {"tag": "cnn", "label": "CNN", "checkpoint": "cnn_8class.pt"},
-    {"tag": "lstm", "label": "LSTM", "checkpoint": "lstm_8class.pt"},
-    {"tag": "serial", "label": "CNN-LSTM", "checkpoint": "serial_8class.pt"},
 ]
 SUMMARY_COLUMNS = [
     "vae_run_tag",

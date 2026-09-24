@@ -8,7 +8,7 @@ Two-stage methodology:
   with minimal, feature-normalized perturbation and constraint satisfaction.
 
 The victim is an injected dependency, so one trained VAE/head design can be evaluated
-against many victims (MLP/CNN/CNN-LSTM/…) without retraining the base manifold.
+against multiple active victims without retraining the base manifold.
 
 Train-only discipline: pass TRAIN-split class data to :meth:`fit`; the perturbation
 scale is a TRAIN-derived robust scale (the FeatureTransform IQR). No Jacobian / JSMA /

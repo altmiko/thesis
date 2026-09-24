@@ -21,21 +21,6 @@ CICIDS2017_NUM_FEATURES = 79
 CICIDS2017_CATEGORY_CLASSES = 5
 
 
-class _GradientSafeVictim(nn.Module):
-    """Keep recurrent victims deterministic while allowing CUDA input gradients."""
-
-    def __init__(self, model: nn.Module, *, disable_cudnn: bool) -> None:
-        super().__init__()
-        self.model = model
-        self.disable_cudnn = disable_cudnn
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if not self.disable_cudnn:
-            return self.model(x)
-        # cuDNN RNN backward requires training mode/reserve-space. Attacks require
-        # deterministic eval semantics, so use PyTorch's native recurrent path.
-        with torch.backends.cudnn.flags(enabled=False):
-            return self.model(x)
 
 
 def load_category_victim(
@@ -96,5 +81,4 @@ def load_category_victim(
     model.eval()
     for parameter in model.parameters():
         parameter.requires_grad_(False)
-    has_recurrent_layer = any(isinstance(module, nn.LSTM) for module in model.modules())
-    return _GradientSafeVictim(model, disable_cudnn=has_recurrent_layer)
+    return model

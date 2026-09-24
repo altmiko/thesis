@@ -24,7 +24,7 @@ RESULTS_DIR = ROOT / "results" / "attacks"
 DATA_DIR = ROOT / "data" / "processed"
 
 FILE_PATTERN = re.compile(
-    r"^attack_(?P<model_tag>mlp|lstm|serial)_8class_(?P<attack>fgsm|pgd|cw)_(?P<eps>[0-9]+(?:\.[0-9]+)?)_r(?P<restarts>[0-9]+)\.npz$"
+    r"^attack_(?P<model_tag>mlp|cnn)_8class_(?P<attack>fgsm|pgd|cw)_(?P<eps>[0-9]+(?:\.[0-9]+)?)_r(?P<restarts>[0-9]+)\.npz$"
 )
 
 

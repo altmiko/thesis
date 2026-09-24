@@ -143,17 +143,15 @@ def _resolve_device(device: str) -> torch.device:
 
 def _infer_model_type(model_path: str) -> str:
     name = Path(model_path).name.lower()
+    if "ft_transformer" in name or "ft-transformer" in name or "fttransformer" in name:
+        return "ft_transformer"
     if "mlp" in name:
         return "mlp"
-    if "serial" in name:
-        return "serial"
-    if "lstm" in name:
-        return "lstm"
     if "cnn" in name:
         return "cnn"
     raise ValueError(
         f"Could not infer model type from filename '{name}'. "
-        "Expected one of: mlp, cnn, lstm, serial."
+        "Expected one of: mlp, cnn, ft_transformer."
     )
 
 

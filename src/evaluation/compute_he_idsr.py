@@ -836,7 +836,7 @@ def _write_report(
         .agg(ASR_valid=("ASR_valid", "mean"))
     )
     target_average["attack"] = target_average["attack_method"].map(target_labels)
-    target_average["models"] = "MLP, CNN, LSTM, CNN-LSTM"
+    target_average["models"] = "MLP, CNN"
     target_average = target_average.set_index("attack_method").loc[
         list(target_labels)
     ].reset_index()
@@ -858,7 +858,7 @@ def _write_report(
         "",
         "## Scope",
         "",
-        "- Four classifiers: MLP, CNN, LSTM, and CNN-LSTM.",
+        "- Two active classifiers: MLP and CNN.",
         "- Seven malicious source classes. Benign is a target class, not an attack source class.",
         "- Ten attack configurations: latent PGD/CW, unconstrained input PGD/CW, targeted latent PGD/CW, constrained input PGD/CW, and their target-to-Benign variants.",
         "- Cells without any correctly classified source samples are omitted, matching the original runs.",
@@ -894,7 +894,7 @@ def _write_report(
             "",
             "## Target-to-Benign Average ASR Valid",
             "",
-            "These are unweighted macro-averages across MLP, CNN, LSTM, and CNN-LSTM.",
+            "These are unweighted macro-averages across MLP and CNN.",
             "",
         ]
     )

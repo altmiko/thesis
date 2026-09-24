@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INPUT = REPO_ROOT / "results" / "he_idsr" / "he_idsr_by_classifier.csv"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "results" / "he_idsr"
 
-INCLUDED_CLASSIFIERS = ["MLP", "CNN", "LSTM", "CNN-LSTM"]
+INCLUDED_CLASSIFIERS = ["MLP", "CNN"]
 ATTACKS = [
     ("targeted-benign-latent-pgd", "Latent PGD", "#2E86AB"),
     ("targeted-benign-latent-cw", "Latent CW", "#6A4C93"),
@@ -107,7 +107,7 @@ def plot_vertical(df: pd.DataFrame, output_dir: Path) -> None:
     ax.text(
         0.5,
         1.01,
-        "Macro-average across MLP, CNN, LSTM, and CNN-LSTM",
+        "Macro-average across MLP and CNN",
         transform=ax.transAxes,
         ha="center",
         va="bottom",
@@ -162,7 +162,7 @@ def plot_horizontal(df: pd.DataFrame, output_dir: Path) -> None:
     ax.text(
         0.5,
         1.01,
-        "Macro-average across MLP, CNN, LSTM, and CNN-LSTM",
+        "Macro-average across MLP and CNN",
         transform=ax.transAxes,
         ha="center",
         va="bottom",

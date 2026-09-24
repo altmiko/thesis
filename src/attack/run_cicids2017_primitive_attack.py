@@ -38,7 +38,7 @@ from experiments.provenance import (
 from src.classifiers.cicids2017d_victims import load_category_victim
 from vae.cicids2017_stage_a import ATTACK_CLASSES, load_stage_a
 
-VICTIMS = ("mlp", "cnn", "lstm", "serial")
+VICTIMS = ("mlp", "cnn", "ft_transformer")
 PRIMITIVE_MODES = ("timing-only", "padding-only", "joint")
 OPTIMIZERS = ("optimized", "random-feasible")
 _LENGTH_COLS = (

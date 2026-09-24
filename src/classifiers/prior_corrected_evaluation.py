@@ -23,12 +23,10 @@ import torch
 
 from src.classifiers.models import get_model
 
-MODEL_NAMES = ("mlp", "cnn", "lstm", "serial")
+MODEL_NAMES = ("mlp", "cnn")
 MODEL_DISPLAY_NAMES = {
     "mlp": "SimpleMLP",
     "cnn": "CNNOnly",
-    "lstm": "LSTMOnly",
-    "serial": "SerialCNNLSTM",
 }
 TASKS = {
     "binary": {

@@ -624,7 +624,7 @@ def save_split(
     )
 
     # The project already uses Parquet. This table is the reproducible, inspectable
-    # split dataset; metadata remains outside the CNN/LSTM NumPy feature matrix.
+    # split dataset; metadata remains outside the model NumPy feature matrix.
     parquet = metadata.copy()
     for column_index, column in enumerate(modelling_columns):
         parquet[column] = pristine[:, column_index]

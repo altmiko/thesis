@@ -79,6 +79,10 @@ Read the plots together. Raw ASR without validity/feasibility/semantic gates is 
 claim. Timing-only versus padding-only identifies which primitive drives evasion; semantic PASS
 and rate retention identify which primitive degrades the flow-level proxy.
 
+The completed full tables, class/victim breakdowns, paired tests, and figure links are in
+[`docs/primattack_budget_results.md`](../primattack_budget_results.md).
+
+
 ## Interpretation boundary
 
 Permitted claim: measurable attack-related flow properties available in CICIDS2017 were

@@ -1,9 +1,9 @@
 """
 Generate per-feature adversarial delta reports for CICIoT2023 models.
 
-Runs PGD (eps=0.05/0.10/0.30) and CW attacks against MLP, LSTM, and
-CNN-LSTM (serial) 8-class checkpoints, computes per-feature aggregate
-statistics in raw feature space, and writes a sortable HTML report.
+Runs PGD (eps=0.05/0.10/0.30) and CW attacks against active MLP and
+CNN 8-class checkpoints, computes per-feature aggregate statistics in raw
+feature space, and writes a sortable HTML report.
 """
 
 from __future__ import annotations
@@ -35,8 +35,7 @@ TARGET_ATTACK_CLASSES = ("DDoS", "DoS", "Mirai", "Recon")
 
 MODEL_CONFIGS: Sequence[Dict[str, str]] = (
     {"tag": "mlp", "label": "MLP", "checkpoint": "mlp_8class.pt"},
-    {"tag": "lstm", "label": "LSTM", "checkpoint": "lstm_8class.pt"},
-    {"tag": "serial", "label": "CNN-LSTM", "checkpoint": "serial_8class.pt"},
+    {"tag": "cnn", "label": "CNN", "checkpoint": "cnn_8class.pt"},
 )
 
 ATTACK_CONFIGS: Sequence[Dict[str, object]] = (
@@ -503,7 +502,7 @@ def _render_html_report(
       <h1>CICIoT2023 Adversarial Delta Report</h1>
       <div class=\"sub\">Sample size: {n} | Stratified classes: DDoS, DoS, Mirai, Recon</div>
       <div class=\"sub\">Sample distribution: {html.escape(sample_distribution)}</div>
-      <div class=\"sub\">Victim models: MLP, LSTM, CNN-LSTM | Attacks: PGD (eps=0.05/0.10/0.30), CW</div>
+      <div class=\"sub\">Victim models: MLP, CNN | Attacks: PGD (eps=0.05/0.10/0.30), CW</div>
     </section>
     {''.join(sections)}
   </div>

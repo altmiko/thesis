@@ -132,7 +132,7 @@ def main() -> None:
 
     # per-class x victim TSV-ASR grids
     classes = ["DoS", "DDoS", "Recon", "BruteForce"]
-    victims = ["mlp", "cnn", "lstm", "serial"]
+    victims = ["mlp", "cnn"]
     for label, d, key, lat in METHODS:
         res = loaded[label][0]
         if not res:
@@ -164,7 +164,7 @@ def main() -> None:
     lines += ["## Gradient-norm diagnostics (representative cells)", "",
               "| Method | cell | TSV-ASR % | dL/dx | dL/dp | dL/dalpha | dL/ddecoder | dL/dz |",
               "|---|---|--:|--:|--:|--:|--:|--:|"]
-    rep = [("DoS", "lstm"), ("DoS", "serial"), ("DDoS", "cnn"), ("DDoS", "mlp"), ("Recon", "mlp")]
+    rep = [("DDoS", "cnn"), ("DDoS", "mlp"), ("Recon", "mlp")]
     grad_out = {}
     for label, d, key, lat in METHODS:
         res = loaded[label][0]

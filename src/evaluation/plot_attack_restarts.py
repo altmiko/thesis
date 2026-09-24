@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RESULTS_DIR = ROOT / "results" / "attacks"
 FIG_DIR = ROOT / "figures" / "appendix"
 
-MODEL_ORDER = ["MLP", "LSTM", "CNN-LSTM"]
+MODEL_ORDER = ["MLP", "CNN"]
 ATTACK_ORDER = [
     ("FGSM", "0.05"),
     ("FGSM", "0.10"),
@@ -52,7 +52,7 @@ def _plot_norm_bars(summary_df: pd.DataFrame) -> None:
     width = 0.24
 
     fig, axes = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
-    colors = {"MLP": "#1b9e77", "LSTM": "#d95f02", "CNN-LSTM": "#7570b3"}
+    colors = {"MLP": "#1b9e77", "CNN": "#377eb8"}
 
     for i, model in enumerate(MODEL_ORDER):
         subset = summary_df[summary_df["model"] == model]

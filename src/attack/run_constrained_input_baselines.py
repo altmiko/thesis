@@ -48,8 +48,6 @@ BENIGN_TARGET_CLASS = CLASS_TO_ID["Benign"]
 MODEL_SPECS = [
     {"tag": "mlp", "label": "MLP", "checkpoint": "mlp_8class.pt"},
     {"tag": "cnn", "label": "CNN", "checkpoint": "cnn_8class.pt"},
-    {"tag": "lstm", "label": "LSTM", "checkpoint": "lstm_8class.pt"},
-    {"tag": "serial", "label": "CNN-LSTM", "checkpoint": "serial_8class.pt"},
 ]
 ATTACK_ORDER = [
     "cinput-pgd",

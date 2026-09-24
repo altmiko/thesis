@@ -20,7 +20,7 @@ from vae.cicids2017_stage_a import load_stage_a
 
 
 ATTACK_CLASSES = {"DoS": 1, "DDoS": 2, "Recon": 3, "BruteForce": 4}
-VICTIMS = ("mlp", "cnn", "lstm", "serial")
+VICTIMS = ("mlp", "cnn")
 
 
 def _sha256(path: Path) -> str:

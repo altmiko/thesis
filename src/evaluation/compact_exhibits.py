@@ -50,9 +50,7 @@ SUMMARY_ATTACK_LABEL = {
 
 MODEL_LABEL = {
     "mlp_binary": "MLP",
-    "serial_binary": "CNN-LSTM",
     "cnn_binary": "CNN",
-    "lstm_binary": "LSTM",
 }
 
 
@@ -92,39 +90,13 @@ def binary_label(y: int) -> str:
     return "Benign" if int(y) == 0 else "Attack"
 
 
-def select_three_models() -> List[str]:
+def select_active_models() -> List[str]:
     existing = {p.stem for p in MODELS_DIR.glob("*_binary.pt")}
-    if not existing:
-        raise FileNotFoundError("No binary checkpoints found in models directory")
-
-    selected: List[str] = []
-
-    def pick(preferred: Sequence[str]) -> Optional[str]:
-        for tag in preferred:
-            if tag in existing and tag not in selected:
-                return tag
-        return None
-
-    first = pick(["mlp_binary", "serial_binary", "cnn_binary", "lstm_binary"])
-    if first is None:
-        raise RuntimeError("Could not choose first model")
-    selected.append(first)
-
-    second = pick(["serial_binary", "cnn_binary", "lstm_binary", "mlp_binary"])
-    if second is None:
-        raise RuntimeError("Could not choose second model")
-    selected.append(second)
-
-    third = pick(["lstm_binary", "cnn_binary", "serial_binary", "mlp_binary"])
-    if third is None:
-        for cand in sorted(existing):
-            if cand not in selected:
-                third = cand
-                break
-    if third is None:
-        raise RuntimeError("Could not choose third model")
-    selected.append(third)
-
+    selected = [tag for tag in ("mlp_binary", "cnn_binary") if tag in existing]
+    if len(selected) != 2:
+        raise FileNotFoundError(
+            "Active MLP/CNN binary checkpoints are required for compact exhibits"
+        )
     return selected
 
 
@@ -210,32 +182,15 @@ def ensure_attack_artifact(
         num_classes=2,
         device=device,
     )
-    use_cudnn_workaround = ("lstm" in model_tag) or ("serial" in model_tag)
-    if use_cudnn_workaround:
-        prev_cudnn = torch.backends.cudnn.enabled
-        torch.backends.cudnn.enabled = False
-        try:
-            result = run_attack(
-                model=model,
-                X=x_sub,
-                y=y_sub,
-                attack_name=attack_name,
-                eps=0.0 if eps is None else float(eps),
-                batch_size=batch_size,
-                device=device,
-            )
-        finally:
-            torch.backends.cudnn.enabled = prev_cudnn
-    else:
-        result = run_attack(
-            model=model,
-            X=x_sub,
-            y=y_sub,
-            attack_name=attack_name,
-            eps=0.0 if eps is None else float(eps),
-            batch_size=batch_size,
-            device=device,
-        )
+    result = run_attack(
+        model=model,
+        X=x_sub,
+        y=y_sub,
+        attack_name=attack_name,
+        eps=0.0 if eps is None else float(eps),
+        batch_size=batch_size,
+        device=device,
+    )
 
     out_path, _ = resolve_attack_npz(model_tag, attack_name, eps)
     np.savez_compressed(
@@ -654,7 +609,7 @@ def main() -> None:
     if len(perturb_mask) != len(FEATURE_NAMES):
         raise ValueError("perturbation mask length mismatch")
 
-    models = select_three_models()
+    models = select_active_models()
     print(f"Selected models: {models}")
 
     x_test = np.load(DATA_DIR / "X_test.npy", mmap_mode="r")

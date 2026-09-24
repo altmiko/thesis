@@ -40,7 +40,7 @@ def main() -> None:
     roles = model.roles()
     idn = ad.class_mapping().id_to_name
     classes = ["DoS", "DDoS", "Recon", "BruteForce"]
-    victims = ["mlp", "cnn", "lstm", "serial"]
+    victims = ["mlp", "cnn"]
 
     L = []
     L.append("# CICIDS2017-DistriNet — realizability-aware primitive-control adversarial examples\n")
