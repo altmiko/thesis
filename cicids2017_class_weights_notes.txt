@@ -1,0 +1,143 @@
+CICIDS2017-DistriNet Class Weights
+==================================
+
+Purpose
+-------
+The CICIDS2017-DistriNet training data are imbalanced: benign flows are much more
+common than several attack classes, especially BruteForce. Class weights compensate
+for this imbalance during neural-network training by assigning a larger loss penalty
+to errors on rare classes and a smaller penalty to errors on common classes.
+
+Source of the weights
+---------------------
+The class weights are not supplied by the original DistriNet dataset and are not
+manually selected. They are calculated from the class frequencies in the TRAINING
+split only. Validation and test labels are not used to calculate the weights. This
+prevents information from the evaluation splits from influencing model fitting.
+
+The preprocessing implementation is in:
+
+  scripts/preprocess_cicids2017_distrinet.py
+
+The relevant function is `balanced_class_weights`. For each class c, it computes:
+
+  weight_c = N_train / (K * N_c)
+
+where:
+
+  N_train = total number of samples in the training split
+  K       = number of classes for the classification task
+  N_c     = number of training samples belonging to class c
+
+This is standard inverse-frequency "balanced" weighting. A class with the average
+class frequency receives a weight of approximately 1. A class occurring less often
+than average receives a weight greater than 1, while a common class receives a weight
+less than 1.
+
+Training split
+--------------
+The training split contains 1,456,265 flows. Class counts are recorded in:
+
+  data/processed/CICIDS_2017_Distrinet/preprocessing_manifest.json
+
+The split is used to produce both a binary classification target and a five-category
+classification target.
+
+Binary classification weights
+-----------------------------
+The binary label encoding is:
+
+  Benign = 0
+  Attack = 1
+
+Training counts:
+
+  Benign: 1,153,431
+  Attack:   302,834
+
+Applying the balanced-weight formula gives:
+
+  Benign: 0.6312752962
+  Attack: 2.4043948650
+
+The saved array order is [Benign, Attack]:
+
+  [0.6312752962, 2.4043948650]
+
+The attack class receives a larger weight because it has fewer training examples.
+Consequently, an error on an attack sample contributes more to the weighted training
+loss than an error on a benign sample.
+
+Five-category classification weights
+------------------------------------
+The five-category label encoding is:
+
+  Benign     = 0
+  DoS        = 1
+  DDoS       = 2
+  Recon      = 3
+  BruteForce = 4
+
+Training counts and calculated weights:
+
+  Class         Training count        Weight
+  ------------------------------------------------
+  Benign             1,153,431        0.2525101304
+  DoS                   120,093        2.4252288342
+  DDoS                   66,568        4.3752703667
+  Recon                 111,311        2.6165697575
+  BruteForce              4,862       59.9039497375
+
+The saved array order is [Benign, DoS, DDoS, Recon, BruteForce]:
+
+  [0.2525101304, 2.4252288342, 4.3752703667,
+   2.6165697575, 59.9039497375]
+
+BruteForce receives a particularly large weight because it is the rarest category in
+the training split. This weighting prevents the loss from being dominated by the
+large benign class. It does not create new samples, remove samples, or rebalance the
+dataset itself; it changes only the relative contribution of each training example
+to the loss function.
+
+Saved preprocessing artifacts
+-----------------------------
+The preprocessing pipeline saves the calculated arrays as:
+
+  data/processed/CICIDS_2017_Distrinet/class_weights_2.npy
+  data/processed/CICIDS_2017_Distrinet/class_weights_5.npy
+
+The formula and numerical values are also recorded under
+`train_only_preprocessing.class_weights` in:
+
+  data/processed/CICIDS_2017_Distrinet/preprocessing_manifest.json
+
+The label-to-index mappings are recorded in:
+
+  data/processed/CICIDS_2017_Distrinet/label_encoders.json
+
+Use during classifier training
+------------------------------
+The neural-classifier experiment runner is:
+
+  src/classifiers/cicids2017d_experiments.py
+
+Its default setting is `--class-weighting balanced`. The runner recomputes the same
+balanced weights directly from the relevant training-label array (`y_train_bin.npy`
+or `y_train_cat.npy`) instead of loading the saved class-weight arrays. It then passes
+the weights to PyTorch `CrossEntropyLoss`. Recomputing from the same training labels
+and formula produces the values listed above.
+
+The runner also supports `effective` and `none` weighting modes, but the default
+balanced mode uses the inverse-frequency formula documented here. Therefore, a report
+should identify the actual experiment configuration when describing model training.
+
+Suggested report wording
+------------------------
+"To mitigate class imbalance, class weights were derived exclusively from the
+training partition using inverse-frequency balanced weighting. For class c, the
+weight was calculated as w_c = N/(K N_c), where N is the number of training samples,
+K is the number of classes, and N_c is the number of training samples in class c.
+Validation and test labels were excluded from this calculation to prevent evaluation
+information from influencing model fitting. The resulting weights were supplied to
+the weighted cross-entropy loss, increasing the contribution of minority-class errors
+without resampling or otherwise modifying the class distribution."

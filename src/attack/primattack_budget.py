@@ -67,7 +67,7 @@ class BudgetLevel:
     max_relative_duration_change: float
 
     def __post_init__(self) -> None:
-        if self.name not in BUDGET_NAMES:
+        if self.name not in BUDGET_NAMES and self.name != "unbounded":
             raise ValueError(f"unknown budget name {self.name!r}")
         if self.padding_bytes_per_forward_packet < 0:
             raise ValueError("padding budget must be non-negative")
@@ -333,6 +333,29 @@ def class_calibration(
             if semantic["rate_retention_required"]
             else None
         ),
+    )
+
+
+def unbounded_calibration(payload: Mapping[str, Any], class_name: str) -> ClassCalibration:
+    """Envelope-only PrimAttack budget: p_max=+inf, max_relative_duration_change=+inf.
+
+    Removes the empirical class budget cap entirely while keeping the SAME train-fit p99
+    physical feasibility envelope and (DoS/DDoS) semantic min-rate floor as the calibrated
+    budgets. `per_flow_bounds` then clamps the primitives to the p99 envelope headroom only,
+    so feasibility is gated by physical plausibility + realizability + semantic rules -- not by
+    the p25/p50/p75 quantile budgets. All statistics remain train-only (reused from the
+    calibration artifact); nothing is fit on val/test.
+    """
+    base = class_calibration(payload, class_name, "maximum-evaluated")
+    return ClassCalibration(
+        class_name=class_name,
+        budget=BudgetLevel(
+            name="unbounded",
+            padding_bytes_per_forward_packet=float("inf"),
+            max_relative_duration_change=float("inf"),
+        ),
+        envelope_upper=dict(base.envelope_upper),
+        min_flow_packets_per_second=base.min_flow_packets_per_second,
     )
 
 
