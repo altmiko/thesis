@@ -26,6 +26,23 @@ Both are **untargeted** (source-class CE / logit margin), not targeted→Benign.
   0.0`. Unconstrained perturbations evade every victim yet **never** pass validator_v2 —
   exactly the intended baseline story motivating PrimAttack's constrained design.
 
+### FAB (AutoAttack) — `fab` family of `scripts/run_full_adversarial_eval.py`
+- **Implementation**: upstream `autoattack.fab_pt.FABAttack_PT` from the frozen clone
+  `external/auto-attack` (commit `a39220048b3c9f2cca9a4d3a54604793c68eca7e`, installed
+  editable into the `thesis` env); adapter `src/comparisons/fab_autoattack.py`
+  (`load_fab_class` asserts the import resolves to the clone).
+- **Attack space**: FAB hard-codes `[0,1]^d`, so `u = (raw − train_min)/span` with the
+  **train-fitted** pristine min-max box (same box as CAPGD native). The 3 train-constant
+  features (`Fwd/Bwd URG Flags`, `URG Flag Count`) are pinned; clean rows outside the box
+  are rejected (none of the CICIDS2017 attack-class test rows are). Output
+  `raw + (u_adv − u0)·span`, so rows FAB fails on are returned bit-identical.
+- **Defaults**: untargeted, `L2`, `eps=0.5` (acceptance radius in the unit box),
+  `n_iter=100`, `n_restarts=1`.
+- **Demo run** (seed 42, 800 clean-correct rows/class, all 3 victims, `--families fab`) →
+  `outputs/adv_campaign/fab_demo_cicids2017/`: raw untargeted ASR mlp 0.894, cnn 0.857,
+  FT 0.918 (class-mean); **valid ASR (evasion ∧ hybrid_valid) = 0.0 in all 12 cells**;
+  0 of 8,541 evading rows even pass `hard_structural_valid`. Single seed; untargeted.
+
 ### Status classification of the related files
 | File | Status |
 |---|---|

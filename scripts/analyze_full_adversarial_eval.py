@@ -112,7 +112,7 @@ def main() -> None:
 
     # ---- aggregate mean/std over seeds ----
     metrics = ["raw_asr_untargeted", "valid_asr_untargeted", "targeted_benign",
-               "valid_targeted_benign", "domain_validity_rate", "realizable_rate", "idr",
+               "valid_targeted_benign", "domain_validity_rate", "realizable_rate",
                "mean_cost_total", "mean_l2_scaled", "semantic_pass_rate",
                "primitive_feasible_rate", "sp_asr"]
 
@@ -203,7 +203,7 @@ def main() -> None:
     with open(OUT / "per_seed_cells.csv", "w", newline="", encoding="utf-8") as f:
         cols = ["victim", "class", "attack", "goal", "seed", "n_eligible", "n_eligible_total",
                 "raw_asr_untargeted", "valid_asr_untargeted", "targeted_benign",
-                "valid_targeted_benign", "domain_validity_rate", "realizable_rate", "idr",
+                "valid_targeted_benign", "domain_validity_rate", "realizable_rate",
                 "semantic_pass_rate", "primitive_feasible_rate", "sp_asr", "mean_cost_total",
                 "mean_l2_scaled", "sha256_sample_ids"]
         w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
@@ -248,7 +248,7 @@ def _write_md(cfg, selection, cells, failures, summary, perclass, comparisons):
     L.append("| 4 | `run_cicids2017_input_baseline.py` **broken**: references "
              "`masks['mined_valid'|'benign'|'realizable']` not emitted by current `evaluate_cell` | "
              "L119/138/157 | Uses current `evaluate_cell` contract "
-             "(`targeted_success`,`domain_valid`,`primitive_transform_consistent`,`in_dist`). |")
+             "(`targeted_success`,`domain_valid`,`primitive_transform_consistent`). |")
     L.append("| 5 | Unverified row-order alignment across y/X_test/X_test_pristine/parquet | "
              "L305-311 | Runtime asserts equal lengths, `y_test_cat==load_split.y`, and "
              "`X_test==(pristine-center)/scale`. |")
@@ -287,7 +287,7 @@ def _write_md(cfg, selection, cells, failures, summary, perclass, comparisons):
     cols = [("raw_asr_untargeted", "Raw ASR"), ("valid_asr_untargeted", "Valid ASR"),
             ("targeted_benign", "Tgt-Benign"), ("valid_targeted_benign", "Valid Tgt-Benign"),
             ("domain_validity_rate", "Domain-valid"), ("realizable_rate", "Realizable"),
-            ("idr", "IDR"), ("semantic_pass_rate", "SemPreserve"), ("sp_asr", "SP-ASR"),
+            ("semantic_pass_rate", "SemPreserve"), ("sp_asr", "SP-ASR"),
             ("mean_cost_total", "Cost")]
     for v in victims:
         L.append(f"### {v}\n")

@@ -25,8 +25,9 @@ from attack.primattack_budget import (
 from attack.realizability.base import NullPacketBackend
 from attack.realizability.cicids2017 import CICIDS2017PrimitiveModel, SCALER_ATOL
 from attack.realizability.validator import RealizabilityValidator
-from attack.run_cicids2017_vae_attacks import _idr_mask
-from attack.primitive_optimizer import CANDIDATE_NAMES, optimize_primitive_candidates
+from attack.primitive_optimizer import (
+    CANDIDATE_NAMES, hybrid_valid_gate, optimize_primitive_candidates,
+)
 from datasets.cicids2017 import CICIDS2017Adapter
 from validation.attack_interface import structural_masks
 from experiments.provenance import (
@@ -36,7 +37,7 @@ from experiments.provenance import (
     ensure_fresh_output_dir,
 )
 from src.classifiers.cicids2017d_victims import load_category_victim
-from vae.cicids2017_stage_a import ATTACK_CLASSES, load_stage_a
+from vae.cicids2017_stage_a import ATTACK_CLASSES
 
 VICTIMS = ("mlp", "cnn", "ft_transformer")
 PRIMITIVE_MODES = ("timing-only", "padding-only", "joint")
@@ -107,16 +108,14 @@ def _decompose_cost(adv_raw, raw, scale, groups_idx):
     return result
 
 
-def evaluate_cell(model, val, victim, base_vae, raw, adv_raw, center, scale,
-                  class_id, idr_path, groups_idx):
-    """Evaluate classifier, validator_v2, realism, and internal primitive consistency."""
+def evaluate_cell(model, val, victim, raw, adv_raw, center, scale, class_id, groups_idx):
+    """Evaluate classifier, validator_v2, and internal primitive consistency."""
     with torch.no_grad():
         x_clean = (raw - center) / scale
         x_adv = (adv_raw - center) / scale
         clean_pred = victim(x_clean).argmax(1)
         adv_pred = victim(x_adv).argmax(1)
         validator = structural_masks(adv_raw.detach().cpu().numpy(), dataset=model.dataset)
-        in_dist = _idr_mask(base_vae, x_adv, idr_path)
         report = val.validate(adv_raw, raw)
         categories = report.categories
         cost = _decompose_cost(adv_raw, raw, scale, groups_idx)
@@ -132,7 +131,6 @@ def evaluate_cell(model, val, victim, base_vae, raw, adv_raw, center, scale,
         "validator_in_distribution": torch.as_tensor(
             validator["in_distribution"], device=raw.device
         ),
-        "in_dist": in_dist,
         "dependency_ok": ~categories["algebraic_dependency_fail"],
         "packet_summary_ok": ~categories["packet_summary_fail"],
         "timing_consistency_ok": ~categories["timing_fail"],
@@ -154,7 +152,7 @@ def _rate(mask: torch.Tensor, eligible: torch.Tensor) -> float:
 
 
 def run(
-    *, classes, victims, device, test_limit, steps, lr, stage_a_dir,
+    *, classes, victims, device, test_limit, steps, lr,
     output_dir, seeds, calibration_path, budget_name, restarts=2,
     primitive_mode="joint", optimizer_name="search",
 ):
@@ -174,6 +172,7 @@ def run(
     realizability = RealizabilityValidator(model)
     calibration = load_calibration(calibration_path)
     semantic_validator = FlowSemanticValidator(model, calibration)
+    success_gate = hybrid_valid_gate(adapter.name)
     packet_backend = NullPacketBackend()
     center = torch.tensor(transform.center, dtype=torch.float32, device=device)
     scale = torch.tensor(transform.scale, dtype=torch.float32, device=device)
@@ -190,7 +189,6 @@ def run(
         columns=["sample_id", "Src IP", "Dst IP"],
     )
     all_row_ids = metadata["sample_id"].astype(str).to_numpy(dtype="U128")
-    stage_a_dir = stage_a_dir or (repo / "outputs" / "cicids2017_vae_stage_a")
     victim_dir = repo / "outputs" / "cicids2017distrinet" / "models"
     method_id = "primitive_search" if optimizer_name == "search" else "primitive_random"
     config = {
@@ -209,8 +207,6 @@ def run(
     }
     checkpoint_paths = {
         **{f"victim_{name}": victim_dir / f"{name}_category.pt" for name in victims},
-        **{f"vae_{name}": stage_a_dir / f"vae_{name}.pt" for name in classes},
-        **{f"idr_{name}": stage_a_dir / f"idr_{name}.npz" for name in classes},
         "budget_calibration": calibration_path,
     }
     provenance = build_provenance(
@@ -270,13 +266,6 @@ def run(
             "Dst IP": metadata.iloc[idx]["Dst IP"].astype(str).to_numpy(),
         }
         labels = np.full(len(idx), class_id, dtype=np.int64)
-        base_vae, _ = load_stage_a(
-            adapter,
-            stage_a_dir / f"vae_{class_name}.pt",
-            expected_class_name=class_name,
-            device=device,
-        )
-        idr_path = stage_a_dir / f"idr_{class_name}.npz"
         caps = model.infer_capabilities(raw)
         bounds = model.per_flow_bounds(
             raw, class_cfg.bounds_config(), capabilities=caps
@@ -297,6 +286,7 @@ def run(
                     optimization = optimize_primitive_candidates(
                         model, victim, raw, center, scale, bounds, caps,
                         steps=steps, learning_rate=lr, restarts=restarts, seed=seed,
+                        validity_fn=success_gate,
                     )
                     requested = optimization.requested
                     projected = optimization.projected
@@ -316,8 +306,8 @@ def run(
                     adv_raw[:, frozen_idx], raw[:, frozen_idx], atol=SCALER_ATOL, rtol=1e-4
                 ), "frozen feature changed under primitive map"
                 masks, cost, clean_prediction, adversarial_prediction = evaluate_cell(
-                    model, realizability, victim, base_vae, raw, adv_raw,
-                    center, scale, class_id, idr_path, groups_idx,
+                    model, realizability, victim, raw, adv_raw,
+                    center, scale, class_id, groups_idx,
                 )
                 semantic = semantic_validator.evaluate(
                     raw,
@@ -364,12 +354,7 @@ def run(
                 )
                 checkpoint_ids = {
                     key: provenance["checkpoints"][key]["sha256"]
-                    for key in (
-                        f"victim_{victim_name}",
-                        f"vae_{class_name}",
-                        f"idr_{class_name}",
-                        "budget_calibration",
-                    )
+                    for key in (f"victim_{victim_name}", "budget_calibration")
                 }
                 costs = semantic.costs
                 np.savez_compressed(
@@ -447,11 +432,17 @@ def run(
                         ])
                         if optimization is not None else np.full(len(raw), "random-feasible")
                     ),
-                    optimizer_forward_evaluations=np.asarray(
-                        optimization.forward_evaluations if optimization is not None else 1
+                    optimizer_realized_evaluations=(
+                        optimization.realized_evaluations.cpu().numpy()
+                        if optimization is not None else np.ones(len(raw), np.int64)
                     ),
-                    optimizer_backward_evaluations=np.asarray(
-                        optimization.backward_evaluations if optimization is not None else 0
+                    optimizer_surrogate_evaluations=(
+                        optimization.surrogate_evaluations.cpu().numpy()
+                        if optimization is not None else np.zeros(len(raw), np.int64)
+                    ),
+                    optimizer_backward_evaluations=(
+                        optimization.backward_evaluations.cpu().numpy()
+                        if optimization is not None else np.zeros(len(raw), np.int64)
                     ),
                     features_changed=changed_features,
                     number_features_changed=semantic.number_features_changed,
@@ -459,7 +450,6 @@ def run(
                     primitive_transform_consistent=masks[
                         "primitive_transform_consistent"
                     ].cpu().numpy(),
-                    in_distribution=masks["in_dist"].cpu().numpy(),
                     clean_logits=clean_logits.cpu().numpy(),
                     adversarial_logits=adversarial_logits.cpu().numpy(),
                     cost_total=cost["total"].cpu().numpy(),
@@ -528,11 +518,13 @@ def run(
                     "primitive_feasibility_rate": float(values(primitive_feasible_np).mean()),
                     "domain_validity_rate": _rate(domain_valid, eligible),
                     "calibrated_budget": class_cfg.budget.__dict__,
-                    "optimizer_forward_evaluations": (
-                        optimization.forward_evaluations if optimization is not None else 1
+                    "optimizer_mean_realized_evaluations": (
+                        float(optimization.realized_evaluations.float().mean())
+                        if optimization is not None else 1.0
                     ),
-                    "optimizer_backward_evaluations": (
-                        optimization.backward_evaluations if optimization is not None else 0
+                    "optimizer_mean_surrogate_evaluations": (
+                        float(optimization.surrogate_evaluations.float().mean())
+                        if optimization is not None else 0.0
                     ),
                 }
                 results["cells"].append(cell)
@@ -553,7 +545,6 @@ def main() -> None:
     parser.add_argument("--learning-rate", type=float, default=0.1)
     parser.add_argument("--restarts", type=int, default=2)
     parser.add_argument("--seeds", default="42,123,2024")
-    parser.add_argument("--stage-a-dir", type=Path, default=None)
     parser.add_argument(
         "--calibration",
         type=Path,
@@ -573,7 +564,6 @@ def main() -> None:
         test_limit=args.test_limit,
         steps=args.steps,
         lr=args.learning_rate,
-        stage_a_dir=args.stage_a_dir,
         output_dir=args.output_dir,
         seeds=[int(value) for value in args.seeds.split(",") if value.strip()],
         restarts=args.restarts,

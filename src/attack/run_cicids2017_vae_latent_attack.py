@@ -26,6 +26,7 @@ from attack.run_cicids2017_primitive_attack import (
     VICTIMS, _class_rows, evaluate_cell,
     _LENGTH_COLS, _TIMING_COLS, _RATE_COLS,
 )
+from attack.run_cicids2017_vae_attacks import _idr_mask
 from attack.vae_latent_primitive import LatentAttackConfig, LatentPrimitiveAttack
 from datasets.cicids2017 import CICIDS2017Adapter
 from experiments.provenance import (
@@ -139,8 +140,9 @@ def run(*, classes, victims, device, test_limit, cost_weight, calibration_path, 
                 fidx = torch.tensor([model.i[n] for n in val.frozen_names], device=device)
                 assert torch.allclose(adv_raw[:, fidx], raw[:, fidx], atol=SCALER_ATOL, rtol=1e-4), \
                     "frozen feature changed in latent attack realization"
-                masks, cost, yc, ya = evaluate_cell(model, val, victim, vae, raw,
-                                                    adv_raw, center, scale, cid, idr_path, groups_idx)
+                masks, cost, yc, ya = evaluate_cell(model, val, victim, raw,
+                                                    adv_raw, center, scale, cid, groups_idx)
+                in_dist = _idr_mask(vae, (adv_raw - center) / scale, idr_path)
                 ap = artifact_dir / f"{class_name}_{vname}_seed{seed}.npz"
                 strict = masks["domain_valid"]
                 checkpoint_ids = {
@@ -185,6 +187,7 @@ def run(*, classes, victims, device, test_limit, cost_weight, calibration_path, 
                         victim=vname, method_id=method_id, seed=seed,
                         checkpoint_ids=checkpoint_ids,
                     ),
+                    in_dist=in_dist.cpu().numpy(),
                     **{k: m.cpu().numpy() for k, m in masks.items()},
                 )
                 denom = int(masks["clean_correct"].sum()); cc = masks["clean_correct"]
@@ -204,7 +207,7 @@ def run(*, classes, victims, device, test_limit, cost_weight, calibration_path, 
                     "realizability_aware_validity_diagnostic": rate(
                         masks["primitive_transform_consistent"]
                     ),
-                    "IDR_generator_relative": rate(masks["in_dist"]),
+                    "IDR_generator_relative": rate(in_dist),
                     "cost_total_mean": float(cost["total"][cc].mean()) if denom else float("nan"),
                     "latent_l2_mean": float(np.mean(ll)) if ll.size else float("nan"),
                     "latent_l2_median": float(np.median(ll)) if ll.size else float("nan"),

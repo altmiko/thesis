@@ -17,17 +17,18 @@ Pairing / eligibility / denominator by construction:
 
 Attack families (all on the SAME eligible rows, per-row outcomes in artifacts/*.npz):
   1. Unconstrained input-space PGD/C&W, untargeted and targeted->Benign.
-  2. VAE latent + masked residual ablation ladder A1..A6 (targeted->Benign; A6 trains the
-     Stage-B residual head against the victim on TRAIN rows of the class).
-  3. PrimAttack {search, random-feasible} x {joint, timing-only, padding-only} x budgets
+  2. PrimAttack {search, random-feasible} x {joint, timing-only, padding-only} x budgets
      (targeted->Benign).
-  4. CAPGD (TabularBench, untargeted): native feature-space (config mask, L2 eps=0.5) and
+  3. CAPGD (TabularBench, untargeted): native feature-space (config mask, L2 eps=0.5) and
      restricted to PrimAttack's p75 primitive-control box.
-  5. FAB (AutoAttack ``FABAttack_PT``, untargeted, unconstrained minimum-norm) in the
+  4. FAB (AutoAttack ``FABAttack_PT``, untargeted, unconstrained minimum-norm) in the
      train-fitted min-max box (default L2 eps=0.5, same attack space as CAPGD native).
 
-Every cell is gated by the SAME validator_v2 profile of the dataset (hybrid_valid), the
-dataset's Stage-A per-class VAE IDR gate, and the primitive-transform realizability check.
+Every cell is gated by the SAME validator_v2 profile of the dataset (hybrid_valid) and the
+primitive-transform realizability check. No VAE is loaded: no VAE latent attack is run and
+no VAE in-distribution (IDR) / True-IDSR metric is computed. ``--resume`` reuses finished
+per-row artifacts and their cells.json entries (same frozen selection asserted),
+recomputing only missing cells.
 
     python scripts/run_full_adversarial_eval.py --dataset cicids2018 --device cuda
 """
@@ -53,7 +54,6 @@ for _p in (str(REPO_ROOT), str(SRC)):
         sys.path.insert(0, _p)
 
 from attack.input_baselines import input_cw_attack, input_pgd_attack  # noqa: E402
-from attack.masks import get_dataset_mask  # noqa: E402
 from attack.realizability.cicids2017 import CICIDS2017PrimitiveModel  # noqa: E402
 from attack.realizability.validator import RealizabilityValidator  # noqa: E402
 from attack.flow_semantics import FlowSemanticValidator, SemanticStatus  # noqa: E402
@@ -62,11 +62,9 @@ from attack.run_cicids2017_primitive_attack import (  # noqa: E402
     evaluate_cell, random_feasible_primitives,
     _apply_primitive_mode, _decompose_cost, _LENGTH_COLS, _TIMING_COLS, _RATE_COLS,
 )
-from attack.run_cicids2017_vae_attacks import (  # noqa: E402
-    _assert_frozen_unchanged, _build_generator, _class_x, _subset, targeted_latent_attack,
+from attack.primitive_optimizer import (  # noqa: E402
+    CANDIDATE_NAMES, hybrid_valid_gate, optimize_primitive_candidates,
 )
-from attack.primitive_optimizer import CANDIDATE_NAMES, optimize_primitive_candidates  # noqa: E402
-from attack.train_attack_head import StageBConfig, VictimGuidedTrainer  # noqa: E402
 from comparisons.capgd_cicids2017 import (  # noqa: E402
     RawCICIDSVictim, build_capgd_resources, evaluate_capgd_output, finalize_capgd_output,
     fit_train_minmax, make_capgd,
@@ -74,29 +72,25 @@ from comparisons.capgd_cicids2017 import (  # noqa: E402
 from comparisons.primitive_capgd import run_primitive_capgd  # noqa: E402
 from comparisons.fab_autoattack import AUTOATTACK_COMMIT, FABBox, load_fab_class, run_fab  # noqa: E402
 from datasets import get_adapter  # noqa: E402
-from experiments.ablations import build_ablation  # noqa: E402
 from experiments.provenance import deterministic_runtime  # noqa: E402
 from src.classifiers.cicids2017d_victims import load_category_victim  # noqa: E402
 from validation.attack_interface import structural_masks  # noqa: E402
-from vae.cicids2017_stage_a import ATTACK_CLASSES, load_stage_a  # noqa: E402
+from vae.cicids2017_stage_a import ATTACK_CLASSES  # noqa: E402
 
 BUDGET_LABEL = {"intermediate": "p50", "maximum-evaluated": "p75", "restricted": "p25",
                 "unbounded": "unb"}
 BENIGN_ID = 0
-VAE_ABLATIONS = ("A1", "A2", "A3", "A4", "A5", "A6")
-FAMILIES = ("input", "vae", "primattack", "capgd", "fab")
+FAMILIES = ("input", "primattack", "capgd", "fab")
 
 DATASET_DEFAULTS = {
     "cicids2017_distrinet": {
         "victims": "mlp,cnn,ft_transformer",
         "calibration": REPO_ROOT / "artifacts/primattack/budget_calibration.json",
-        "stage_a_dir": REPO_ROOT / "outputs/cicids2017_vae_stage_a",
     },
     "cicids2018_distrinet": {
         "victims": ",".join(f"{a}-s{s}" for a in ("mlp", "cnn", "ft_transformer")
                             for s in (42, 123, 2024)),
         "calibration": REPO_ROOT / "artifacts/primattack/budget_calibration_cicids2018.json",
-        "stage_a_dir": REPO_ROOT / "outputs/cicids2018_vae_stage_a",
     },
 }
 
@@ -187,9 +181,6 @@ def build_attack_roster(families, budgets, modes, optimizers):
             {"name": "pgd_tb", "family": "input", "kind": "tpgd", "goal": "targeted_benign"},
             {"name": "cw_tb", "family": "input", "kind": "tcw", "goal": "targeted_benign"},
         ]
-    if "vae" in families:
-        roster += [{"name": f"vae_{a}", "family": "vae", "kind": "vae", "ablation": a,
-                    "goal": "targeted_benign"} for a in VAE_ABLATIONS]
     if "primattack" in families:
         for budget in budgets:
             for opt_name in optimizers:
@@ -252,13 +243,6 @@ def main() -> None:
     ap.add_argument("--prim-steps", type=int, default=40)
     ap.add_argument("--prim-lr", type=float, default=0.1)
     ap.add_argument("--prim-restarts", type=int, default=2)
-    # vae latent
-    ap.add_argument("--vae-steps", type=int, default=40)
-    ap.add_argument("--vae-lr", type=float, default=0.1)
-    ap.add_argument("--vae-latent-epsilon", type=float, default=20.0)
-    ap.add_argument("--vae-constraint-weight", type=float, default=0.1)
-    ap.add_argument("--vae-layer1-fit-limit", type=int, default=200000)
-    ap.add_argument("--vae-stage-b-train-limit", type=int, default=20000)
     # capgd
     ap.add_argument("--capgd-epsilon", type=float, default=0.5)
     ap.add_argument("--capgd-steps", type=int, default=10)
@@ -272,16 +256,17 @@ def main() -> None:
     ap.add_argument("--fab-restarts", type=int, default=1)
     ap.add_argument("--fab-batch-size", type=int, default=1024)
     ap.add_argument("--calibration", type=Path, default=None)
-    ap.add_argument("--stage-a-dir", type=Path, default=None)
     ap.add_argument("--output-dir", type=Path, default=None,
                     help="default: outputs/adv_campaign/<dataset>")
+    ap.add_argument("--resume", action="store_true",
+                    help="skip (victim, class, attack, seed) cells whose npz AND cells.json "
+                         "entry already exist in --output-dir")
     args = ap.parse_args()
 
     adapter = get_adapter(args.dataset)
     dataset = adapter.name
     defaults = DATASET_DEFAULTS[dataset]
     calibration_path = args.calibration or defaults["calibration"]
-    stage_a_dir = args.stage_a_dir or defaults["stage_a_dir"]
     out = args.output_dir or (REPO_ROOT / "outputs/adv_campaign" / dataset)
 
     device = args.device
@@ -318,13 +303,14 @@ def main() -> None:
         raise ValueError(f"calibration {calibration_path} is for {calibration.get('dataset')!r}, "
                          f"not {dataset!r}")
     semantic_validator = FlowSemanticValidator(model, calibration)
+    # Search success = targeted->Benign AND validator_v2 hybrid_valid on the realized flow,
+    # i.e. the same predicate the valid-ASR columns report.
+    success_gate = hybrid_valid_gate(dataset)
     groups_idx = {
         "padding": torch.tensor([model.i[n] for n in _LENGTH_COLS], device=device),
         "timing": torch.tensor([model.i[n] for n in _TIMING_COLS], device=device),
         "rate": torch.tensor([model.i[n] for n in _RATE_COLS], device=device),
     }
-    resolved = get_dataset_mask(dataset).resolve(manifest)
-
     # ---- data + alignment assertions ----
     processed = adapter._processed
     raw_all = np.load(processed / "X_test_pristine.npy", mmap_mode="r")
@@ -346,29 +332,6 @@ def main() -> None:
     raw_all_t = torch.tensor(np.ascontiguousarray(raw_all), dtype=torch.float32, device=device)
     scaled_all_t = (raw_all_t - center) / scale  # single source of truth for victim input
 
-    # ---- per-class Stage-A VAE + IDR (+ VAE-attack train-only context) ----
-    base_vae, base_state, idr_path = {}, {}, {}
-    for cname in classes:
-        vae, ckpt = load_stage_a(adapter, stage_a_dir / f"vae_{cname}.pt",
-                                 expected_class_name=cname, device=device)
-        base_vae[cname] = vae
-        base_state[cname] = ckpt["state_dict"]
-        idr_path[cname] = stage_a_dir / f"idr_{cname}.npz"
-
-    raw_train = np.load(processed / "X_train_pristine.npy", mmap_mode="r")
-    layer1_fit_raw = _subset(raw_train, args.vae_layer1_fit_limit, 42)
-    layer2_path = REPO_ROOT / "old_constraints" / dataset / "mined.json"
-    perturbable = resolved.perturbable_mask().to(device)
-    # Independent A4 engine (Layer 0+1+2) scores EVERY attack's output for the ablation ladder.
-    engine = build_ablation("A4", adapter, encoder_input_transform="asinh",
-                            layer1_fit_x_raw=layer1_fit_raw, mutable_mask=perturbable,
-                            layer2_path=layer2_path).engine
-    stage_b_rows = {}
-    if "vae" in families:
-        train_split = adapter.load_split("train")
-        for cname in classes:
-            cid = mapping.name_to_id[cname]
-            stage_b_rows[cname] = _class_x(train_split, cid, args.vae_stage_b_train_limit, 142 + cid)
     capgd_resources = build_capgd_resources(REPO_ROOT, adapter=adapter) if "capgd" in families else None
     fab_cls = fab_box = None
     if "fab" in families:
@@ -388,22 +351,12 @@ def main() -> None:
         "denominator": "clean-correct eligible set (identical across attacks within a victim)",
         "benign_id": BENIGN_ID,
         "validator_v2_profile": dataset,
-        "stage_a_dir": str(stage_a_dir),
-        "layer2_rules": str(layer2_path),
         "pgd": {"epsilon": args.pgd_epsilon, "alpha": args.pgd_alpha, "steps": args.pgd_steps},
         "cw": {"lambda": args.cw_lambda, "kappa": args.cw_kappa, "iters": args.cw_iters,
                "lr": args.cw_lr, "conv": args.cw_conv},
         "primattack": {"steps": args.prim_steps, "learning_rate": args.prim_lr,
                        "restarts": args.prim_restarts, "calibration": str(calibration_path),
                        "calibration_fit_split": calibration["fit_split"]},
-        "vae": {"ablations": list(VAE_ABLATIONS), "steps": args.vae_steps, "lr": args.vae_lr,
-                "latent_epsilon": args.vae_latent_epsilon,
-                "constraint_weight": args.vae_constraint_weight,
-                "layer1_fit_rows": int(len(layer1_fit_raw)),
-                "stage_b": {"epochs": 5, "batch_size": 256, "lr": 1e-3, "lambda_delta": 0.1,
-                            "train_limit_per_class": args.vae_stage_b_train_limit,
-                            "fit_split": "train"},
-                "mask": "config mask (9 perturbable + 7 derived-exact)"},
         "capgd": {"native": {"norm": "L2", "epsilon": args.capgd_epsilon,
                              "steps": args.capgd_steps, "batch_size": args.capgd_batch_size},
                   "primitive": {"norm": "Linf", "epsilon": 1.0, "box": "PrimAttack p75 joint",
@@ -467,10 +420,22 @@ def main() -> None:
                 "src": {"Src IP": meta.iloc[idx]["Src IP"].astype(str).to_numpy(),
                         "Dst IP": meta.iloc[idx]["Dst IP"].astype(str).to_numpy()},
             }
+    prior_sel = out / "selection.json"
+    if args.resume and prior_sel.exists():
+        old = json.loads(prior_sel.read_text(encoding="utf-8"))
+        for vname in victims:
+            for cname in classes:
+                if old.get(vname, {}).get(cname, {}).get("sha256_sample_ids") != \
+                        selection[vname][cname]["sha256_sample_ids"]:
+                    raise ValueError(f"--resume: selection changed for {vname}/{cname}")
     (out / "selection.json").write_text(json.dumps(selection, indent=2), encoding="utf-8")
 
     # ---- run attacks ----
-    cells, failures = [], []
+    prior_cells = {}
+    if args.resume and (out / "cells.json").exists():
+        prior_cells = {(c["victim"], c["class"], c["attack"], c["seed"]): c for c in
+                       json.loads((out / "cells.json").read_text(encoding="utf-8"))}
+    cells, failures, n_resumed = [], [], 0
     t0 = time.time()
     for vname in victims:
         victim = victim_cache[vname]
@@ -486,6 +451,12 @@ def main() -> None:
             caps = model.infer_capabilities(raw)
             for atk in roster:
                 for seed in seeds:
+                    key = (vname, cname, atk["name"], seed)
+                    if key in prior_cells and (
+                            art / f"{vname}__{cname}__{atk['name']}__seed{seed}.npz").exists():
+                        cells.append(prior_cells[key])
+                        n_resumed += 1
+                        continue
                     deterministic_runtime(seed)
                     semantic = None
                     requested = projected = optimization = bounds = ccfg = None
@@ -511,37 +482,6 @@ def main() -> None:
                         x_adv = targeted_cw_benign(
                             victim, x0, lambda_conf=args.cw_lambda, kappa=args.cw_kappa,
                             iters=args.cw_iters, lr=args.cw_lr, device=device)
-                    elif kind == "vae":
-                        bundle = build_ablation(
-                            atk["ablation"], adapter, encoder_input_transform="asinh",
-                            layer1_fit_x_raw=layer1_fit_raw, mutable_mask=perturbable,
-                            layer2_path=layer2_path)
-                        bundle.vae.load_state_dict(base_state[cname], strict=True)
-                        bundle.vae.to(device).eval()
-                        for parameter in bundle.vae.parameters():
-                            parameter.requires_grad_(False)
-                        generator = _build_generator(bundle, device, resolved=resolved,
-                                                     mutable_mask=perturbable)
-                        if atk["ablation"] == "A6":
-                            VictimGuidedTrainer(
-                                generator, victim, transform, bundle.engine,
-                                StageBConfig(epochs=5, batch_size=256, lr=1e-3,
-                                             lambda_attack=1.0, lambda_delta=0.1,
-                                             lambda_c1=args.vae_constraint_weight,
-                                             lambda_c2=args.vae_constraint_weight, seed=seed),
-                                device=device,
-                            ).fit(stage_b_rows[cname])
-                        parts = []
-                        for s in range(0, n, 256):
-                            adv_b, _ = targeted_latent_attack(
-                                generator, bundle.engine, victim, x0[s:s + 256],
-                                steps=args.vae_steps, learning_rate=args.vae_lr,
-                                latent_epsilon=args.vae_latent_epsilon,
-                                lambda_constraints=args.vae_constraint_weight,
-                                resolved=resolved)
-                            parts.append(adv_b)
-                        x_adv = torch.cat(parts, dim=0)
-                        _assert_frozen_unchanged(resolved, base_vae[cname], x0, x_adv)
                     elif kind == "capgd":
                         attack = make_capgd(capgd_resources, raw_victim, device=device, seed=seed,
                                             norm="L2", eps=args.capgd_epsilon,
@@ -585,6 +525,7 @@ def main() -> None:
                                 model, victim, raw, center, scale, bounds, caps,
                                 steps=args.prim_steps, learning_rate=args.prim_lr,
                                 restarts=args.prim_restarts, seed=seed,
+                                validity_fn=success_gate,
                             )
                             requested = optimization.requested
                             projected = optimization.projected
@@ -600,7 +541,7 @@ def main() -> None:
                             original_labels=labels, adversarial_labels=labels.copy(),
                             original_metadata=E["src"], adversarial_metadata=E["src"])
 
-                    if kind in ("input_pgd", "input_cw", "tpgd", "tcw", "vae"):
+                    if kind in ("input_pgd", "input_cw", "tpgd", "tcw"):
                         adv_raw = (x_adv * scale + center).detach()
                     x_adv = (adv_raw - center) / scale
                     elapsed_seconds = time.perf_counter() - attack_t0
@@ -611,11 +552,9 @@ def main() -> None:
                         continue
 
                     masks, _cost_unused, clean_pred, adv_pred = evaluate_cell(
-                        model, realizability, victim, base_vae[cname], raw, adv_raw,
-                        center, scale, cid, idr_path[cname], groups_idx)
+                        model, realizability, victim, raw, adv_raw,
+                        center, scale, cid, groups_idx)
                     cost = _decompose_cost(adv_raw, raw, scale, groups_idx)
-                    with torch.no_grad():
-                        ladder = engine.validate(adv_raw)
 
                     cc = masks["clean_correct"]
                     if int(cc.sum().item()) != n:
@@ -627,7 +566,6 @@ def main() -> None:
                     targeted = adv_pred == BENIGN_ID
                     domain_valid = masks["domain_valid"]
                     realizable = masks["primitive_transform_consistent"]
-                    in_dist = masks["in_dist"]
                     if semantic is not None:
                         sem_pass = torch.as_tensor(
                             semantic.semantic_status == SemanticStatus.PASS.value, device=device)
@@ -648,9 +586,7 @@ def main() -> None:
                         clean_correct=np_(cc), evasion=np_(evasion), targeted_success=np_(targeted),
                         domain_valid=np_(domain_valid),
                         hard_structural_valid=np_(masks["hard_structural_valid"]),
-                        realizable=np_(realizable), in_dist=np_(in_dist),
-                        engine_l0=np_(ladder["pass_l0"]), engine_l0_l1=np_(ladder["pass_l0_l1"]),
-                        engine_l0_l1_l2=np_(ladder["pass_l0_l1_l2"]),
+                        realizable=np_(realizable),
                         semantic_pass=(np_(sem_pass) if sem_pass is not None
                                        else np.full(n, -1, dtype=np.int8)),
                         primitive_feasible=(np_(prim_feasible) if prim_feasible is not None
@@ -690,10 +626,6 @@ def main() -> None:
                         "valid_targeted_benign": rate(targeted & domain_valid),
                         "domain_validity_rate": rate(domain_valid),
                         "realizable_rate": rate(realizable),
-                        "idr": rate(in_dist),
-                        "true_idsr_untargeted": rate(evasion & domain_valid & in_dist),
-                        "true_idsr_targeted": rate(targeted & domain_valid & in_dist),
-                        "engine_l0_l1_l2_rate": rate(ladder["pass_l0_l1_l2"]),
                         "mean_cost_total": float(cost["total"].mean().item()),
                         "mean_l2_scaled": float(l2.mean().item()),
                         "elapsed_seconds": elapsed_seconds,
@@ -711,7 +643,7 @@ def main() -> None:
     (out / "failures.json").write_text(json.dumps(failures, indent=2), encoding="utf-8")
 
     assert_pairing(out, victim_info, classes, roster, selection)
-    print(f"[done] {len(cells)} cells, {len(failures)} failures; "
+    print(f"[done] {len(cells)} cells ({n_resumed} resumed), {len(failures)} failures; "
           f"pairing assertions PASSED; artifacts in {art}", flush=True)
 
 

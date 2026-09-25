@@ -31,7 +31,6 @@ OUTCOMES = {
     "targeted_valid": "targeted ∧ hybrid_valid",
     "targeted_valid_feasible": "targeted ∧ valid ∧ primitive_feasible",
     "semantic_pass": "targeted ∧ valid ∧ feasible ∧ SP",
-    "true_idsr": "True-IDSR: targeted ∧ valid ∧ in_distribution",
 }
 CONTRASTS = (
     ("search_vs_old", "prim_search_{mode}_{budget}", "new", "prim_opt_{mode}_{budget}", "old"),
@@ -43,8 +42,6 @@ def _outcome(data: dict[str, np.ndarray], outcome: str) -> np.ndarray:
     success = data["targeted_success"].astype(bool) & data["domain_valid"].astype(bool)
     if outcome == "targeted_valid":
         return success
-    if outcome == "true_idsr":
-        return success & data["in_dist"].astype(bool)
     feasible = data["primitive_feasible"]
     if feasible.dtype != bool and int(feasible.min()) < 0:
         raise ValueError("primitive outcome requested for a non-primitive artifact")
@@ -83,7 +80,7 @@ class Runs:
             with np.load(path, allow_pickle=True) as data:
                 loaded = {name: data[name] for name in (
                     "sample_id", "targeted_success", "domain_valid",
-                    "primitive_feasible", "semantic_pass", "in_dist",
+                    "primitive_feasible", "semantic_pass",
                 )}
             expected = np.asarray(
                 self.selection["new"][victim][class_name]["sample_ids"], dtype="U128"
@@ -192,9 +189,7 @@ def write_report(path: Path, runs: Runs, result: dict, hashes: dict) -> None:
         "- McNemar: exact binomial when b+c<25, otherwise continuity-corrected χ². 95% CI: Newcombe "
         "square-and-add paired interval for rate(A) − rate(B). Holm correction within each contrast × "
         "outcome family (27 tests = 3 victims × 3 budgets × 3 modes).",
-        "- Outcomes: targeted ∧ hybrid_valid ⊇ ∧ primitive_feasible ⊇ ∧ semantic PASS (nested); "
-        "True-IDSR = targeted ∧ valid ∧ in_distribution (per-class VAE Mahalanobis gate, val-anchored "
-        "p95; realism, kept outside structural validity).",
+        "- Outcomes: targeted ∧ hybrid_valid ⊇ ∧ primitive_feasible ⊇ ∧ semantic PASS (nested).",
         "- The old and new runs differ in timing primitive as well as optimizer: old timing is "
         "proportional dilation `α`; new timing is `(delay, shape)`, which contains `α` as `shape=0`. "
         "Padding-only rows isolate the optimizer change.",

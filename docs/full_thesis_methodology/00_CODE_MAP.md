@@ -22,7 +22,7 @@ retired snapshot.
 |------|------|--------|
 | `src/attack/realizability/base.py` | `FeatureRole`, `PrimitiveSpec`, `PrimitiveCapabilities`, `NullPacketBackend`, protocols | LIVE |
 | `src/attack/realizability/cicids2017.py` | `CICIDS2017PrimitiveModel` — the φ(x₀,p,delay,shape) transform, capabilities, bounds, projection | LIVE (core) |
-| `src/attack/primitive_optimizer.py` | `optimize_primitive_candidates` — exact integer-padding enumeration + adaptive projected refinement, success-first candidate selection | LIVE (core) |
+| `src/attack/primitive_optimizer.py` | `RealizedSearch` (shared projection → quantized realization → victim + `hybrid_valid` success gate → per-flow incumbent and evaluation counts) and three optimizers on it: `optimize_primitive_candidates` (Hybrid: exact integer-padding enumeration + adaptive projected refinement; the default), `optimize_primitive_pgd`, `optimize_primitive_cw` (ablation baselines) | LIVE (core) |
 | `src/attack/realizability/validator.py` | `RealizabilityValidator` — internal primitive-consistency checks | LIVE |
 | `src/attack/primattack_budget.py` | Train-only budget calibration + loading | LIVE |
 | `src/attack/flow_semantics.py` | `FlowSemanticValidator` — SP proxy | LIVE |
@@ -31,6 +31,9 @@ retired snapshot.
 | `outputs/full_adv_eval_primattack_v2/` | Completed CICIDS2017 paired PrimAttack-v2 campaign: 3 victims × 4 classes × p50/p75/envelope-only × 3 modes × search/random × 3 attack seeds | LIVE artifacts |
 | `outputs/full_adv_eval/` | Paired evaluation with the replaced Adam/sigmoid `(p, α)` optimizer (`prim_opt_*`); frozen selection source and "before" condition | LIVE (historical) |
 | `scripts/budget_sweep_primitive.py` | Drives the 3-budget × 3-mode sweep | LIVE |
+| `scripts/run_primattack_optimizer_ablation.py` | Controlled optimizer ablation (Hybrid / Prim-PGD / Prim-C&W) on the frozen `adv_campaign_noidr` selection at a matched per-flow evaluation budget; `--split val` for tuning → `outputs/primattack_optimizer_ablation/<dataset>/` | LIVE |
+| `scripts/tune_primattack_ablation_baselines.py` | Validation-split grid for Prim-PGD step / Prim-C&W `c`, lr → `outputs/primattack_optimizer_ablation/val_tuning/` | LIVE |
+| `scripts/analyze_primattack_optimizer_ablation.py` | Ablation tables, paired McNemar/Newcombe/Holm, Cochran's Q, overlap, ASR-vs-evaluations, plots → `<root>/analysis/` | LIVE |
 | `artifacts/primattack/budget_calibration.json` | Frozen train-fit calibration | LIVE |
 | `outputs/primattack_budget_sensitivity_full/` | Sweep from the replaced `(p, α)` Adam optimizer (mlp,cnn × 4 classes × 3 budgets × 3 modes × seed 42 = 72 npz) | historical |
 | `outputs/primattack_random_control/` | Random-feasible control (older commit, MLP-only) | CODE-ONLY/older |

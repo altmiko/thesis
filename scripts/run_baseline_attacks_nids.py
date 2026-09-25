@@ -1,5 +1,5 @@
 """Baseline (unconstrained input-space) PGD and C&W attacks on the CICIDS2017-DistriNet
-NIDS victims (MLP, CNN, FT-Transformer), with domain-validity + realism gating and
+NIDS victims (MLP, CNN, FT-Transformer), with domain-validity gating and
 multi-seed variance.
 
 These are the *classical* adversarial baselines -- they perturb all 79 RobustScaler-space
@@ -13,9 +13,7 @@ Validity is scored with the repository's canonical gate (``evaluate_cell`` from
 * ``domain_valid``     -- validator_v2 ``hybrid_valid`` (PAVE feature-domain + mined density).
 * ``realizable``       -- internal realizability all-pass (dependency / packet-summary /
                           timing / rate / discreteness / frozen categories).
-* ``IDR``              -- per-class VAE Mahalanobis in-distribution rate (realism).
 * ``valid_evasion``    -- evasion AND domain_valid.
-* ``valid_real_evasion`` -- evasion AND domain_valid AND IDR (true attacker success).
 
 All rates use the clean-correct denominator (repo convention: (mask & clean_correct)/clean_correct).
 Runs every seed and reports mean +/- sample-std across seeds.
@@ -49,7 +47,7 @@ from attack.run_cicids2017_primitive_attack import (  # noqa: E402
 from datasets.cicids2017 import CICIDS2017Adapter  # noqa: E402
 from experiments.provenance import deterministic_runtime  # noqa: E402
 from src.classifiers.cicids2017d_victims import load_category_victim  # noqa: E402
-from vae.cicids2017_stage_a import ATTACK_CLASSES, load_stage_a  # noqa: E402
+from vae.cicids2017_stage_a import ATTACK_CLASSES  # noqa: E402
 
 # victim tag -> (checkpoint path relative to repo root, expected model_type)
 VICTIMS = {
@@ -62,7 +60,7 @@ VICTIMS = {
 }
 
 # metric key -> mask expression over the evaluate_cell masks (all gated by clean_correct later)
-METRICS = ("asr", "domain_valid", "realizable", "idr", "valid_evasion", "valid_real_evasion")
+METRICS = ("asr", "domain_valid", "realizable", "valid_evasion")
 
 
 def _select_clean_correct(victim, x_scaled, y, class_id, per_class, device, bs=8192):
@@ -87,14 +85,11 @@ def _counts(masks, extra_masks, cc):
     ev = masks["evasion"]
     dv = masks["domain_valid"]
     rz = masks["primitive_transform_consistent"]
-    idr = masks["in_dist"]
     m = {
         "asr": ev,
         "domain_valid": dv,
         "realizable": rz,
-        "idr": idr,
         "valid_evasion": ev & dv,
-        "valid_real_evasion": ev & dv & idr,
     }
     return {k: int((v & cc).sum().item()) for k, v in m.items()}
 
@@ -124,7 +119,6 @@ def main() -> None:
     ap.add_argument("--cw-iters", type=int, default=200)
     ap.add_argument("--cw-lr", type=float, default=0.01)
     ap.add_argument("--cw-conv", type=float, default=1e-5)
-    ap.add_argument("--stage-a-dir", type=Path, default=REPO_ROOT / "outputs" / "cicids2017_vae_stage_a")
     ap.add_argument("--output-dir", type=Path, default=REPO_ROOT / "outputs" / "cicids2017_baseline_pgd_cw")
     args = ap.parse_args()
 
@@ -151,17 +145,6 @@ def main() -> None:
     x_scaled = np.asarray(np.load(adapter._processed / "X_test.npy", mmap_mode="r"))
     raw_test = np.load(adapter._processed / "X_test_pristine.npy", mmap_mode="r")
     y = np.load(adapter._processed / "y_test_cat.npy").astype(np.int64)
-
-    # per-class stage-A VAE + IDR (loaded once)
-    base_vae = {}
-    idr_path = {}
-    for cname in classes:
-        vae, _ = load_stage_a(
-            adapter, args.stage_a_dir / f"vae_{cname}.pt",
-            expected_class_name=cname, device=device,
-        )
-        base_vae[cname] = vae
-        idr_path[cname] = args.stage_a_dir / f"idr_{cname}.npz"
 
     # records[(victim, cls, seed, attack)] = {"cc": int, "n": int, counts..., "l2_sum", "linf_sum"}
     records: dict = {}
@@ -213,8 +196,8 @@ def main() -> None:
                         )
                     adv_raw = (x_adv * scale + center).detach()
                     masks, _cost, _cp, _ap = evaluate_cell(
-                        prim, validator, victim, base_vae[cname], raw, adv_raw,
-                        center, scale, cid, idr_path[cname], groups_idx,
+                        prim, validator, victim, raw, adv_raw,
+                        center, scale, cid, groups_idx,
                     )
                     cc = masks["clean_correct"]
                     delta = (x_adv - x0).reshape(len(idx), -1)
@@ -256,7 +239,7 @@ def main() -> None:
             row["per_class"] = {}
             for cname in classes:
                 pc = {}
-                for metric in ("asr", "valid_real_evasion"):
+                for metric in ("asr", "valid_evasion"):
                     mean, std = _mean_std([seed_rate(vname, attack, metric, s, [cname]) for s in seeds])
                     pc[metric] = {"mean": mean, "std": std}
                 row["per_class"][cname] = pc
@@ -279,7 +262,7 @@ def main() -> None:
                           "num_iterations": args.cw_iters, "learning_rate": args.cw_lr,
                           "convergence_threshold": args.cw_conv},
             "validity_source": "attack.run_cicids2017_primitive_attack.evaluate_cell "
-                               "(validator_v2 hybrid_valid domain gate + internal realizability + per-class VAE IDR)",
+                               "(validator_v2 hybrid_valid domain gate + internal realizability)",
         },
         "summary": summary,
     }
@@ -322,19 +305,18 @@ def _write_md(path: Path, payload: dict) -> None:
     L.append("- **ASR**: untargeted evasion rate (misclassified).")
     L.append("- **Domain-valid**: validator_v2 `hybrid_valid` (PAVE feature-domain + mined density).")
     L.append("- **Realizable**: internal realizability all-pass (dependency/packet/timing/rate/discreteness/frozen).")
-    L.append("- **IDR**: per-class VAE Mahalanobis in-distribution rate (realism).")
-    L.append("- **Valid-evasion**: evasion AND domain-valid. **Valid+Real evasion**: evasion AND domain-valid AND IDR.")
+    L.append("- **Valid-evasion**: evasion AND domain-valid.")
     L.append("- All rates over the clean-correct denominator.\n")
 
     L.append("## Summary (mean +/- std across seeds)\n")
-    L.append("| Victim | Clean acc | n | Attack | ASR | Valid-evasion | Valid+Real evasion | "
-             "Domain-valid | Realizable | IDR | Mean L2 | Mean Linf |")
-    L.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    L.append("| Victim | Clean acc | n | Attack | ASR | Valid-evasion | "
+             "Domain-valid | Realizable | Mean L2 | Mean Linf |")
+    L.append("|---|---|---|---|---|---|---|---|---|---|")
     for r in payload["summary"]:
         L.append(
             f"| {r['victim']} | {r['clean_test_accuracy']*100:.2f}% | {r['n_per_seed']} | {r['attack']} | "
-            f"{_pm(r['asr'])} | {_pm(r['valid_evasion'])} | {_pm(r['valid_real_evasion'])} | "
-            f"{_pm(r['domain_valid'])} | {_pm(r['realizable'])} | {_pm(r['idr'])} | "
+            f"{_pm(r['asr'])} | {_pm(r['valid_evasion'])} | "
+            f"{_pm(r['domain_valid'])} | {_pm(r['realizable'])} | "
             f"{_pm(r['mean_l2'], pct=False)} | {_pm(r['mean_linf'], pct=False)} |"
         )
     L.append("")
@@ -342,10 +324,10 @@ def _write_md(path: Path, payload: dict) -> None:
     L.append("## Per-class (mean +/- std across seeds)\n")
     for r in payload["summary"]:
         L.append(f"### {r['victim']} / {r['attack']}\n")
-        L.append("| Class | ASR | Valid+Real evasion |")
+        L.append("| Class | ASR | Valid-evasion |")
         L.append("|---|---|---|")
         for cname, pc in r["per_class"].items():
-            L.append(f"| {cname} | {_pm(pc['asr'])} | {_pm(pc['valid_real_evasion'])} |")
+            L.append(f"| {cname} | {_pm(pc['asr'])} | {_pm(pc['valid_evasion'])} |")
         L.append("")
 
     path.write_text("\n".join(L) + "\n", encoding="utf-8")

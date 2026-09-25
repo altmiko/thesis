@@ -30,7 +30,6 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
-import torch
 from scipy.stats import chi2, fisher_exact
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -38,12 +37,9 @@ for _p in (str(REPO_ROOT), str(REPO_ROOT / "src")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from attack.run_cicids2017_vae_attacks import _idr_mask  # noqa: E402
-from datasets import get_adapter  # noqa: E402
 from evaluation.paired_validity_gap import (  # noqa: E402
     holm_adjust, mcnemar_test, newcombe_paired_ci, wilson_score_interval,
 )
-from vae.cicids2017_stage_a import load_stage_a  # noqa: E402
 
 ROOT = REPO_ROOT / "outputs" / "adv_campaign"  # overridable with --root
 DATASETS = {"cicids2017_distrinet": "CICIDS2017", "cicids2018_distrinet": "CSE-CIC-IDS-2018"}
@@ -53,15 +49,14 @@ ARCH_LABEL = {"mlp": "MLP", "cnn": "CNN", "ft_transformer": "FT-Transformer"}
 
 # Levels of the nested success ladder (goal success = targeted->Benign for targeted attacks,
 # any misclassification for untargeted attacks). None = level undefined for that attack.
-LEVELS = ("raw", "valid", "feasible", "sp", "true_idsr")
+LEVELS = ("raw", "valid", "feasible", "sp")
 HEADLINE_ATTACKS = (
     "pgd_untargeted", "cw_untargeted", "pgd_tb", "cw_tb",
-    "vae_A1", "vae_A4", "vae_A5", "vae_A6",
     "prim_search_joint_p50", "prim_search_joint_p75", "prim_search_joint_unb",
     "prim_rand_joint_p75", "capgd_native", "capgd_prim_p75",
 )
 REFERENCE_PRIM = "prim_search_joint_p75"
-C2_COMPARATORS = ("pgd_untargeted", "cw_untargeted", "capgd_native", "vae_A6",
+C2_COMPARATORS = ("pgd_untargeted", "cw_untargeted", "capgd_native",
                   "capgd_prim_p75", "prim_rand_joint_p75", "prim_search_joint_unb")
 
 
@@ -81,8 +76,7 @@ def _load_dataset(ds: str) -> dict:
                     d = np.load(p, allow_pickle=True)
                     n = len(d["sample_id"])
                     parts["class"].append(np.full(n, cname))
-                    for key in ("evasion", "targeted_success", "domain_valid", "in_dist",
-                                "realizable", "engine_l0_l1_l2"):
+                    for key in ("evasion", "targeted_success", "domain_valid", "realizable"):
                         parts[key].append(d[key].astype(bool))
                     for key in ("primitive_feasible", "semantic_pass"):
                         parts[key].append(d[key].astype(np.int8))
@@ -103,8 +97,6 @@ def outcome(r: dict, atk: dict, level: str, *, goal: str | None = None) -> np.nd
     valid = base & r["domain_valid"]
     if level == "valid":
         return valid
-    if level == "true_idsr":
-        return valid & r["in_dist"]
     if atk["family"] != "primattack" and atk["kind"] != "prim_capgd":
         return None
     feasible = valid & (r["primitive_feasible"] == 1)
@@ -163,32 +155,12 @@ def _holm_family(tests: list[dict]) -> None:
         t["p_holm"] = adj
 
 
-# ----------------------------------------------------------------------------- clean IDR
-def clean_idr(ds: str, data: dict) -> dict:
-    adapter = get_adapter(ds)
-    cfg, sel = data["config"], data["selection"]
-    stage_a = Path(cfg["stage_a_dir"])
-    transform = adapter.feature_transform()
-    raw = np.load(adapter._processed / "X_test_pristine.npy", mmap_mode="r")
-    center = torch.tensor(transform.center, dtype=torch.float32)
-    scale = torch.tensor(transform.scale, dtype=torch.float32)
-    out = {}
-    for cname in cfg["classes"]:
-        vae, _ = load_stage_a(adapter, stage_a / f"vae_{cname}.pt", expected_class_name=cname)
-        for victim in cfg["victims"]:
-            idx = np.asarray(sel[victim][cname]["positional_idx"], np.int64)
-            x = (torch.tensor(np.asarray(raw[idx]), dtype=torch.float32) - center) / scale
-            m = _idr_mask(vae, x, stage_a / f"idr_{cname}.npz").numpy()
-            out.setdefault(victim, {})[cname] = float(m.mean())
-    return out
-
-
 # ----------------------------------------------------------------------------- analysis
 def analyze_dataset(ds: str, data: dict) -> dict:
     cfg, rows, roster = data["config"], data["rows"], data["roster"]
     victims = list(cfg["victims"])
     res: dict = {"victims": cfg["victims"], "rates": {}, "variability": {}, "per_class": {},
-                 "contrasts": {}, "engine_ladder": {}, "selection": {}}
+                 "contrasts": {}, "selection": {}}
     for v in victims:
         res["selection"][v] = {c: {k: data["selection"][v][c][k] for k in
                                    ("n_class_test", "n_eligible_total", "n_used",
@@ -205,17 +177,12 @@ def analyze_dataset(ds: str, data: dict) -> dict:
                 o = outcome(r, atk, lvl)
                 entry[lvl] = rate_ci(o) if o is not None else None
             entry["evasion_valid"] = rate_ci(outcome(r, atk, "valid", goal="untargeted"))
-            entry["evasion_true_idsr"] = rate_ci(outcome(r, atk, "true_idsr", goal="untargeted"))
             entry["domain_valid"] = rate_ci(r["domain_valid"])
-            entry["in_dist"] = rate_ci(r["in_dist"])
-            ok = outcome(r, atk, "valid")
-            entry["in_dist_given_valid_success"] = (
-                float(r["in_dist"][ok].mean()) if ok.any() else None)
             entry["mean_l2_scaled"] = float(r["l2_scaled"].mean())
             entry["elapsed_s"] = float(r["elapsed"].sum())
             res["rates"].setdefault(v, {})[name] = entry
             var = {}
-            for lvl in ("raw", "valid", "true_idsr"):
+            for lvl in ("raw", "valid"):
                 vals = [float(outcome(rows[(v, name, s)], atk, lvl).mean()) for s in seeds]
                 var[lvl] = {"values": vals, "mean": float(np.mean(vals)),
                             "sd": float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0}
@@ -227,10 +194,6 @@ def analyze_dataset(ds: str, data: dict) -> dict:
                     pc[cname] = {lvl: (float(o[m].mean()) if (o := outcome(r, atk, lvl)) is not None
                                        else None) for lvl in LEVELS}
                 res["per_class"].setdefault(v, {})[name] = pc
-        # engine ladder for the VAE ablations
-        res["engine_ladder"][v] = {
-            n: float(rows[(v, n, ref)]["engine_l0_l1_l2"].mean())
-            for n in roster if n.startswith("vae_")}
 
     # ---- paired contrasts per victim (seed 42) ----
     for v in victims:
@@ -242,20 +205,11 @@ def analyze_dataset(ds: str, data: dict) -> dict:
         C["C1_validity_gap"] = [
             {"attack": n, **paired(outcome(R(n), a, "raw"), outcome(R(n), a, "valid"))}
             for n, a in roster.items()]
-        # C1b in-distribution gap: valid vs true-IDSR
-        C["C1b_realism_gap"] = [
-            {"attack": n, **paired(outcome(R(n), a, "valid"), outcome(R(n), a, "true_idsr"))}
-            for n, a in roster.items()]
-        # C2 PrimAttack reference vs other families (valid evasion and true-IDSR, untargeted)
+        # C2 PrimAttack reference vs other families (valid evasion, untargeted)
         C["C2_family_valid_evasion"] = [
             {"a": REFERENCE_PRIM, "b": n,
              **paired(outcome(R(REFERENCE_PRIM), roster[REFERENCE_PRIM], "valid", goal="untargeted"),
                       outcome(R(n), roster[n], "valid", goal="untargeted"))}
-            for n in C2_COMPARATORS if n in roster]
-        C["C2_family_true_idsr"] = [
-            {"a": REFERENCE_PRIM, "b": n,
-             **paired(outcome(R(REFERENCE_PRIM), roster[REFERENCE_PRIM], "true_idsr", goal="untargeted"),
-                      outcome(R(n), roster[n], "true_idsr", goal="untargeted"))}
             for n in C2_COMPARATORS if n in roster]
         # C3 primitive mode (joint / timing / padding), search, per budget; valid targeted
         C["C3_mode"] = []
@@ -274,14 +228,6 @@ def analyze_dataset(ds: str, data: dict) -> dict:
             pairs = [{"a": names[i], "b": names[j], **paired(mats[:, i], mats[:, j])}
                      for i, j in ((1, 0), (2, 1))]
             C["C4_budget"].append({"level": lvl, "cochran": cochran_q(mats), "pairs": pairs})
-        # C5 VAE ablation ladder A1..A6 (raw targeted and valid targeted)
-        C["C5_vae_ladder"] = []
-        names = [f"vae_A{i}" for i in range(1, 7)]
-        for lvl in ("raw", "valid"):
-            mats = np.stack([outcome(R(n), roster[n], lvl) for n in names], 1)
-            pairs = [{"a": names[i + 1], "b": names[i], **paired(mats[:, i + 1], mats[:, i])}
-                     for i in range(5)]
-            C["C5_vae_ladder"].append({"level": lvl, "cochran": cochran_q(mats), "pairs": pairs})
         # C6 optimizer: search vs random-feasible, every budget x mode (valid targeted)
         C["C6_optimizer"] = [
             {"a": f"prim_search_{m}_{b}", "b": f"prim_rand_{m}_{b}",
@@ -307,7 +253,6 @@ def analyze_dataset(ds: str, data: dict) -> dict:
                 if "cochran" in t:
                     t["cochran"]["p_holm"] = min(1.0, t["cochran"]["p"] * len(fam))
         res["contrasts"][v] = C
-    res["clean_idr"] = clean_idr(ds, data)
     return res
 
 
@@ -322,16 +267,14 @@ def cross_dataset(results: dict, data: dict) -> list[dict]:
         tests = []
         for name in HEADLINE_ATTACKS:
             atk = d17["roster"][name]
-            for metric, lvl, goal in (("valid_evasion", "valid", "untargeted"),
-                                      ("true_idsr", "true_idsr", "untargeted")):
-                a = outcome(d17["rows"][(v17, name, REF_SEED)], atk, lvl, goal=goal)
-                b = outcome(d18["rows"][(v18, name, REF_SEED)], atk, lvl, goal=goal)
-                k1, n1, k2, n2 = int(a.sum()), a.size, int(b.sum()), b.size
-                lo, hi = newcombe_unpaired(k1, n1, k2, n2)
-                p = float(fisher_exact([[k1, n1 - k1], [k2, n2 - k2]])[1])
-                tests.append({"arch": arch, "attack": name, "metric": metric,
-                              "rate_2017": k1 / n1, "rate_2018": k2 / n2, "n_2017": n1,
-                              "n_2018": n2, "rd": k1 / n1 - k2 / n2, "ci": [lo, hi], "p": p})
+            a = outcome(d17["rows"][(v17, name, REF_SEED)], atk, "valid", goal="untargeted")
+            b = outcome(d18["rows"][(v18, name, REF_SEED)], atk, "valid", goal="untargeted")
+            k1, n1, k2, n2 = int(a.sum()), a.size, int(b.sum()), b.size
+            lo, hi = newcombe_unpaired(k1, n1, k2, n2)
+            p = float(fisher_exact([[k1, n1 - k1], [k2, n2 - k2]])[1])
+            tests.append({"arch": arch, "attack": name, "metric": "valid_evasion",
+                          "rate_2017": k1 / n1, "rate_2018": k2 / n2, "n_2017": n1,
+                          "n_2018": n2, "rd": k1 / n1 - k2 / n2, "ci": [lo, hi], "p": p})
         _holm_family(tests)
         out.extend(tests)
     return out
@@ -366,30 +309,28 @@ def write_markdown(results: dict, cross: list[dict], data: dict) -> str:
         # selection
         L.append(f"### {name}: eligible rows (clean-correct, seeded random sample, cap {cfg['n_per_class_cap']}/class)\n")
         L.append("| victim | " + " | ".join(f"{c} used / eligible / test" for c in cfg["classes"])
-                 + " | clean hybrid_valid | clean IDR (per class) |")
-        L.append("|---|" + "---|" * (len(cfg["classes"]) + 2))
+                 + " | clean hybrid_valid |")
+        L.append("|---|" + "---|" * (len(cfg["classes"]) + 1))
         for v in victims:
             s = res["selection"][v]
             hv = np.mean([s[c]["clean_hybrid_valid_rate"] for c in cfg["classes"]])
-            idr = " / ".join(f"{100 * res['clean_idr'][v][c]:.0f}" for c in cfg["classes"])
             L.append(f"| {_vlabel(ds, v)} | " + " | ".join(
                 f"{s[c]['n_used']} / {s[c]['n_eligible_total']} / {s[c]['n_class_test']}"
-                for c in cfg["classes"]) + f" | {100 * hv:.2f}% | {idr} |")
+                for c in cfg["classes"]) + f" | {100 * hv:.2f}% |")
         L.append("")
         # headline ladder
         L.append(f"### {name}: success ladder per victim (reference seed 42, classes pooled; % [Wilson 95% CI])\n")
         L.append("Goal success = targeted→Benign for targeted attacks, misclassification for untargeted "
                  "attacks. valid = ∧ validator_v2 hybrid_valid; feasible = ∧ primitive-feasible; "
-                 "SP = ∧ flow-semantic PASS; True-IDSR = valid ∧ in-distribution (per-class VAE IDR).\n")
+                 "SP = ∧ flow-semantic PASS.\n")
         for v in victims:
             L.append(f"**{_vlabel(ds, v)}** (N = {res['rates'][v][HEADLINE_ATTACKS[0]]['raw']['n']})\n")
-            L.append("| attack | goal | raw | valid | feasible | SP | True-IDSR | hybrid_valid rate | IDR | IDR \\| valid success | mean L2 (scaled) |")
-            L.append("|---|---|---|---|---|---|---|---|---|---|---|")
+            L.append("| attack | goal | raw | valid | feasible | SP | hybrid_valid rate | mean L2 (scaled) |")
+            L.append("|---|---|---|---|---|---|---|---|")
             for n, e in res["rates"][v].items():
                 g = "T" if data[ds]["roster"][n]["goal"] == "targeted_benign" else "U"
                 L.append(f"| `{n}` | {g} | {_ci(e['raw'])} | {_ci(e['valid'])} | {_ci(e['feasible'])} | "
-                         f"{_ci(e['sp'])} | {_ci(e['true_idsr'], 2)} | {_pct(e['domain_valid']['rate'])} | "
-                         f"{_pct(e['in_dist']['rate'])} | {_pct(e['in_dist_given_valid_success'])} | "
+                         f"{_ci(e['sp'])} | {_pct(e['domain_valid']['rate'])} | "
                          f"{e['mean_l2_scaled']:.3g} |")
             L.append("")
         # variability
@@ -411,34 +352,22 @@ def write_markdown(results: dict, cross: list[dict], data: dict) -> str:
             L.append(f"| `{n}` | " + " | ".join(cells) + " |")
         L.append("")
         # per class
-        L.append(f"### {name}: per-class valid goal-success / True-IDSR (%, seed 42)\n")
-        key = ["prim_search_joint_p75", "prim_search_joint_unb", "capgd_native", "vae_A6", "pgd_untargeted"]
+        L.append(f"### {name}: per-class valid goal-success (%, seed 42)\n")
+        key = ["prim_search_joint_p75", "prim_search_joint_unb", "capgd_native", "pgd_untargeted"]
         L.append("| victim | attack | " + " | ".join(cfg["classes"]) + " |")
         L.append("|---|---|" + "---|" * len(cfg["classes"]))
         for v in victims:
             for n in key:
                 pc = res["per_class"][v][n]
                 L.append(f"| {_vlabel(ds, v)} | `{n}` | " + " | ".join(
-                    f"{_pct(pc[c]['valid'])} / {_pct(pc[c]['true_idsr'], 2)}" for c in cfg["classes"]) + " |")
-        L.append("")
-        # VAE engine ladder
-        L.append(f"### {name}: VAE ablation ladder — raw targeted / valid targeted / ConstraintEngine L0+L1+L2 pass (%, seed 42)\n")
-        L.append("| victim | " + " | ".join(f"A{i}" for i in range(1, 7)) + " |")
-        L.append("|---|" + "---|" * 6)
-        for v in victims:
-            L.append(f"| {_vlabel(ds, v)} | " + " | ".join(
-                f"{_pct(res['rates'][v][f'vae_A{i}']['raw']['rate'])} / "
-                f"{_pct(res['rates'][v][f'vae_A{i}']['valid']['rate'])} / "
-                f"{_pct(res['engine_ladder'][v][f'vae_A{i}'])}" for i in range(1, 7)) + " |")
+                    _pct(pc[c]["valid"]) for c in cfg["classes"]) + " |")
         L.append("")
         # contrasts
         L.append(f"### {name}: paired tests (seed 42, per victim; Holm within family)\n")
         L.append("RD = rate(A) − rate(B) in percentage points with Newcombe 95% CI; "
                  "A-only/B-only = discordant rows; OR = Haldane–Anscombe (A-only+½)/(B-only+½).\n")
         for fam, title in (("C1_validity_gap", "C1 validity gap: raw vs valid goal-success (A = raw, B = valid)"),
-                           ("C1b_realism_gap", "C1b realism gap: valid vs True-IDSR (A = valid, B = valid ∧ in-dist)"),
                            ("C2_family_valid_evasion", f"C2 `{REFERENCE_PRIM}` vs other families — valid evasion (untargeted)"),
-                           ("C2_family_true_idsr", f"C2 `{REFERENCE_PRIM}` vs other families — True-IDSR (untargeted)"),
                            ("C6_optimizer", "C6 search vs random-feasible (valid targeted)"),
                            ("C7_box_optimizer", "C7 PrimAttack search vs CAPGD in the SAME p75 primitive box (untargeted)")):
             L.append(f"#### {title}\n")
@@ -447,14 +376,13 @@ def write_markdown(results: dict, cross: list[dict], data: dict) -> str:
             for v in victims:
                 for t in res["contrasts"][v][fam]:
                     a = t.get("a", t.get("attack")) + (f" ({t['level']})" if "level" in t else "")
-                    b = t.get("b", {"C1_validity_gap": "valid", "C1b_realism_gap": "true-IDSR"}.get(fam, ""))
+                    b = t.get("b", "valid" if fam == "C1_validity_gap" else "")
                     L.append(f"| {_vlabel(ds, v)} | `{a}` | `{b}` | {t['n']} | {_pct(t['rate_a'], 2)} | {_pct(t['rate_b'], 2)} | "
                              f"{100 * t['rd']:+.2f} [{100 * t['ci'][0]:+.2f}, {100 * t['ci'][1]:+.2f}] | "
                              f"{t['a_only']} | {t['b_only']} | {t['or_ha']:.3g} | {_p(t['p'])} | {_p(t['p_holm'])} |")
             L.append("")
         for fam, title, lab in (("C3_mode", "C3 primitive mode (search, valid targeted)", "budget"),
-                                ("C4_budget", "C4 budget p50 → p75 → unbounded (search joint)", "level"),
-                                ("C5_vae_ladder", "C5 VAE ablation ladder A1…A6 (targeted)", "level")):
+                                ("C4_budget", "C4 budget p50 → p75 → unbounded (search joint)", "level")):
             L.append(f"#### {title}\n")
             L.append(f"| victim | {lab} | Cochran Q (df) | p | p_Holm | rates % | pairwise RD pp [CI], p_Holm |")
             L.append("|---|---|---|---|---|---|---|")

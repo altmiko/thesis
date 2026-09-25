@@ -31,7 +31,7 @@ from experiments.provenance import (
     load_row_ids,
 )
 from src.classifiers.cicids2017d_victims import load_category_victim
-from vae.cicids2017_stage_a import ATTACK_CLASSES, load_stage_a
+from vae.cicids2017_stage_a import ATTACK_CLASSES
 
 
 def _seed(seed: int) -> None:
@@ -51,8 +51,7 @@ def targeted_pgd(victim, x0_scaled, target, *, epsilon, steps, alpha):
     return x_adv
 
 
-def run(*, classes, victims, device, test_limit, epsilon, steps, alpha, stage_a_dir,
-        output_dir, seeds):
+def run(*, classes, victims, device, test_limit, epsilon, steps, alpha, output_dir, seeds):
     adapter = CICIDS2017Adapter(); repo = adapter.repo_root
     manifest = adapter.feature_manifest(); transform = adapter.feature_transform()
     mapping = adapter.class_mapping()
@@ -65,16 +64,11 @@ def run(*, classes, victims, device, test_limit, epsilon, steps, alpha, stage_a_
     test = adapter.load_split("test")
     raw_test = np.load(adapter._processed / "X_test_pristine.npy", mmap_mode="r")
     raw_train = np.load(adapter._processed / "X_train_pristine.npy", mmap_mode="r")
-    stage_a_dir = stage_a_dir or (repo / "outputs" / "cicids2017_vae_stage_a")
     victim_dir = repo / "outputs" / "cicids2017distrinet" / "models"
     config = {"epsilon": epsilon, "steps": steps, "alpha": alpha,
               "test_limit_per_class": test_limit, "seeds": seeds,
               "attack_batch_size_per_class": test_limit}
-    checkpoint_paths = {
-        **{f"victim_{name}": victim_dir / f"{name}_category.pt" for name in victims},
-        **{f"vae_{name}": stage_a_dir / f"vae_{name}.pt" for name in classes},
-        **{f"idr_{name}": stage_a_dir / f"idr_{name}.npz" for name in classes},
-    }
+    checkpoint_paths = {f"victim_{name}": victim_dir / f"{name}_category.pt" for name in victims}
     provenance = build_provenance(
         repo_root=repo, dataset=adapter.name, method_id="input_pgd", config=config,
         preprocessing_manifest=adapter._processed / "preprocessing_manifest.json",
@@ -97,11 +91,6 @@ def run(*, classes, victims, device, test_limit, epsilon, steps, alpha, stage_a_
         idx = _class_rows(test.y, cid, test_limit, 42 + cid)
         raw_np = np.ascontiguousarray(np.asarray(raw_test[idx]), dtype=np.float32)
         raw = torch.tensor(raw_np, device=device)
-        base_vae, _ = load_stage_a(
-            adapter, stage_a_dir / f"vae_{class_name}.pt",
-            expected_class_name=class_name, device=device,
-        )
-        idr_path = stage_a_dir / f"idr_{class_name}.npz"
         for vname in victims:
             victim = load_category_victim(
                 victim_dir / f"{vname}_category.pt", adapter=adapter,
@@ -113,14 +102,11 @@ def run(*, classes, victims, device, test_limit, epsilon, steps, alpha, stage_a_
                 target = torch.zeros(raw.shape[0], dtype=torch.long, device=device)
                 x_adv = targeted_pgd(victim, x0, target, epsilon=epsilon, steps=steps, alpha=alpha)
                 adv_raw = (x_adv * scale + center).detach()
-                masks, cost, yc, ya = evaluate_cell(model, val, victim, base_vae, raw,
-                                                    adv_raw, center, scale, cid, idr_path, groups_idx)
+                masks, cost, yc, ya = evaluate_cell(model, val, victim, raw,
+                                                    adv_raw, center, scale, cid, groups_idx)
                 ap = artifact_dir / f"{class_name}_{vname}_seed{seed}.npz"
                 strict = masks["mined_valid"]
-                checkpoint_ids = {
-                    key: provenance["checkpoints"][key]["sha256"]
-                    for key in (f"victim_{vname}", f"vae_{class_name}", f"idr_{class_name}")
-                }
+                checkpoint_ids = {f"victim_{vname}": provenance["checkpoints"][f"victim_{vname}"]["sha256"]}
                 with torch.no_grad():
                     clean_logits = victim((raw - center) / scale)
                     final_logits = victim((adv_raw - center) / scale)
@@ -156,7 +142,6 @@ def run(*, classes, victims, device, test_limit, epsilon, steps, alpha, stage_a_
                         "strict_validity": rate(strict),
                         "mined_validity": rate(masks["mined_valid"]),
                         "realizability_aware_validity_diagnostic": rate(masks["realizable"]),
-                        "IDR": rate(masks["in_dist"]),
                         "cost_total_mean": float(cost["total"][cc].mean()) if denom else float("nan")}
                 results["cells"].append(cell)
                 print(json.dumps({k: cell[k] for k in ("class", "victim", "seed", "targeted_benign_asr",
@@ -176,13 +161,12 @@ def main() -> None:
     ap.add_argument("--steps", type=int, default=50)
     ap.add_argument("--alpha", type=float, default=0.05)
     ap.add_argument("--seeds", default="42,43,44")
-    ap.add_argument("--stage-a-dir", type=Path, default=None)
     ap.add_argument("--output-dir", type=Path, default=Path("outputs/cicids2017_input_baseline"))
     a = ap.parse_args()
     run(classes=[c.strip() for c in a.classes.split(",") if c.strip()],
         victims=[v.strip() for v in a.victims.split(",") if v.strip()],
         device=a.device, test_limit=a.test_limit, epsilon=a.epsilon, steps=a.steps, alpha=a.alpha,
-        stage_a_dir=a.stage_a_dir, output_dir=a.output_dir,
+        output_dir=a.output_dir,
         seeds=[int(x) for x in str(a.seeds).split(",") if str(x).strip()])
 
 

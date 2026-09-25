@@ -104,11 +104,23 @@ full malicious test rows
 ```
 
 The current `scripts/run_full_adversarial_eval.py` default is a seeded uniform sample
-from **all** clean-correct rows (`--selection random --selection-seed 42`). This avoids
-using a chronological/source-label head slice. `--selection head` retains the older
-selection behavior. In either case, `selection.json` stores positional indices,
-`sample_id`s, source-label composition, and a SHA-256; every attack and seed receives
-the same rows in the same order within a victim/class.
+from **all** clean-correct rows (`--selection random --selection-seed 42`). A
+class-specific permutation is generated with seed `selection_seed + class_id`; each
+victim keeps the first `N` rows in that permutation that it classifies correctly, then
+the selected positions are sorted back into test order. `--selection head` instead
+takes the first `N` clean-correct rows in test order.
+
+The current runner records the selection method, seed, and rule in `config.json`.
+`selection.json` records each victim/class roster itself: positional indices,
+`sample_id`s, eligible/used counts, source-label composition, clean-validity rate, and
+the SHA-256 of the ordered sample IDs. Every attack and attack seed receives that same
+ordered roster within a victim/class.
+
+The committed `outputs/full_adv_eval_primattack_v2` campaign used the legacy
+**head-after-clean-correct** selection, not the current random default. Its older
+`config.json` predates the explicit `selection` metadata block; the method is stated
+in `FULL_ADVERSARIAL_EVALUATION_CICIDS2017_PRIMATTACK_V2.md`, while its exact rows and
+hashes are in `outputs/full_adv_eval_primattack_v2/selection.json`.
 
 The standalone runner is useful for focused experiments, but its selection procedure
 is different: `_class_rows` first samples rows by true class, then `clean_correct`
@@ -332,9 +344,12 @@ checks discreteness on the complete data-mined integer feature set.
 
 ## 2.8 Current optimizer
 
-`optimize_primitive_candidates` searches the **realized attack**. Its differentiable
-relaxation supplies gradients, but candidate selection always uses
-`project_controls` followed by `generate(..., quantize=True)`.
+`optimize_primitive_candidates` (the **Hybrid Search**) searches the **realized attack**. Its
+differentiable relaxation supplies gradients, but candidate selection always uses
+`project_controls` followed by `generate(..., quantize=True)`. All PrimAttack optimizers
+(Hybrid, and the ablation baselines `optimize_primitive_pgd` / `optimize_primitive_cw`) run
+on one `RealizedSearch` object that owns projection, quantized realization, victim scoring,
+the success predicate, the per-flow incumbent, and per-flow evaluation counting.
 
 ### Targeted objective
 
@@ -344,13 +359,18 @@ $$
 m(x)=\max_{k\ne0} z_k(x)-z_0(x).
 $$
 
-Lower is better. Actual success is tested with `argmax(logits) == 0`, not inferred from
-the sign of a relaxed loss.
+Lower is better. Actual success is tested on the realized flow as
+`argmax(logits) == 0` **and** the injected validity gate (every runner passes
+`hybrid_valid_gate(dataset)`, i.e. validator_v2 `hybrid_valid`) — the same predicate as the
+reported valid ASR. Before this fix, selection used `argmax == 0` alone, so a
+validator-invalid padding "success" could stop the padding sweep and block timing
+refinement (material on CICIDS2018, where padding breaks the mined
+`Fwd Packet Length Min == Packet Length Min` rule).
 
 There is no cost term in the gradient objective. Hard bounds define feasibility.
 Per-row candidate selection is lexicographic:
 
-1. a targeted success replaces any failure;
+1. a (valid, targeted) success replaces any failure;
 2. among successes, minimize
    `p/p_hi + delay/delay_hi`;
 3. if success costs tie, use lower margin;
@@ -375,8 +395,10 @@ $$
 Values are evaluated in increasing cost order. For `m` currently unresolved rows, the
 implementation batches `k=max(1,min(values_remaining,4096//m))` consecutive padding
 values into one victim call. In the completed campaign (`m <= 800`) this caps each
-call at 4096 candidate rows. A row leaves the sweep after its first targeted success
-or after exhausting its cap. This yields the minimum-padding successful padding-only
+call at 4096 candidate rows. A row leaves the sweep after its first (valid, targeted)
+success or after exhausting its cap; the batched values after a row's first success are
+discarded and not charged, so the per-flow evaluation count equals sequential scoring.
+This yields the minimum-padding successful padding-only
 attack wherever one exists; otherwise it retains the padding value with the lowest
 targeted margin.
 
@@ -397,7 +419,7 @@ $$
 At each iteration:
 
 ```text
-relaxed = phi(x0, controls(q), quantize=False)
+relaxed = phi(x0, controls(max(q, 1e-3)), quantize=False)   # straight-through floor
 g       = gradient_q sum(targeted_margin(victim(scale(relaxed))))
 v       = 0.75 * v + g / max(mean(abs(g)), 1e-12)
 q       = clamp(q - step_size * sign(v), 0, 1)
@@ -417,11 +439,23 @@ halve their step size, return to their restart-best `q`, and clear momentum.
 - Successful rows are not removed from adaptive iterations; the success-first,
   lowest-cost selector still decides what survives.
 
-Defaults are `steps=40`, `learning_rate=0.1`, and `restarts=2`. The search records the
-winning source (`identity`, `exact-padding`, `adaptive-clean`, or
-`adaptive-random`), realized target margin, normalized cost, and victim forward/backward
-call counts. The seed only affects random restarts; identity, exact padding, and the
-clean restart are deterministic given the runtime/model.
+The canonical map copies a row verbatim where `p == 0` / `delay == 0`, so the relaxation's
+gradient is exactly zero at a zero control. Surrogate evaluations therefore use
+`max(q, SURROGATE_FLOOR=1e-3)` on coordinates with headroom, with the gradient passed
+straight through to `q`; realized scoring never sees the floor. Without it, restart 0
+(which starts at `delay = 0`) could never move timing.
+
+Defaults are `steps=40`, `learning_rate=0.1`, and `restarts=2`; `restarts=None` with an
+`eval_budget` keeps starting random restarts until each refined row has spent the per-flow
+budget (used by the optimizer ablation). The search records the winning source (`identity`,
+`exact-padding`, `adaptive-clean`, or `adaptive-random`), realized target margin,
+normalized cost, and per-flow counts of realized forward, surrogate forward, and backward
+victim evaluations plus the evaluation index of the first success. The seed only affects
+random restarts; identity, exact padding, and the clean restart are deterministic given the
+runtime/model.
+
+The controlled optimizer ablation (Hybrid vs Prim-PGD vs Prim-C&W at a matched per-flow
+evaluation budget) is documented in the root report `primattack_optimizer_ablation.md`.
 
 ### Random-feasible control
 
@@ -644,6 +678,7 @@ The committed v2 campaign is
 - three victims: MLP, CNN, FT-Transformer;
 - four attack classes;
 - 800 frozen clean-correct rows per victim/class;
+- legacy head selection: first 800 clean-correct rows in test order per victim/class;
 - attack seeds `42, 123, 2024`;
 - p50, p75, and envelope-only boxes;
 - joint, timing-only, and padding-only modes;

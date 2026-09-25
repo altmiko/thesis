@@ -171,7 +171,6 @@ def main() -> None:
                 test_limit=args.test_limit,
                 steps=args.steps,
                 lr=0.1,
-                stage_a_dir=None,
                 output_dir=run_dir,
                 seeds=seeds,
                 calibration_path=args.calibration,
