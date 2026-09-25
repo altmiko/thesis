@@ -28,7 +28,7 @@ from evaluation.paired_validity_gap import (  # noqa: E402
 
 DEFAULT_VICTIMS = ("mlp", "cnn", "ft_transformer")
 DEFAULT_CLASSES = ("DoS", "DDoS", "Recon", "BruteForce")
-PRIM_REFERENCE = "prim_opt_joint_p75"
+PRIM_REFERENCE = "prim_search_joint_p75"
 
 
 def _load(path: Path) -> dict[str, np.ndarray]:
@@ -206,10 +206,10 @@ def _write_report(args, result, victims, methods) -> None:
     L.append("## Design\n")
     L.append(f"- Rows: the full frozen clean-correct selection ({config.get('n_per_class') or 800} per victim/class).")
     L.append(f"- Victims: {', '.join(victims)}. Classes: {', '.join(config['classes'])}. Seeds: {config['seeds']}.")
-    L.append("- CAPGD controls: `q_padding, q_timing in [0,1]`, mapped per row to `p = p_hi*q_padding`, `alpha = 1 + (alpha_hi-1)*q_timing`.")
+    L.append("- CAPGD controls: `q_padding, q_delay, q_shape in [0,1]`, mapped per row to `p = p_hi*q_padding`, `delay = delay_hi*q_delay`, `shape = shape_hi*q_shape`.")
     L.append("- CAPGD config: untargeted CE, two starts, adaptive momentum/step schedule, normalized Linf radius 1, no epsilon margin.")
-    L.append(f"- CAPGD step budgets: {config['steps']} (10 = CAA default; 40 matches PrimAttack's optimizer budget).")
-    L.append(f"- Reference: existing `{result['primattack_reference']}` (targeted-Benign Adam, 40 steps), evaluated on the identical rows.")
+    L.append(f"- CAPGD step budgets: {config['steps']} (10 = CAA default; 40 matches PrimAttack's refinement step budget).")
+    L.append(f"- Reference: `{result['primattack_reference']}` (targeted-Benign exact-padding search + adaptive timing refinement), evaluated on the identical rows.")
     L.append("- Final controls use PrimAttack integer padding projection and the quantized canonical transform; validity is independently evaluated.")
     L.append("")
     L.append("## Results\n")
@@ -246,11 +246,11 @@ def _write_report(args, result, victims, methods) -> None:
         )
     L.append("")
     L.append("## Interpretation\n")
-    L.append("With the feasible set equalized to PrimAttack's two controls and p75 box, any remaining difference reflects the optimizer and objective, not the feature-space capability. Public CAPGD stays untargeted CE with adaptive step sizing; PrimAttack uses a targeted-Benign Adam objective with a primitive-cost penalty. Compare each CAPGD variant against `prim_opt_joint_p75` on the valid-untargeted rows for the fair optimizer contrast.")
+    L.append("With the feasible set equalized to PrimAttack's three controls and p75 box, any remaining difference reflects the optimizer and objective, not the feature-space capability. Public CAPGD stays untargeted CE with adaptive step sizing; PrimAttack uses a targeted-Benign logit-margin search with exact integer-padding enumeration and success-first candidate selection. Compare each CAPGD variant against `prim_search_joint_p75` on the valid-untargeted rows for the fair optimizer contrast.")
     L.append("")
     L.append("## Limitations\n")
     L.append("1. This is a custom CAPGD-over-primitives adaptation, not native TabularBench CAPGD or full CAA.")
-    L.append("2. CAPGD (untargeted CE) and PrimAttack (targeted-Benign + cost) optimize different objectives; the comparison isolates capability, not objective.")
+    L.append("2. CAPGD (untargeted CE) and PrimAttack (targeted-Benign margin) optimize different objectives; the comparison isolates capability, not objective.")
     L.append("3. Normalized Linf radius 1 exposes the complete p75 box; it is a box parameterization, not a claim that padding and timing share physical units.")
     L.append("4. Padding is integer-projected and timing is quantized exactly as in PrimAttack, so both methods realize the same discrete primitive space.")
     L.append("5. Packet-level realization, CICFlowMeter re-extraction, replay, and malicious-function preservation remain unavailable; the semantic proxy is flow-level and NOT_FULLY_TESTABLE for Recon/BruteForce.")
@@ -272,7 +272,7 @@ def main() -> None:
         default=REPO_ROOT / "outputs/comparisons/primitive_capgd_vs_primattack",
     )
     parser.add_argument(
-        "--primattack-dir", type=Path, default=REPO_ROOT / "outputs/full_adv_eval",
+        "--primattack-dir", type=Path, default=REPO_ROOT / "outputs/full_adv_eval_primattack_v2",
     )
     parser.add_argument("--reference-seed", type=int, default=42)
     parser.add_argument(

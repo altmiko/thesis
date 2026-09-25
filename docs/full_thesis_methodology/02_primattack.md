@@ -1,400 +1,759 @@
-# 2. PrimAttack (MAXIMUM DETAIL)
+# 2. PrimAttack: current implementation
 
-PrimAttack is a **primitive-domain white-box evasion attack**. Instead of perturbing
-the 79-dim feature vector directly, it optimizes **two physically-interpretable
-attacker primitives** — forward-packet **padding** `p` and forward-timing
-**dilation** `α` — and *deterministically recomputes* all dependent CICFlowMeter
-features through a differentiable transform `φ(x₀, p, α)`. This keeps every
-adversarial vector inside the CICFlowMeter algebra by construction.
+PrimAttack is the thesis's **primitive-domain, targeted white-box attack** for
+CICIDS2017-DistriNet. It does not optimize any of the 79 CICFlowMeter features
+independently. It searches controls for two attacker operations:
 
-### Source files
-| Concern | File |
+1. add a uniform integer number of bytes `p` to every forward packet represented by
+   the flow; and
+2. add an integer total forward delay `delay`, with a continuous `shape` control that
+   allocates that delay between proportional dilation and an equal additive shift of
+   every forward inter-arrival gap.
+
+The canonical transform
+
+$$
+x_{\mathrm{adv}}=\phi(x_0,p,\mathrm{delay},\mathrm{shape})
+$$
+
+recomputes the aggregate features declared as dependent on those operations. The
+classifier only sees the transformed vector after the final controls have been
+projected and the integer-valued outputs have been quantized.
+
+This is a **feature-space proxy over aggregate flow summaries**. No packet is edited,
+no PCAP is replayed, and no target service is exercised.
+
+## 2.1 What changed
+
+The current code replaces the earlier Adam/sigmoid search over `(p, alpha)`.
+
+| Earlier implementation | Current implementation |
 |---|---|
-| Primitive contracts, roles, capabilities, `NullPacketBackend` | `src/attack/realizability/base.py` |
-| The transform φ, capabilities, per-flow bounds, projection | `src/attack/realizability/cicids2017.py` (`CICIDS2017PrimitiveModel`) |
-| Internal primitive-consistency validator | `src/attack/realizability/validator.py` (`RealizabilityValidator`) |
-| Train-only budget calibration | `src/attack/primattack_budget.py` |
-| Flow-level semantic proxy | `src/attack/flow_semantics.py` |
-| Runner + metrics + npz artifacts | `src/attack/run_cicids2017_primitive_attack.py` |
-| Budget/mode sweep | `scripts/budget_sweep_primitive.py` |
+| timing control `alpha >= 1` uniformly multiplied every forward gap | `delay >= 0` adds an integer total delay and `shape in [0,1]` controls its allocation |
+| two optimized controls `(p, alpha)` | three search controls `(p, delay, shape)` representing two physical operations |
+| Adam over unconstrained sigmoid parameters | identity check, exhaustive integer-padding search, then adaptive projected sign-momentum refinement |
+| targeted cross-entropy plus a primitive-cost penalty | targeted Benign logit margin; cost is used only to choose between successful candidates |
+| continuous optimization followed by one final projection | every retained candidate is projected, quantized, and re-evaluated on the victim |
+| only named p25/p50/p75 budget runs | named p50/p75 runs plus an evaluated envelope-only `unbounded` condition in the full paired driver |
+| MLP/CNN sweep artifacts | paired MLP/CNN/FT-Transformer artifacts with one frozen clean-correct roster per victim/class |
 
----
+The old and current joint/timing results differ in both optimizer and timing
+parameterization. **Padding-only** comparisons isolate the optimizer change because
+the padding primitive and its canonical map are shared.
 
-## 2.1 One sample end-to-end
+## 2.2 Source map
 
-Trace of a single source flow `x₀` (raw/pristine 79-vector), for one
-(class, victim, budget, mode, seed) cell (`run :302-491`):
+| Concern | Current source |
+|---|---|
+| Dataset-agnostic primitive contracts, roles, capabilities, packet-backend interface | `src/attack/realizability/base.py` |
+| CICFlowMeter primitive specifications, capabilities, bounds, projection, and canonical transform | `src/attack/realizability/cicids2017.py` (`CICIDS2017PrimitiveModel`) |
+| Quantization-aware candidate search | `src/attack/primitive_optimizer.py` (`optimize_primitive_candidates`) |
+| Internal transform-consistency checks | `src/attack/realizability/validator.py` (`RealizabilityValidator`) |
+| Train-only budget fitting/loading | `src/attack/primattack_budget.py` |
+| Flow-level semantic-preservation proxy | `src/attack/flow_semantics.py` |
+| Standalone CICIDS2017 runner and detailed NPZ audit record | `src/attack/run_cicids2017_primitive_attack.py` |
+| Canonical paired campaign driver | `scripts/run_full_adversarial_eval.py` |
+| Same-box primitive CAPGD comparison | `src/comparisons/primitive_capgd.py` |
+| Optimizer regression tests | `src/attack/tests/test_primitive_optimizer.py` |
+| Transform, projection, and realizability tests | `src/attack/tests/test_primattack_transformation.py`, `src/attack/tests/test_primitive_controls.py` |
 
-1. **Clean-correct eligibility** — victim must classify the *clean* flow correctly:
-   `clean_correct = victim(scale(x₀)).argmax == class_id` (`evaluate_cell :164`).
-   ASR denominators use only eligible rows.
-2. **Capability inference** — `infer_capabilities(x₀)` (`:292-336`) decides per-flow
-   whether `p` and `α` are *semantically admissible* (below).
-3. **Per-flow hard bounds** — `per_flow_bounds(x₀, class_cfg, caps)` (`:349-433`)
-   returns `p_hi, α_hi` (the feasible box), intersecting the class budget, the
-   global-train p99 envelope, and (DoS/DDoS) a minimum-rate cap; capability gates
-   force unsupported primitives to identity.
-4. **Mode masking** — `_apply_primitive_mode` (`:123-135`) zeroes `p` (timing-only) or
-   pins `α=1` (padding-only); `joint` keeps both.
-5. **Optimization variables** — two unconstrained leaves `u, v`; controls via sigmoid.
-6. **Attack loop** — `optimize_primitives` (`:65-106`): Adam over `u,v`, targeted-Benign
-   cross-entropy + primitive-cost penalty; φ is applied every step (differentiable,
-   `quantize=False`).
-7. **Projection / quantization** — `project_controls` (`:494-520`) then
-   `generate(..., quantize=True)` (`:523-624`) → final integer-consistent adversarial
-   raw vector `x_adv`.
-8. **Frozen-feature assertion** — features φ does not write must equal x₀ within
-   `SCALER_ATOL=1e-6` (`run :345-350`).
-9. **Victim evaluation** — targeted success `adv_pred==0(Benign)`, evasion
-   `adv_pred≠class_id` (`evaluate_cell :155-166`).
-10. **validator_v2** — `structural_masks(x_adv)` → `hybrid_valid` (doc 3).
-11. **Primitive feasibility** — `FlowSemanticValidator.evaluate(...).primitive_feasible`
-    ∧ internal transform consistency (`run :368-374`).
-12. **Semantic proxy** — `semantic_status ∈ {PASS, FAIL, NOT_FULLY_TESTABLE}` (doc 6).
-13. **Metrics + npz** — nested ASRs + full per-sample audit written to
-    `attack_artifacts/<class>_<victim>_seed<seed>.npz` (`run :408-491`).
+`CICIDS2017PrimitiveModel` takes feature positions from the dataset
+`FeatureManifest`; it does not define a second feature order. The model can also
+consume the CSE-CIC-IDS-2018 DistriNet manifest because that dataset has the same
+extractor layout, but the results discussed here are the completed
+CICIDS2017-DistriNet campaign.
 
----
+## 2.3 Threat model and attack goal
 
-## 2.2 Padding primitive `p`
+- **Knowledge:** white-box access to the frozen category victim, preprocessing
+  transform, primitive map, train-fitted calibration, and validation rules.
+- **Source rows:** malicious test flows from `DoS`, `DDoS`, `Recon`, and
+  `BruteForce`.
+- **Eligibility:** the victim must classify the clean row as its true malicious
+  category.
+- **Target:** category id `0` (`Benign`).
+- **Allowed operations:** forward length augmentation and forward delay only.
+- **Forbidden operations:** shortening packets, accelerating traffic, adding/removing
+  packets, changing backward traffic, ports, protocol, endpoints, flags, labels, or
+  arbitrary aggregate features.
+- **Primary success:** `adv_pred == Benign`, then success is successively gated by
+  validator_v2 validity, primitive feasibility, and the semantic proxy.
+- **Realism:** the per-class VAE Mahalanobis IDR gate is reported separately. It is not
+  part of structural validity or primitive feasibility.
 
-- **Physical meaning**: uniform **forward packet-length augmentation** — add `p` bytes
-  to *every* forward packet's length (a feature-level model of forward padding: MSS
-  padding / filler). Docstring `cicids2017.py:5-9`.
-- **Units**: `bytes_per_forward_packet`, `dtype = discrete_integer`
-  (`PrimitiveSpec`, `:149-164`).
-- **Direction**: `increase_only`; `identity = 0`; `absolute_lower_bound = 0`; no fixed
-  upper bound (bounded per-flow). Padding can never shorten packets.
-- **Capability mask** (`infer_capabilities :313-315`): `pad_allowed = (Total Fwd Packet
-  ≥ 1) ∧ (Total Length of Fwd Packet > 0) ∧ (Fwd Packet Length Mean > 0)`. A flow with
-  zero forward payload (e.g. a single-SYN Recon probe) has nothing to pad →
-  `p_hi = 0`. Reason codes `PAD_ALLOWED / NO_FORWARD_PAYLOAD / INSUFFICIENT_FWD_PACKETS`.
-- **Legal range**: `0 ≤ p ≤ p_hi` where (`per_flow_bounds :372-381`)
-  `p_hi = min( env_headroom_maxlen, env_headroom_minlen, env_headroom_meanlen,
-  (env_TL_fwd − TL_fwd)/N_f ) clamped to [0, p_max]`, then ×`pad_allowed`.
-  Envelopes are global-train p99 of the relevant length features; `p_max` is the class
-  budget (below).
-- **Integer projection** (`project_controls :513-518`): `p ← min(round(p),
-  floor(p_hi))`, clamped ≥0, forced to 0 where `¬pad_allowed`.
-- **Every feature p writes** (`generate :547-610`, roles `:198-211`):
-  Total Length of Fwd Packet, Fwd Packet Length {Min,Max,Mean}, Fwd Segment Size Avg,
-  Packet Length {Min,Max,Mean,Variance,Std}, Average Packet Size, and (via totals)
-  Flow Bytes/s. **Fwd Packet Length Std is PROVEN-invariant** under a uniform shift.
+The direct attack loads the per-class Stage-A VAE only to compute the IDR mask. The
+VAE is **not** in PrimAttack's generation or gradient path.
 
-### Exact padding recomputation (`generate`)
-Let `N_f = Total Fwd Packet`, and subscript 0 = source value.
-```
-TL_fwd      = TL_fwd0 + N_f · p                    # accumulator (:548)
-fmin        = fmin0 + p ;  fmax = fmax0 + p        # uniform shift (:549-550)
-fmean       = TL_fwd / N_f                          # exact (:553)
-Fwd Seg Size Avg = fmean                            # extractor identity (:559)
-fstd        = fstd0                                 # shift-invariant (:554)
-# combined fwd+bwd length stats (:587-610), N = N_f+N_b, has_f/has_b = direction present
-Packet Length Max = ext(fmax, bwd_max) ;  Packet Length Min = ext(fmin, bwd_min)
-Packet Length Mean = (TL_fwd + TL_bwd)/N ;  Average Packet Size = Packet Length Mean
-Packet Length Variance = pooled_sample_variance(N_f,fmean,fstd ; N_b,bmean,bstd)  # (:597-603)
-Packet Length Std = sqrt(Variance)
-Flow Bytes/s = (TL_fwd + TL_bwd) / (duration_us/1e6)   # (:618-621)
-```
-`ext(...)` is the direction-branching min/max (`:591-594`). Pooled variance uses the
-exact between+within decomposition (`:599-603`).
+## 2.4 End-to-end data flow
 
----
+The current paired driver follows this path for each `(victim, class)`:
 
-## 2.3 Timing primitive `α`
-
-- **Physical meaning**: uniform **forward inter-arrival timing dilation** — stretch
-  every forward IAT gap by `α` (delay only). Docstring `:10-12`.
-- **Units**: `dimensionless_ratio`, `dtype = continuous`.
-- **Direction**: `increase_only`; `identity = 1`; `absolute_lower_bound = 1`. `α ≥ 1`
-  can never compress a flow, so duration stays positive and rates finite.
-- **Capability mask** (`:317-319`): `timing_allowed = (Total Fwd Packet ≥ 2) ∧
-  (Fwd IAT Total > 0)` — a forward IAT sequence must exist and be non-zero. Reason
-  codes `TIMING_ALLOWED / SINGLE_FWD_PACKET / ZERO_TIMING_HEADROOM`.
-- **Legal range**: `1 ≤ α ≤ α_hi` where `α_hi` is the min (`per_flow_bounds :383-421`) of
-  - relative-duration cap `1 + B_D · Duration/Fwd IAT Total` (`B_D` = class timing budget),
-  - per-feature envelope caps `env_{Fwd IAT Total,Max,Std,Mean}/current`,
-  - a duration-envelope cap `(env_Flow Duration − Duration)/Fwd IAT Total + 1`,
-  - **(DoS/DDoS only)** a minimum-rate cap: duration may not grow past
-    `N·1e6/min_flow_packets_per_second` (`:409-420`),
-  then ×`timing_allowed` (else 1).
-- **Projection** (`:516`): `α ← min(α, α_hi)`, clamped ≥1; integer microsecond fields
-  quantized by `generate(quantize=True)`.
-- **Every feature α writes** (`generate :561-617`, roles `:212-223`):
-  Fwd IAT {Total,Mean,Std,Max,Min}, Flow Duration, Flow IAT Mean, Flow IAT Max,
-  Flow Bytes/s, Flow Packets/s, Fwd Packets/s, Bwd Packets/s.
-
-### Exact timing recomputation (`generate`)
-```
-fit   = α · fit0                                   # Fwd IAT Total (:563)
-fimax = α · fimax0 ; fimin = α · fimin0            # (:564)
-fistd = α · fistd0                                 # scale-equivariant (:565)
-dur   = Duration0 + (fit − fit0)                   # conservative delay projection (:567)
-dur   = max(dur, fit, Bwd IAT Total)  ≥ dur_floor_us (=1µs)   # (:568-569)
-Flow IAT Max = Flow IAT Max0 + max(dur − Duration0, 0)        # added delay → largest gap (:571)
-fimean = fit / max(N_f − 1, 1)                     # Fwd IAT Mean (:576)
-Flow IAT Mean = dur / max(N − 1, 1)                # (:577)
-dur_s = max(dur,·)/1e6
-Fwd Packets/s = N_f/dur_s ; Bwd Packets/s = N_b/dur_s ; Flow Packets/s = N/dur_s   # (:615-617)
-Flow Bytes/s  = (TL_fwd+TL_bwd)/dur_s                                              # (:618-621)
-```
-**Timing assumptions** made explicit in the docstring (`:28-34`): Flow Duration under
-dilation is a *conservative packet-sequence projection* (all added forward delay
-extends the flow); Flow IAT Max grows by the same delay so `mean ≤ max ≤ duration`
-stays exact. Both are labelled **CONDITIONAL_DERIVED / Level-C-approximate**.
-
----
-
-## 2.4 φ(x₀, p, α): per-feature map
-
-`generate` (`:523-624`) writes only rows where the primitive is active
-(`padding_rows = p≠0`, `timing_rows = α≠1`); rows with `p=0 ∧ α=1` are returned as an
-exact copy (`identity_rows`, `:624`). Every write is differentiable except the optional
-`round` under `quantize=True`.
-
-| Feature | Primitive | Original inputs | Equation | Differentiable? | Projection |
-|---|---|---|---|---|---|
-| Total Length of Fwd Packet | p | TL_fwd0, N_f, p | `TL_fwd0 + N_f·p` | yes | round (quantize) |
-| Fwd Packet Length Min/Max | p | min0/max0, p | `+ p` | yes | round |
-| Fwd Packet Length Mean | p | TL_fwd, N_f | `TL_fwd/N_f` | yes | — |
-| Fwd Segment Size Avg | p | Fwd Pkt Len Mean | `= mean` (EXT identity) | yes | — |
-| Fwd Packet Length Std | p | — | **invariant** (unchanged) | n/a | — |
-| Packet Length Min/Max | p | fwd±p, bwd | direction-branched ext | yes | round (len) |
-| Packet Length Mean / Average Packet Size | p | TL_fwd,TL_bwd,N | `(TL_fwd+TL_bwd)/N` | yes | — |
-| Packet Length Variance / Std | p | N_f,fmean,fstd,N_b,… | pooled sample variance | yes | — |
-| Fwd IAT Total | α | fit0 | `α·fit0` | yes | round |
-| Fwd IAT Max/Min | α | fimax0/fimin0 | `α··` | yes | round |
-| Fwd IAT Std | α | fistd0 | `α·fistd0` | yes | — |
-| Fwd IAT Mean | α | fit, N_f | `fit/(N_f−1)` | yes | — |
-| Flow Duration | α | Dur0, fit−fit0, bwd | `Dur0+(fit−fit0)`, floored | yes | round |
-| Flow IAT Mean | α | dur, N | `dur/(N−1)` | yes | — |
-| Flow IAT Max | α | Flow IAT Max0, Δdur | `+ max(Δdur,0)` | yes | round |
-| Fwd/Bwd/Flow Packets/s | α | counts, dur | `count/dur_s` | yes | — |
-| Flow Bytes/s | p, α | TL_fwd+TL_bwd, dur | `bytes/dur_s` | yes | — |
-
-Roles enum (`base.py FeatureRole`): `DERIVED_P (Dp)`, `DERIVED_T (Dt)`, `DERIVED (D)`,
-`CONDITIONAL (C)`, `RATE (R)`, `INVARIANT (I)`, `FROZEN (F)`, `LEVEL_C (Fᶜ)`.
-
-### Frozen / immutable / held-constant features
-- **Frozen (F)** — genuinely unaffected (ports, protocol, packet counts, flags, header
-  lengths, backward-length stats, Init-Win bytes, …): `frozen_idx` = every column φ does
-  not write (`:112`); asserted unchanged post-attack (`run :345-350`).
-- **Invariant (I)** — Fwd Packet Length Std, *proven* unchanged under a uniform shift.
-- **Level-C held-constant (Fᶜ)** (`roles :224-235`): **UNRESOLVED** features that *would*
-  change under real packet edits but are **not reconstructable from aggregate flow**, so
-  held constant and flagged (never fabricated): `Fwd Act Data Pkts` (p is length
-  augmentation, *not* asserted payload insertion), `Subflow Fwd Bytes`,
-  `Fwd {Bytes,Packet,Bulk Rate}/Bulk Avg`, `Flow IAT Std`, `Flow IAT Min`, and all
-  Active/Idle {Mean,Std,Max,Min}.
-
-**Assumptions these introduce**: holding Fᶜ constant means the adversarial vector is
-*internally CICFlowMeter-consistent* but not *packet-trace-consistent* — real padding
-would move `Fwd Act Data Pkts`/subflow/bulk/active-idle; these are the explicit
-Level-C limitations. Duration and Flow-IAT-Max effects are conservative projections,
-not derived from the merged packet order (which the aggregate row does not contain).
-
----
-
-## 2.5 Optimization
-
-### Variables `u, v` and the sigmoid parameterization (`optimize_primitives :65-106`)
-Two unconstrained scalar leaves per flow, initialized `u,v = −2 + 0.5·𝒩(0,1)`
-(`init_noise=0.5`, seeded generator). Controls are mapped into the **hard per-flow box**
-so gradients are unconstrained but outputs are always feasible:
-```
-p(u)  = p_hi · σ(u) · 1[pad_allowed]
-α(v)  = 1 + (α_hi − 1) · σ(v) · 1[timing_allowed]
-```
-`σ` = logistic sigmoid. Initializing at `−2` makes `σ(−2)≈0.12`, i.e. attacks start
-near identity (small perturbation) and grow only if it helps.
-
-### Objective (Adam / C&W-style) (`:92-103`)
-Per-flow loss, minimized by **Adam** over `[u,v]`:
-```
-L = CE( victim( (φ(x₀,p(u),α(v)) − center)/scale ), target=Benign )
-    + cost_weight · ( σ(u)·1[pad] + σ(v)·1[timing] )
-```
-- **Targeted cross-entropy** toward class 0 (Benign) — this is a *targeted→Benign*
-  attack (`target = zeros`, `:81`).
-- **Primitive-cost penalty** `cost_weight·(σ(u)+σ(v))` (default `cost_weight=0.01`)
-  discourages large primitives — the C&W-style trade-off term, here on the *normalized*
-  primitive magnitude rather than an L₂ norm.
-- `loss.sum().backward(); optimizer.step()` for `steps=40` iterations, `lr=0.1`
-  (the committed sweep values).
-
-### Gradient flow / where gradients stop
-- Gradients flow: `u,v → σ → p,α → φ (generate) → scaler → victim logits → CE`. All of
-  φ's writes are differentiable; the victim is frozen (`requires_grad_(False)`) but
-  **input gradients pass through** (`cicids2017d_victims.load_category_victim`).
-- Gradients **stop** at: the discrete `round` (only applied at projection/quantization,
-  *outside* the loop, `quantize=False` during optimization); the capability masks
-  (constant 0/1 multipliers); and the per-flow bounds `p_hi, α_hi` (precomputed
-  constants). The identity-row `torch.where` (`:624`) also blocks gradient on no-op rows.
-
-### Discrete projection (after the loop)
-```
-requested = {p(u), α(v)}                      # continuous, in-box
-projected = project_controls(x₀, requested, bounds)   # p←min(round(p),floor(p_hi)); α←min(α,α_hi)
-x_adv     = generate(x₀, projected, quantize=True)    # integer µs / byte fields rounded
-```
-Success is then **re-evaluated on the projected, quantized vector** — the reported ASR
-reflects realizable integer primitives, not the continuous relaxation.
-
-### One-iteration pseudocode
-```
-for t in 1..steps:
-    p   = p_hi * sigmoid(u) * pad_active
-    a   = 1 + (a_hi - 1) * sigmoid(v) * timing_active
-    xadv = generate(x0, {p, a}, quantize=False)      # φ, differentiable
-    logits = victim((xadv - center) / scale)
-    loss = CE(logits, Benign) + cost_weight*(sigmoid(u)*pad_active + sigmoid(v)*timing_active)
-    u,v <- Adam.step(∇_{u,v} loss.sum())
-# after loop:
-p,a  = project_controls(x0, {p_hi*σ(u)*pad, 1+(a_hi-1)*σ(v)*timing}, bounds)
-xadv = generate(x0, {p,a}, quantize=True)
+```text
+full malicious test rows
+  -> victim(clean scaled row)
+  -> retain clean-correct rows
+  -> freeze at most N row IDs and their order
+  -> infer per-row primitive capabilities once
+  -> build per-row hard bounds from train-only calibration
+  -> apply mode: joint | timing-only | padding-only
+  -> search or random-feasible control
+  -> project p and delay to the integer hard box; clamp shape
+  -> phi(x0, projected controls, quantize=True)
+  -> victim + validator_v2 + internal realizability + IDR + semantic proxy
+  -> one per-cell NPZ containing per-row arrays and one cell summary
 ```
 
-### Worked numerical example (padding + timing, illustrative)
-Source BruteForce flow: `N_f=5, TL_fwd0=300, mean0=60, min0=40, max0=100,
-Fwd IAT Total0=1000µs, Flow Duration0=2000µs, N_b=0`. Suppose the optimizer settles on
-`p=10, α=1.1` (within a maximum-evaluated BruteForce box `p_max=91`, `B_D=0.2337`):
+The current `scripts/run_full_adversarial_eval.py` default is a seeded uniform sample
+from **all** clean-correct rows (`--selection random --selection-seed 42`). This avoids
+using a chronological/source-label head slice. `--selection head` retains the older
+selection behavior. In either case, `selection.json` stores positional indices,
+`sample_id`s, source-label composition, and a SHA-256; every attack and seed receives
+the same rows in the same order within a victim/class.
+
+The standalone runner is useful for focused experiments, but its selection procedure
+is different: `_class_rows` first samples rows by true class, then `clean_correct`
+defines the denominator inside that sample. Use the full paired driver for cross-method
+claims.
+
+For one PrimAttack cell:
+
+1. `infer_capabilities(x0)` determines whether each physical operation is supported by
+   the source row.
+2. `per_flow_bounds(x0, class_config, capabilities)` intersects class budget,
+   train-p99 envelope headroom, capability gates, and any DoS/DDoS rate floor.
+3. `_apply_primitive_mode` zeroes the irrelevant **upper bounds** for timing-only or
+   padding-only ablations.
+4. `optimize_primitive_candidates` searches the realized integer attack, or
+   `random_feasible_primitives` supplies the control condition.
+5. `project_controls` produces legal controls.
+6. `generate(..., quantize=True)` produces the final raw 79-vector.
+7. The raw vector is transformed by the training-fitted scaler and passed to the
+   victim.
+8. Structural validity, internal consistency, IDR, primitive feasibility, and semantic
+   status are computed independently.
+
+## 2.5 Primitive contracts
+
+### 2.5.1 Padding `p`
+
+`p` is uniform forward packet-length augmentation.
+
+| Property | Contract |
+|---|---|
+| Units | bytes per forward packet |
+| Type | discrete integer after projection |
+| Identity | `0` |
+| Direction | increase only |
+| Absolute range | `[0, +inf)` before per-flow bounds |
+| Capability | at least one forward packet, positive total forward length, and positive forward mean length |
+| Disabled reasons | `NO_FORWARD_PAYLOAD` or `INSUFFICIENT_FWD_PACKETS` |
+| Projection | `min(round(max(p,0)), floor(p_hi))`, then capability mask |
+
+The capability check is:
+
+$$
+m_p =
+[N_f \ge 1]
+\land [L_f > 0]
+\land [\bar l_f > 0].
+$$
+
+If it fails, `p_hi=0` before the optimizer sees the row. A zero-payload SYN-like flow
+is therefore not treated as paddable merely because a numeric envelope has headroom.
+
+The numeric upper bound is:
+
+$$
+\begin{aligned}
+p_{\mathrm{hi}}=\min\{&
+E_{\mathrm{fwd,max}}-\mathrm{fwdmax}_0,\;
+E_{\mathrm{fwd,min}}-\mathrm{fwdmin}_0,\\
+&E_{\mathrm{fwd,mean}}-\mathrm{fwdmean}_0,\;
+(E_{\mathrm{TL,fwd}}-L_{f,0})/\max(N_f,1),\;
+p_{\max}\},
+\end{aligned}
+$$
+
+clamped below at zero and multiplied by the capability mask. Every `E` value is a
+global-training p99 upper envelope; `p_max` comes from the selected class budget.
+
+For projected `p`, the canonical map computes:
+
+```text
+Total Length of Fwd Packet = TL_fwd0 + N_f * p
+Fwd Packet Length Min      = min0 + p
+Fwd Packet Length Max      = max0 + p
+Fwd Packet Length Mean     = TL_fwd / max(N_f, 1)
+Fwd Segment Size Avg       = Fwd Packet Length Mean
+Fwd Packet Length Std      = unchanged
 ```
-TL_fwd = 300 + 5·10 = 350 ;  mean = 350/5 = 70 ; min = 50 ; max = 110 ; std unchanged
-Fwd IAT Total = 1.1·1000 = 1100 ;  Fwd IAT Mean = 1100/4 = 275
-Flow Duration = 2000 + (1100−1000) = 2100 ;  Flow IAT Mean = 2100/4 = 525
-Flow IAT Max += (2100−2000) = +100
-Fwd Packets/s = 5 / (2100/1e6) = 2380.95 ;  Flow Bytes/s = 350 / 0.0021 = 166 666.7
+
+A uniform shift preserves the forward-length standard deviation. Combined packet
+length min/max branch on whether each direction is present. Combined mean uses total
+forward plus backward bytes. Combined variance uses the exact pooled sample-variance
+decomposition from forward/backward counts, means, and standard deviations. Packet
+Length Std is the square root of that variance. `Flow Bytes/s` is then recomputed from
+the updated byte total and projected duration.
+
+### 2.5.2 Total forward delay `delay`
+
+`delay` is the total number of microseconds added across the forward IAT sequence.
+
+| Property | Contract |
+|---|---|
+| Units | total microseconds of additional forward delay |
+| Type | discrete integer after projection |
+| Identity | `0` |
+| Direction | increase only |
+| Capability | at least two forward packets and positive `Fwd IAT Total` |
+| Disabled reasons | `SINGLE_FWD_PACKET` or `ZERO_TIMING_HEADROOM` |
+| Projection | `min(round(max(delay,0)), floor(delay_hi))`, then capability mask |
+
+The timing capability is:
+
+$$
+m_t=[N_f\ge2]\land[T_f>0].
+$$
+
+If it fails, both `delay_hi` and `shape_hi` become zero.
+
+### 2.5.3 Delay allocation `shape`
+
+`shape` does not create more delay. It allocates the selected total:
+
+- `shape=0`: proportional dilation of existing forward gaps;
+- `shape=1`: equal additive delay for every forward gap;
+- `0<shape<1`: affine mixture of both endpoints.
+
+For $m=\max(N_f-1,1)$ gaps with original total $T_f$:
+
+$$
+a=1+(1-\mathrm{shape})\frac{\mathrm{delay}}{T_f},
+\qquad
+b=\mathrm{shape}\frac{\mathrm{delay}}{m},
+$$
+
+$$
+g_i'=a g_i+b.
+$$
+
+Therefore:
+
+$$
+\sum_i g_i'=T_f+\mathrm{delay}.
+$$
+
+Both endpoints add delay only and preserve gap order because `a >= 1` and `b >= 0`.
+`shape` is clamped to `[0,1]`, capped by `shape_hi`, and forced to zero whenever the
+projected delay is zero.
+
+The timing recomputation is:
+
+```text
+Fwd IAT Total = fit0 + delay
+Fwd IAT Max   = a * fimax0 + b
+Fwd IAT Min   = a * fimin0 + b
+Fwd IAT Std   = a * fistd0
+Fwd IAT Mean  = Fwd IAT Total / max(N_f - 1, 1)
+
+Flow Duration = max(duration0 + delay,
+                    Fwd IAT Total,
+                    Bwd IAT Total,
+                    1 microsecond)
+Flow IAT Mean = Flow Duration / max(N_f + N_b - 1, 1)
+Flow IAT Max  = Flow IAT Max0 + max(Flow Duration - duration0, 0)
+
+Fwd Packets/s  = N_f / duration_seconds
+Bwd Packets/s  = N_b / duration_seconds
+Flow Packets/s = (N_f + N_b) / duration_seconds
+Flow Bytes/s   = (TL_fwd + TL_bwd) / duration_seconds
 ```
-Relative duration change = 100/2000 = 0.05 ≤ 0.2337 (feasible). Represented bytes rose
-(350>300) → `TRAFFIC_VOLUME_DECREASED` passes. Ports/counts/flags unchanged (frozen).
 
----
+`Flow Duration` and `Flow IAT Max` are conservative aggregate projections. The merged
+forward/backward packet order is absent, so they are not claimed as exact packet-trace
+re-extractions.
 
-## 2.6 "Original / non-budget" vs budgeted PrimAttack
+## 2.6 Hard per-flow timing bounds
 
-**Finding (discrepancy):** there is **no separate committed "original / non-budget"
-PrimAttack experiment.** `run(...)` always requires
-`budget_name ∈ {restricted, intermediate, maximum-evaluated}` and always applies a
-calibrated hard box; "original" in the source docs means the *original source flow*
-x₀. See `00_OPEN_ISSUES.md#A2`.
+`delay_hi` is the minimum of:
 
-What differs across the (existing) conditions is **only the size of the feasible box**,
-via two knobs consumed by `per_flow_bounds`:
-- `p_max` — the class padding budget (caps `p_hi`),
-- `max_relative_duration_change = B_D` — the class timing budget (caps `α_hi` via
-  `1 + B_D·Duration/Fwd IAT Total`).
+1. named relative-duration budget
+   `max_relative_duration_change * max(Flow Duration, 1us)`;
+2. global train-p99 headroom for `Fwd IAT Total`;
+3. `gaps *` global train-p99 headroom for `Fwd IAT Mean`;
+4. global train-p99 headroom for `Flow Duration`;
+5. `Fwd IAT Max` headroom divided by the worst allocation coefficient
+   `max(Fwd IAT Max / Fwd IAT Total, 1/gaps)`;
+6. `Fwd IAT Std` headroom divided by its proportional-allocation coefficient; and
+7. for DoS/DDoS, the delay allowed before `Flow Packets/s` falls below the
+   class-training p05.
 
-| Condition | `p_max` | `B_D` | Feasible box |
-|---|---|---|---|
-| restricted | train p25 | train p25 | smallest |
-| intermediate | train p50 | train p50 | medium |
-| maximum-evaluated | train p75 | train p75 | **largest evaluated** |
-| *hypothetical non-budget* | ∞ (→ envelope p99 only) | large | bounded only by global-train p99 envelope + capability + (DoS/DDoS) rate cap |
+The max/std terms use the worst coefficient over every `shape in [0,1]`. Consequently,
+the returned `delay x shape` rectangle is intended to be feasible without a soft
+constraint penalty. `Fwd IAT Min` needs no separate upper cap because it cannot exceed
+the bounded maximum under the affine order-preserving map.
 
-**Why an unbudgeted attack could have much higher valid ASR:** removing `p_max`/`B_D`
-lets `p_hi`/`α_hi` grow to the p99 envelope, so the sigmoid range widens and the
-optimizer can push far larger padding/dilation — more classifier movement toward
-Benign. Crucially, **validity is preserved regardless of box size** (φ keeps the
-CICFlowMeter algebra intact and validator_v2 rejected *none* of the classifier
-successes even at maximum budget), so any extra raw evasion would also be *valid*
-evasion. The budget therefore trades attacker success for a *defensible, train-derived
-plausibility bound*. The historically high ASRs in the archive were against the
-**retired LSTM/serial** victims, not the current MLP/CNN (see `00_OPEN_ISSUES.md#C13`).
+`per_flow_bounds` returns semantic bounds (`p`, `delay`, `shape`) and pre-capability
+numeric bounds (`p_numeric`, `delay_numeric`, `shape_numeric`) for auditability.
 
-**Measured budgeted results** (`docs/primattack_budget_results.md`, mlp+cnn, seed 42,
-512 rows/class, pooled N=4064): timing-only 0/4064 at every budget; padding-only and
-joint 10/4064 raw=valid=feasible (0.25%) *only* at maximum-evaluated, **SP-ASR 0**
-(all 10 are BruteForce, `NOT_FULLY_TESTABLE`). Budgeted PrimAttack essentially does
-not evade the current victims.
+## 2.7 Canonical feature map and role system
 
----
+`generate` starts with `raw.clone()` and writes only declared dependencies on rows where
+the relevant projected control is non-identity. If both `p=0` and `delay=0`, it returns
+the source row exactly.
 
-## 2.7 Budget calibration (`primattack_budget.py`)
+| Role | Meaning | Examples |
+|---|---|---|
+| `DERIVED_P` (`Dp`) | exact padding-derived value | forward and combined length statistics |
+| `DERIVED_T` (`Dt`) | exact affine-timing-derived value | forward IAT summaries |
+| `DERIVED` (`D`) | other exact algebraic derivation | reserved role in the generic contract |
+| `CONDITIONAL` (`C`) | branch-dependent or conservative reconstruction | combined min/max, duration, Flow IAT Max |
+| `RATE` (`R`) | count/bytes over projected duration | bytes/s and packet rates |
+| `INVARIANT` (`I`) | mathematically unchanged | Fwd Packet Length Std under uniform padding |
+| `FROZEN` (`F`) | genuinely unaffected by allowed operations | ports, protocol, counts, flags, backward-only fields |
+| `LEVEL_C` (`F^C`) | would require packet sequence/re-extraction; held constant, not claimed invariant | subflow, bulk, active/idle, merged Flow IAT Std/Min |
 
-- **Training-only** (`calibrate :152-287`): reads `X_train_pristine.npy` +
-  `y_train_cat.npy` only; `load_calibration` asserts `fit_split=="train"`
-  (`:301-302`). `selection_prohibited_inputs` explicitly bars val/test features,
-  victim predictions, and adversarial success (`:258-263`).
-- **Budget levels = training quantiles** (`_LEVEL_QUANTILES :21`):
-  restricted=p25, intermediate=p50, maximum-evaluated=p75.
-- **Padding statistic** (`_padding_population :131-137`): population = *positive*
-  `Fwd Packet Length Mean` over class rows with forward payload;
-  `padding_bytes_per_forward_packet = round(quantile(pop, q))` (`_rounded_empirical_budget
-  :146-149`) — discrete bytes, rounded to nearest legal byte, **not** derived from an
-  MTU constant or from attack success.
-- **Timing statistic** (`_relative_duration_variation :140-143`): population =
-  `|Flow Duration − median| / median` over class rows; `max_relative_duration_change =
-  quantile(pop, q)`.
-- **Per-class** for DoS/DDoS/Recon/BruteForce; also stores a **global-train p99
-  envelope** per length/timing feature (`_ENVELOPE_FEATURES`, `:165-168`) shared across
-  classes to keep budgets comparable and avoid a class-local structural zero acting as a
-  physical ceiling.
-- **Semantic thresholds** (`:241-251`): class-train p05 `Flow Packets/s` and
-  `Flow Bytes/s` (lower), p99 `Flow Duration` (upper), `rate_retention_required` =
-  class∈{DoS,DDoS}, and a `critical_not_testable` list for Recon/BruteForce.
+The explicit `LEVEL_C` set includes:
 
-### Frozen calibrated budgets (`artifacts/primattack/budget_calibration.json`)
-`padding bytes / max relative duration change`:
+- `Fwd Act Data Pkts`;
+- `Subflow Fwd Bytes`;
+- forward bulk byte/packet/rate averages;
+- `Flow IAT Std` and `Flow IAT Min`; and
+- all Active/Idle mean/std/max/min fields.
 
-| Class (n train) | Restricted (p25) | Intermediate (p50) | Max-eval (p75) | rate-req | pps p05 |
-|---|---|---|---|---|---|
-| DoS (120,093) | 41 / 0.0427 | 47 / 0.5671 | 54 / 1.2682 | yes | 0.625 |
-| DDoS (66,568) | 2 / 0.2220 | 2 / 0.4353 | 3 / 0.6874 | yes | 1.065 |
-| Recon (111,311) | 2 / 0.0851 | 2 / 0.2128 | 10 / 0.5319 | no | 22 471.9 |
-| BruteForce (4,862) | 11 / 0.0617 | 12 / 0.1199 | 91 / 0.2337 | no | 2.848 |
+These held values are the main boundary between **aggregate algebraic consistency** and
+packet-level realizability. `NullPacketBackend.available()` is false, so Level-C
+verification is unavailable.
 
-**Why these are evaluation budgets, not physical realism:** they are *empirical
-quantiles of already-observed benign-vs-attack flow variation on the training split*,
-chosen so the attacker's edit stays within the range the dataset already exhibits. They
-bound how far the attack strays from the training distribution; they do **not** prove a
-packet-level attacker could realize exactly that padding/delay while preserving the
-attack. The calibration manifest itself notes: *"These are evaluated flow-level
-envelopes, not universal physical maxima."* (`:282-284`).
+When `quantize=True`, the transform rounds projected `p` and `delay` and the
+integer-valued fields it writes: forward/combined length extrema and totals, forward IAT
+total/extrema, flow duration, and flow IAT maximum. The internal validator independently
+checks discreteness on the complete data-mined integer feature set.
 
----
+## 2.8 Current optimizer
 
-## 2.8 PrimAttack variants (what's implemented; what's held constant)
+`optimize_primitive_candidates` searches the **realized attack**. Its differentiable
+relaxation supplies gradients, but candidate selection always uses
+`project_controls` followed by `generate(..., quantize=True)`.
 
-Two optimizers over the **same feasible box** (`OPTIMIZERS`, `:43`):
+### Targeted objective
 
-1. **`optimized`** (Adam / C&W-style) — `optimize_primitives`, §2.5. `method_id =
-   "primitive_direct"`.
-2. **`random-feasible`** (control) — `random_feasible_primitives :109-120`:
-   `p = p_hi·U(0,1)`, `α = 1+(α_hi−1)·U(0,1)`, seeded. `method_id = "primitive_random"`.
-   Committed at `outputs/primattack_random_control/` (older commit, MLP-only). Isolates
-   "does the optimizer help beyond random sampling inside the box?".
+For target class `0`:
 
-There is **no Prim-PGD** variant in the current code — the only gradient optimizer is
-the Adam/sigmoid one above. (Feature-space PGD/C&W are separate baselines, doc 8; VAE
-latent→primitive is a separate method, doc 9.)
+$$
+m(x)=\max_{k\ne0} z_k(x)-z_0(x).
+$$
 
-**Held constant across variants (fair comparison):** the primitive contract
-(`PrimitiveSpec`), φ (`generate`), capability inference, per-flow bounds, projection,
-quantization, the frozen-feature assertion, validator_v2, the semantic proxy, the
-victim checkpoints, and the eligible source rows (`source_id_consistency.json`:
-`identical_across_all_configurations = true`). Only `u,v` optimization vs uniform
-sampling differs.
+Lower is better. Actual success is tested with `argmax(logits) == 0`, not inferred from
+the sign of a relaxed loss.
 
----
+There is no cost term in the gradient objective. Hard bounds define feasibility.
+Per-row candidate selection is lexicographic:
 
-## 2.9 Assumptions · Limitations · Claims
+1. a targeted success replaces any failure;
+2. among successes, minimize
+   `p/p_hi + delay/delay_hi`;
+3. if success costs tie, use lower margin;
+4. among failures, use lower margin.
 
-**Assumptions**: (i) forward padding/timing are the attacker's only levers; (ii) aggregate
-flow features suffice to *define* feasibility; (iii) capability gates (forward payload,
-≥2 fwd packets) are the right admissibility evidence; (iv) conservative duration/IAT-Max
-projections are acceptable stand-ins for the unknown packet order.
+`shape` has no direct cost because it reallocates a fixed total delay.
 
-**Limitations**: Level-C features (Fwd Act Data Pkts, subflow, bulk, active/idle,
-Flow IAT Std/Min) are held constant, so realism at the packet level is unproven
-(`NullPacketBackend`); budgets are dataset-empirical, not physical; only p and α are
-modeled (no packet injection, no backward-direction edits, no flag changes); success is
-near-zero against the current victims.
+### Stage 1: identity
 
-**Can claim**: a principled, differentiable, validity-preserving primitive-domain
-attack with train-only calibrated hard budgets; every adversarial vector is
-CICFlowMeter-algebra-consistent and validator_v2-valid; a clean 4-level evaluation
-(evasion → validity → feasibility → semantic proxy) with full per-sample provenance.
+The exact no-op candidate `(0,0,0)` is projected, generated, quantized, and scored. It
+is the initial best candidate.
 
-**Must NOT claim**: packet-level realizability, PCAP validity, preserved malicious
-functionality, or that PrimAttack is a *high-success* evasion attack on MLP/CNN. Do not
-present a "non-budget PrimAttack" as an executed experiment.
+### Stage 2: exhaustive integer padding
+
+For each row, the search evaluates:
+
+$$
+p=1,2,\ldots,\lfloor p_{\mathrm{hi}}\rfloor,
+\qquad \mathrm{delay}=0,\quad \mathrm{shape}=0.
+$$
+
+Values are evaluated in increasing cost order. For `m` currently unresolved rows, the
+implementation batches `k=max(1,min(values_remaining,4096//m))` consecutive padding
+values into one victim call. In the completed campaign (`m <= 800`) this caps each
+call at 4096 candidate rows. A row leaves the sweep after its first targeted success
+or after exhausting its cap. This yields the minimum-padding successful padding-only
+attack wherever one exists; otherwise it retains the padding value with the lowest
+targeted margin.
+
+In timing-only mode `p_hi=0`, so this stage is only the identity.
+
+### Stage 3: adaptive projected refinement
+
+Only rows still unresolved after exhaustive padding and with
+`delay_hi >= 1 microsecond` enter this stage. Controls are normalized:
+
+$$
+q\in[0,1]^3,\qquad
+(p,\mathrm{delay},\mathrm{shape})
+=(p_{\mathrm{hi}}q_p,\mathrm{delay}_{\mathrm{hi}}q_d,
+\mathrm{shape}_{\mathrm{hi}}q_s).
+$$
+
+At each iteration:
+
+```text
+relaxed = phi(x0, controls(q), quantize=False)
+g       = gradient_q sum(targeted_margin(victim(scale(relaxed))))
+v       = 0.75 * v + g / max(mean(abs(g)), 1e-12)
+q       = clamp(q - step_size * sign(v), 0, 1)
+
+realized_controls = project_controls(controls(q))
+realized_candidate = phi(x0, realized_controls, quantize=True)
+score and commit the realized candidate
+```
+
+Every `max(5, steps // 4)` iterations, rows whose best realized margin has stalled
+halve their step size, return to their restart-best `q`, and clear momentum.
+
+- Restart 0 begins from the best identity/exact-padding control (`adaptive-clean`).
+- Later restarts begin from seeded uniform normalized controls
+  (`adaptive-random`).
+- Controls whose integer headroom is absent are pinned to zero.
+- Successful rows are not removed from adaptive iterations; the success-first,
+  lowest-cost selector still decides what survives.
+
+Defaults are `steps=40`, `learning_rate=0.1`, and `restarts=2`. The search records the
+winning source (`identity`, `exact-padding`, `adaptive-clean`, or
+`adaptive-random`), realized target margin, normalized cost, and victim forward/backward
+call counts. The seed only affects random restarts; identity, exact padding, and the
+clean restart are deterministic given the runtime/model.
+
+### Random-feasible control
+
+`random_feasible_primitives` draws three independent continuous `U(0,1)` fractions,
+multiplies them by `p_hi`, `delay_hi`, and `shape_hi`, then applies the same projection
+and quantized transform. Because `p` and `delay` are rounded afterward, this is uniform
+in the continuous pre-projection box, not exactly uniform over discrete integer values.
+It tests whether directed search improves over one random feasible candidate.
+
+## 2.9 Calibration and evaluated boxes
+
+`primattack_budget.calibrate` reads only `X_train_pristine.npy` and
+`y_train_cat.npy`. The frozen artifact records `fit_split="train"` and explicitly
+prohibits validation/test features, victim predictions, and adversarial success from
+budget selection.
+
+For each attack class:
+
+- padding reference population: positive class-conditional
+  `Fwd Packet Length Mean` on rows that pass the padding evidence check;
+- timing reference population:
+  `abs(Flow Duration - class_median) / class_median`;
+- `restricted`, `intermediate`, `maximum-evaluated`: empirical p25, p50, p75;
+- padding quantiles are rounded to the nearest legal byte;
+- a shared complete-training p99 feature envelope supplies physical/plausibility
+  headroom;
+- DoS/DDoS receive an additional class-training p05 `Flow Packets/s` floor.
+
+Frozen values in `artifacts/primattack/budget_calibration.json`:
+
+| Class (train n) | Restricted p25 (`p / relative duration`) | Intermediate p50 | Maximum-evaluated p75 | Rate floor required |
+|---|---:|---:|---:|---|
+| DoS (120,093) | `41 / 0.0427` | `47 / 0.5671` | `54 / 1.2682` | yes |
+| DDoS (66,568) | `2 / 0.2220` | `2 / 0.4353` | `3 / 0.6874` | yes |
+| Recon (111,311) | `2 / 0.0851` | `2 / 0.2128` | `10 / 0.5319` | no |
+| BruteForce (4,862) | `11 / 0.0617` | `12 / 0.1199` | `91 / 0.2337` | no |
+
+These are empirical evaluation budgets, not MTU limits or universal physical maxima.
+
+### Named budgets versus `unbounded`
+
+The standalone runner accepts only the three named calibrated budgets. The full paired
+driver additionally calls `unbounded_calibration`:
+
+```text
+p_max = +inf
+max_relative_duration_change = +inf
+```
+
+This removes the class p25/p50/p75 caps but retains:
+
+- the same train-p99 feature envelope;
+- per-flow capability gates;
+- exact integer projection;
+- and the DoS/DDoS minimum-rate floor.
+
+`unbounded` therefore means **envelope-only**, not unconstrained feature-space attack.
+It is an evaluated condition in `outputs/full_adv_eval_primattack_v2`, not a
+hypothetical one. It must not be described as compliant with a named empirical budget.
+The fully unconstrained comparison is input-space PGD/C&W, which does not use the
+primitive map.
+
+## 2.10 Validation, feasibility, semantics, and metrics
+
+The gates are deliberately separate.
+
+### Structural validity
+
+`validation.attack_interface.structural_masks` evaluates validator_v2:
+
+$$
+\mathrm{hybrid\_valid}
+=\mathrm{SCHEMA}\land\mathrm{EXTRACTOR}\land\mathrm{PROTOCOL}\land\mathrm{MINED}.
+$$
+
+The runner stores this as `domain_valid`. PrimAttack is designed to preserve many of
+these identities, but external validator acceptance is still measured rather than
+assumed.
+
+### Internal primitive consistency
+
+`RealizabilityValidator` independently checks:
+
+- declared algebraic dependencies;
+- packet-summary ordering/non-negativity;
+- timing ordering and totals;
+- non-negative rates;
+- integrality of integer-valued features; and
+- exact preservation of `FROZEN`, `INVARIANT`, and held `LEVEL_C` columns.
+
+This produces `primitive_transform_consistent`. It is not packet-level verification.
+
+### Primitive feasibility
+
+`FlowSemanticValidator` checks projected controls against per-row bounds, integer
+requirements, shape bounds, represented-byte monotonicity, and the selected relative
+duration budget. The reported primitive-feasible mask is:
+
+$$
+\mathrm{primitive\_feasible}
+=\mathrm{budget\_compliance}
+\land\mathrm{primitive\_transform\_consistent}.
+$$
+
+For `unbounded`, the relative-duration budget is infinite, but envelope and capability
+bounds still apply.
+
+### Flow-level semantic proxy
+
+Generic required checks preserve:
+
+- attack-label metadata;
+- protocol, source/destination ports, endpoints, and direction;
+- packet counts and TCP flag aggregates;
+- finite generated values;
+- non-decreasing represented traffic volume; and
+- the rule that only declared primitive dependencies may change.
+
+Class-specific checks are:
+
+- **DoS/DDoS:** adversarial `Flow Packets/s` must remain at or above the
+  class-training p05 absolute floor.
+- **Recon:** complete scanned-port set, scan order, and distinct attempt sequence are
+  unavailable from one aggregate row.
+- **BruteForce:** authentication attempts, credentials/payload semantics, and service
+  outcome are unavailable.
+
+The result is `PASS`, `FAIL`, or `NOT_FULLY_TESTABLE`. Recon/BruteForce rows remain in
+the denominator; they are never silently dropped to inflate SP-ASR.
+
+### Nested rates
+
+On one frozen clean-correct denominator:
+
+$$
+\mathrm{ASR}_{raw}
+\supseteq
+\mathrm{ASR}_{hybrid\ valid}
+\supseteq
+\mathrm{ASR}_{primitive\ feasible}
+\supseteq
+\mathrm{SP\mbox{-}ASR}.
+$$
+
+For targeted PrimAttack:
+
+```text
+raw              = targeted_success
+valid            = targeted_success & domain_valid
+primitive        = targeted_success & domain_valid & primitive_feasible
+SP-ASR           = targeted_success & domain_valid & primitive_feasible & semantic_PASS
+True-IDSR        = targeted_success & domain_valid & in_distribution
+```
+
+IDR is intentionally outside structural validity and outside SP-ASR.
+
+## 2.11 Runners and artifacts
+
+### Focused standalone run
+
+```powershell
+$Env:PYTHONPATH = "src"
+python -m attack.run_cicids2017_primitive_attack `
+  --classes DoS,DDoS,Recon,BruteForce `
+  --victims mlp,cnn,ft_transformer `
+  --budget maximum-evaluated `
+  --primitive-mode joint `
+  --optimizer search `
+  --steps 40 `
+  --learning-rate 0.1 `
+  --restarts 2 `
+  --seeds 42,123,2024 `
+  --output-dir outputs/primattack_calibrated
+```
+
+The output directory is required to be fresh. It contains:
+
+- `run_manifest.json`: source/config/checkpoint/scaler/manifest provenance;
+- `attack_results.json`: per-cell rates and cost summaries;
+- `attack_artifacts/<class>_<victim>_seed<seed>.npz`: detailed per-row audit.
+
+The standalone NPZ includes clean/adversarial raw vectors, scaled adversarial vectors,
+sample IDs, predictions/logits, requested and projected controls, bounds, capability
+reasons, candidate source/margin, validity and feasibility masks/reasons, semantic
+status/reasons, IDR, costs, changed features, and provenance hashes.
+
+### Canonical paired campaign
+
+To run only the current PrimAttack family with the current driver:
+
+```powershell
+$Env:PYTHONPATH = "src"
+python scripts/run_full_adversarial_eval.py `
+  --dataset cicids2017 `
+  --families primattack `
+  --budgets intermediate,maximum-evaluated,unbounded `
+  --modes joint,timing-only,padding-only `
+  --optimizers search,random-feasible `
+  --selection random `
+  --selection-seed 42 `
+  --seeds 42,123,2024
+```
+
+The full driver writes `config.json`, `selection.json`, `cells.json`,
+`failures.json`, and one artifact named
+`<victim>__<class>__<attack>__seed<seed>.npz`. `assert_pairing` reloads artifacts
+and fails if sample IDs, row order, or clean-correct eligibility differ within a
+victim/class.
+
+The full driver can also run `capgd_prim_p75`, an untargeted CAPGD optimizer over the
+same normalized `(p, delay, shape)` p75 joint box. The canonical transform, projection,
+quantization, and final validators remain unchanged, so this is an optimizer-control
+comparison rather than native feature-space CAPGD.
+
+## 2.12 Current measured behavior
+
+The committed v2 campaign is
+`outputs/full_adv_eval_primattack_v2`:
+
+- three victims: MLP, CNN, FT-Transformer;
+- four attack classes;
+- 800 frozen clean-correct rows per victim/class;
+- attack seeds `42, 123, 2024`;
+- p50, p75, and envelope-only boxes;
+- joint, timing-only, and padding-only modes;
+- search and random-feasible control;
+- 648 PrimAttack cells and no recorded failures.
+
+In those artifacts, domain validity and primitive feasibility are both 100% in every
+PrimAttack cell. This is an **observed result for this campaign**, not a universal
+guarantee of the transform.
+
+Reference-seed (`42`) class-pooled results, `N=3,200` per victim:
+
+| Victim | Condition | Valid targeted ASR | SP-ASR | True-IDSR |
+|---|---|---:|---:|---:|
+| MLP | search joint p50 | 4.19% | 4.09% | 0.00% |
+| MLP | search joint p75 | 6.28% | 6.19% | 0.00% |
+| MLP | search joint envelope-only | 23.22% | 18.38% | 0.00% |
+| CNN | search joint p50 | 12.31% | 7.56% | 0.03% |
+| CNN | search joint p75 | 34.91% | 10.97% | 0.06% |
+| CNN | search joint envelope-only | 57.66% | 24.78% | 0.09% |
+| FT-Transformer | search joint p50 | 5.03% | 0.22% | 0.00% |
+| FT-Transformer | search joint p75 | 5.19% | 0.22% | 0.00% |
+| FT-Transformer | search joint envelope-only | 5.44% | 0.22% | 0.00% |
+
+At p75, the random-feasible valid targeted rates were 1.50% (MLP), 5.56% (CNN),
+and 3.69% (FT-Transformer), versus 6.28%, 34.91%, and 5.19% for search.
+
+The replaced `(p, alpha)` Adam run in `outputs/full_adv_eval` produced p75 joint valid
+targeted rates of 0.16%, 1.19%, and 4.66% at the same reference seed. The paired report
+is `PRIMATTACK_V2_OPTIMIZER_COMPARISON.md`. Interpret joint/timing differences as a
+combined optimizer-and-timing-model change; use padding-only rows for the clean
+optimizer comparison.
+
+The substantive result is not “PrimAttack always works.” Valid evasion is strongly
+victim- and class-dependent, and almost every successful flow is outside the
+val-anchored per-class VAE IDR gate. PrimAttack v2 is therefore evidence for
+**validity-constrained robustness evaluation**, not an in-distribution evasion claim.
+
+## 2.13 Verified invariants
+
+The dedicated tests cover:
+
+- exact no-op identity, including quantized generation;
+- completeness of each primitive's declared dependency set;
+- affine timing endpoints and equations;
+- padding and pooled-length equations;
+- hard integer projection and capability masking;
+- finite-difference agreement with autograd through the scaler and real victim;
+- non-finite input/control rejection and tiny-duration boundaries;
+- internal algebraic, packet-summary, timing, rate, discreteness, and frozen checks;
+- machine-readable capability reasons;
+- result regeneration from returned requested/projected controls;
+- hard-box compliance; and
+- optimizer dominance over identity and every exhaustively enumerated padding
+  candidate.
+
+The budget tests reproduce the frozen train-only artifact and verify monotone p25/p50/p75
+levels and prohibited-input provenance.
+
+## 2.14 Assumptions, limitations, and defensible claims
+
+### Assumptions
+
+1. Forward uniform padding and forward delay allocation are meaningful attacker
+   operations for the evaluated flows.
+2. Positive forward payload and a non-zero forward-IAT sequence are sufficient evidence
+   to enable the corresponding aggregate primitive.
+3. The conservative duration/Flow-IAT-Max construction is acceptable for a flow-level
+   proxy.
+4. Training p99 envelopes and class quantiles are defensible evaluation bounds for this
+   dataset, not physical constants.
+
+### Limitations
+
+- No packet trace is edited or re-extracted; `NullPacketBackend` declares packet-level
+  verification unavailable.
+- Level-C sequence-dependent fields are held constant because they cannot be recovered
+  from one aggregate row.
+- Complete malicious functionality is unobservable, especially for Recon and
+  BruteForce.
+- Only forward padding and delay are modeled; there is no packet injection/splitting,
+  payload rewrite, backward edit, flag edit, or target-state feedback.
+- The p25/p50/p75 budgets are empirical dataset envelopes. `unbounded` removes only
+  those class caps and remains constrained by train-p99/capability/rate rules.
+- Results are feature-space, closed-set, and victim-specific. Victims must not be pooled
+  as independent replicates.
+- The committed campaign uses one frozen row roster that was inspected diagnostically
+  before the v2 design; optimizer comparisons are post-hoc rather than held-out
+  confirmation.
+- Seed variation changes random restarts/control samples, not victim training. It does
+  not establish training-seed robustness for CICIDS2017 victims.
+
+### Can claim
+
+- PrimAttack searches interpretable primitive controls rather than arbitrary features.
+- Final candidates obey the declared integer hard box and are re-evaluated after
+  quantization.
+- The canonical map preserves its declared aggregate dependencies and frozen columns
+  under the tested contract.
+- The completed v2 campaign observed 100% validator_v2 and internal primitive-feasibility
+  acceptance for PrimAttack outputs.
+- Valid targeted evasion is measurable but highly victim-dependent.
+
+### Must not claim
+
+- packet-level realizability or PCAP validity;
+- complete CICFlowMeter re-extraction equivalence;
+- preserved malicious functionality or deployment behavior;
+- in-distribution evasion when True-IDSR is approximately zero;
+- an unconstrained primitive attack: even `unbounded` retains the train-p99 envelope,
+  capability gates, integer projection, and DoS/DDoS rate floor; or
+- universal robustness/generalization from one dataset split, one frozen source roster,
+  or pooled victims.

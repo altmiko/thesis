@@ -36,7 +36,8 @@ def _context(class_name: str, n: int = 32):
 
 
 def _identity(raw):
-    return {"p": torch.zeros(len(raw)), "alpha": torch.ones(len(raw))}
+    zeros = torch.zeros(len(raw))
+    return {"p": zeros.clone(), "delay": zeros.clone(), "shape": zeros.clone()}
 
 
 def test_dos_identity_passes_all_flow_level_proxy_checks():
@@ -83,13 +84,11 @@ def test_each_generic_invariant_violation_is_detected():
         assert all(reason in reasons for reasons in report.failure_reasons)
 
 
-@pytest.mark.parametrize("primitive", ["p", "alpha"])
+@pytest.mark.parametrize("primitive", ["p", "delay"])
 def test_intentional_primitive_budget_violation_fails_closed(primitive):
     model, validator, cfg, raw, bounds, metadata, labels = _context("DoS", 8)
     violating = _identity(raw)
-    violating[primitive] = (
-        bounds[primitive] + (100.0 if primitive == "p" else 1.0)
-    )
+    violating[primitive] = bounds[primitive] + (100.0 if primitive == "p" else 1000.0)
     adversarial = model.generate(raw, violating)
     report = validator.evaluate(
         raw, adversarial, violating, violating, bounds,

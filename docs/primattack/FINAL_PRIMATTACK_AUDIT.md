@@ -1,5 +1,10 @@
 # Final PrimAttack audit — active roster
 
+> **Historical pre-v2 audit.** The victim roster and `(p, alpha)` contract below are
+> obsolete. The active roster includes MLP, CNN, and FT-Transformer and uses
+> `(p, delay, shape)`. See
+> [`../full_thesis_methodology/02_primattack.md`](../full_thesis_methodology/02_primattack.md).
+
 ## Active victim roster
 
 Current reported neural victims are MLP and CNN. Future transformer integration is excluded from

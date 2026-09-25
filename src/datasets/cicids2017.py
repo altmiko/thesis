@@ -141,6 +141,10 @@ _DERIVATIONS: dict[str, tuple[str, tuple[str, ...]]] = {
 
 class CICIDS2017Adapter(DatasetAdapter):
     name = "cicids2017_distrinet"
+    # Subclasses sharing the 79-feature CICFlowMeter layout override these three.
+    processed_dirname = "CICIDS_2017_Distrinet"
+    typing: dict[str, tuple[str, float, float | None, str]] = _TYPING
+    derivations: dict[str, tuple[str, tuple[str, ...]]] = _DERIVATIONS
 
     def __init__(self, repo_root: Path | str | None = None) -> None:
         self.repo_root = (
@@ -148,7 +152,7 @@ class CICIDS2017Adapter(DatasetAdapter):
             if repo_root is not None
             else Path(__file__).resolve().parents[2]
         )
-        self._processed = self.repo_root / "data" / "processed" / "CICIDS_2017_Distrinet"
+        self._processed = self.repo_root / "data" / "processed" / self.processed_dirname
         self._manifest: FeatureManifest | None = None
         self._transform: FeatureTransform | None = None
 
@@ -169,14 +173,14 @@ class CICIDS2017Adapter(DatasetAdapter):
         names = self._feature_order()
         specs: list[FeatureSpec] = []
         for idx, name in enumerate(names):
-            typing = _TYPING.get(name)
+            typing = self.typing.get(name)
             if typing is None:
                 raise ManifestError(
-                    f"no value_type declared for CICIDS2017 feature {name!r}; "
-                    "extend datasets.cicids2017._TYPING"
+                    f"no value_type declared for {self.name} feature {name!r}; "
+                    f"extend {type(self).__module__}.typing"
                 )
             value_type, lower, upper, semantic = typing
-            derived = _DERIVATIONS.get(name)
+            derived = self.derivations.get(name)
             derivation, parents = derived if derived is not None else (None, ())
             specs.append(
                 FeatureSpec(
@@ -218,7 +222,7 @@ class CICIDS2017Adapter(DatasetAdapter):
         scaler_path = self._processed / "scaler.pkl"
         if not scaler_path.exists():
             raise FileNotFoundError(
-                f"CICIDS2017 scaler not found at {scaler_path}; cannot build "
+                f"{self.name} scaler not found at {scaler_path}; cannot build "
                 "FeatureTransform without train-fit scaling metadata"
             )
         with open(scaler_path, "rb") as fh:

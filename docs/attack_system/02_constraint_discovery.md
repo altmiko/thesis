@@ -7,7 +7,7 @@ number that was tuned on val/test.
 
 | # | Kind | Discovered from | Enforced by | File(s) |
 |---|------|-----------------|-------------|---------|
-| A | **Algebraic identities** (`p, alpha` -> feature map) | CICFlowMeter extractor semantics + 0% train violation across 400k–600k rows | `generate()` recomputes them; realizability validator re-checks | `attack/realizability/cicids2017.py` |
+| A | **Algebraic identities** (`p, delay, shape` -> feature map) | CICFlowMeter extractor semantics + 0% train violation across 400k–600k rows | `generate()` recomputes them; realizability validator re-checks | `attack/realizability/cicids2017.py` |
 | B | **Exact derivations** (manifest) | 0% train violation, 100% val pass | Layer-0 projector recomputes | `datasets/cicids2017.py::_DERIVATIONS`, `constraints/layer0.py` |
 | C | **Mined density rules** (Layer 2) | fit on 1,456,265 pristine train rows; keep if train violation-rate ≤ 1% | `ConstraintEngine` Layer 2 (validation only) | `old_constraints/cicids2017_distrinet/mined.json` |
 | D | **Robust tail bound** (Layer 1) | median/IQR/tau fit on first 200,000 pristine train rows | `ConstraintEngine` Layer 1 (validation) | `constraints/layer1.py::RobustTailBound.fit` |
@@ -22,10 +22,11 @@ mined/fitted on TRAIN ONLY; nothing hand-authored; each kind flows through one a
 
 ## A. Algebraic identities (the realizability map)
 
-These are the exact CICFlowMeter relationships that let two primitives regenerate 79
-features. They are declared in `attack/realizability/cicids2017.py` and were **mined on the
-pristine TRAIN split** — the module docstring (lines 14–34) states each identity had **0%
-violation across 400k–600k train rows**. Examples (exact):
+These are the exact CICFlowMeter relationships that let three controls for two physical
+operations regenerate their declared dependent features. They are declared in
+`attack/realizability/cicids2017.py` and were **mined on the pristine TRAIN split** —
+the module docstring states each identity had **0% violation across 400k–600k train
+rows**. Examples (exact):
 
 ```
 Fwd Packet Length Mean = Total Length of Fwd Packet / Total Fwd Packet

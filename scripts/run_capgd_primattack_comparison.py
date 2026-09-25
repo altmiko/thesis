@@ -370,7 +370,7 @@ def run(args: argparse.Namespace) -> Path:
         "method_id": CAPGD_METHOD_ID,
         "cells": cells,
         "elapsed_seconds": time.perf_counter() - started,
-        "comparison_reference": "outputs/full_adv_eval artifacts for prim_opt_joint_p75",
+        "comparison_reference": "outputs/full_adv_eval_primattack_v2 artifacts for prim_search_joint_p75",
     }
     (output_dir / "attack_results.json").write_text(
         json.dumps(summary, indent=2), encoding="utf-8"

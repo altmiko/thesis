@@ -13,7 +13,7 @@ under `data/raw/CICIDS_2017_Distrinet/`. It is not the original eight-file CIC
 row counts, and CICFlowMeter behavior. Consequently, the five corrected files are
 processed directly by:
 
-- [`scripts/preprocess_cicids2017_distrinet.py`](../../../scripts/preprocess_cicids2017_distrinet.py)
+- [`src/preprocessing/preprocess_cicids2017_distrinet.py`](../../../src/preprocessing/preprocess_cicids2017_distrinet.py)
 
 They are **not** passed through `scripts/merge_cicids2017.py`, which explicitly
 hard-codes the eight original TrafficLabelling files.
@@ -817,7 +817,7 @@ Run from the repository root:
 
 ```powershell
 C:/Users/user6/.local/share/mamba/envs/thesis/python.exe `
-  scripts/preprocess_cicids2017_distrinet.py
+  src/preprocessing/preprocess_cicids2017_distrinet.py
 ```
 
 A limited run can use `--max-rows-per-file`, but its manifest is marked

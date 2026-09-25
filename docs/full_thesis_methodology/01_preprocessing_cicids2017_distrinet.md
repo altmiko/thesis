@@ -1,8 +1,8 @@
 # 1. CICIDS2017-DistriNet Preprocessing (MAXIMUM DETAIL)
 
 Single source file, no hidden dependencies:
-**`scripts/preprocess_cicids2017_distrinet.py`** (≈898 lines). Run from repo root:
-`python scripts/preprocess_cicids2017_distrinet.py`. Reads
+**`src/preprocessing/preprocess_cicids2017_distrinet.py`** (≈898 lines). Run from repo root:
+`python src/preprocessing/preprocess_cicids2017_distrinet.py`. Reads
 `data/raw/CICIDS_2017_Distrinet/*.csv`, writes
 `data/processed/CICIDS_2017_Distrinet/`.
 

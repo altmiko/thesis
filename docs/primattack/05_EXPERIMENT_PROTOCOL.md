@@ -1,5 +1,10 @@
 # PrimAttack experiment protocol
 
+> **Historical sweep protocol.** Commands and optimizer names below describe the
+> replaced PrimAttack runner. The current search, controls, paired selection, and
+> commands are documented in
+> [`../full_thesis_methodology/02_primattack.md`](../full_thesis_methodology/02_primattack.md).
+
 ## Evaluation levels
 
 The protocol reports four separate questions in this order:

@@ -22,7 +22,7 @@ CICIDS2017-centric and flags CICIoT-only or stale code wherever it appears.
 | — | [`00_CODE_MAP.md`](00_CODE_MAP.md) | — | File→responsibility map; live vs stale vs archived |
 | — | [`00_OPEN_ISSUES.md`](00_OPEN_ISSUES.md) | — | Discrepancies, defects, claim boundaries |
 | 1 | [`01_preprocessing_cicids2017_distrinet.md`](01_preprocessing_cicids2017_distrinet.md) | **MAX** | Raw CSV → transformed arrays/artifacts |
-| 2 | [`02_primattack.md`](02_primattack.md) | **MAX** | Primitive-domain white-box attack (p, α) |
+| 2 | [`02_primattack.md`](02_primattack.md) | **MAX** | Primitive-domain white-box attack (p, delay, shape) |
 | 3 | [`03_validator_v2.md`](03_validator_v2.md) | **MAX** | SCHEMA/PROTOCOL/EXTRACTOR/MINED validator |
 | 4 | [`04_statistical_evaluation.md`](04_statistical_evaluation.md) | **MAX** | Cochran/McNemar/Friedman/Wilcoxon/Holm |
 | 5 | [`05_victim_classifiers.md`](05_victim_classifiers.md) | MOD | MLP / CNN / FT-Transformer |

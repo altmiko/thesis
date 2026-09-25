@@ -1,0 +1,1930 @@
+dataset: cicids2018_distrinet
+n_features: 79
+feature_order:
+- Src Port
+- Dst Port
+- Protocol
+- Flow Duration
+- Total Fwd Packet
+- Total Bwd packets
+- Total Length of Fwd Packet
+- Total Length of Bwd Packet
+- Fwd Packet Length Max
+- Fwd Packet Length Min
+- Fwd Packet Length Mean
+- Fwd Packet Length Std
+- Bwd Packet Length Max
+- Bwd Packet Length Min
+- Bwd Packet Length Mean
+- Bwd Packet Length Std
+- Flow Bytes/s
+- Flow Packets/s
+- Flow IAT Mean
+- Flow IAT Std
+- Flow IAT Max
+- Flow IAT Min
+- Fwd IAT Total
+- Fwd IAT Mean
+- Fwd IAT Std
+- Fwd IAT Max
+- Fwd IAT Min
+- Bwd IAT Total
+- Bwd IAT Mean
+- Bwd IAT Std
+- Bwd IAT Max
+- Bwd IAT Min
+- Fwd PSH Flags
+- Bwd PSH Flags
+- Fwd URG Flags
+- Bwd URG Flags
+- Fwd Header Length
+- Bwd Header Length
+- Fwd Packets/s
+- Bwd Packets/s
+- Packet Length Min
+- Packet Length Max
+- Packet Length Mean
+- Packet Length Std
+- Packet Length Variance
+- FIN Flag Count
+- SYN Flag Count
+- RST Flag Count
+- PSH Flag Count
+- ACK Flag Count
+- URG Flag Count
+- CWR Flag Count
+- ECE Flag Count
+- Down/Up Ratio
+- Average Packet Size
+- Fwd Segment Size Avg
+- Bwd Segment Size Avg
+- Fwd Bytes/Bulk Avg
+- Fwd Packet/Bulk Avg
+- Fwd Bulk Rate Avg
+- Bwd Bytes/Bulk Avg
+- Bwd Packet/Bulk Avg
+- Bwd Bulk Rate Avg
+- Subflow Fwd Packets
+- Subflow Fwd Bytes
+- Subflow Bwd Packets
+- Subflow Bwd Bytes
+- FWD Init Win Bytes
+- Bwd Init Win Bytes
+- Fwd Act Data Pkts
+- Fwd Seg Size Min
+- Active Mean
+- Active Std
+- Active Max
+- Active Min
+- Idle Mean
+- Idle Std
+- Idle Max
+- Idle Min
+features:
+  Src Port:
+    index: 0
+    category: flow_identity
+    units: port_number
+    derived: false
+    uncertain: false
+    description: Source TCP/UDP port number of the flow (0-65535).
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 28289
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 65534.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Dst Port:
+    index: 1
+    category: flow_identity
+    units: port_number
+    derived: false
+    uncertain: false
+    description: Destination TCP/UDP port number of the flow (0-65535).
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 1343
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 65389.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Protocol:
+    index: 2
+    category: flow_identity
+    units: ip_protocol_number
+    derived: false
+    uncertain: false
+    description: IP protocol number of the flow (e.g. 6=TCP, 17=UDP, 0=other/unset).
+    value_type: categorical
+    finite: true
+    constant_value: null
+    domain:
+    - 0.0
+    - 1.0
+    - 6.0
+    - 17.0
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 4
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 17.0
+      val_value_type: categorical
+      val_type_confirmed: true
+  Flow Duration:
+    index: 3
+    category: timing
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Elapsed time between the first and last packet of the flow.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 134587
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 1.0
+        observed_max: 119999984.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Total Fwd Packet:
+    index: 4
+    category: packet_count
+    units: packets
+    derived: true
+    uncertain: false
+    description: Number of packets sent in the forward (client->server) direction.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 291
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 221415.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Total Bwd packets:
+    index: 5
+    category: packet_count
+    units: packets
+    derived: true
+    uncertain: false
+    description: Number of packets sent in the backward (server->client) direction.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 276
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 24293.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Total Length of Fwd Packet:
+    index: 6
+    category: byte_count
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Total payload/packet bytes summed over all forward packets.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 3173
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 7437183.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Total Length of Bwd Packet:
+    index: 7
+    category: byte_count
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Total payload/packet bytes summed over all backward packets.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 4640
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 35023204.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Fwd Packet Length Max:
+    index: 8
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Largest forward-packet length in the flow.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 1640
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 36500.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Fwd Packet Length Min:
+    index: 9
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Smallest forward-packet length in the flow.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 86
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 500.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Fwd Packet Length Mean:
+    index: 10
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Mean forward-packet length in the flow.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 6161
+        frac_integral: 0.41063
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 8207.640625
+      val_value_type: numeric
+      val_type_confirmed: true
+  Fwd Packet Length Std:
+    index: 11
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Standard deviation of forward-packet lengths in the flow.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 8065
+        frac_integral: 0.251325
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 9970.130859375
+      val_value_type: numeric
+      val_type_confirmed: true
+  Bwd Packet Length Max:
+    index: 12
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Largest backward-packet length in the flow.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 636
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 14316.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Bwd Packet Length Min:
+    index: 13
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Smallest backward-packet length in the flow.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 250
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 735.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Bwd Packet Length Mean:
+    index: 14
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Mean backward-packet length in the flow.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 6086
+        frac_integral: 0.744415
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 4353.92578125
+      val_value_type: numeric
+      val_type_confirmed: true
+  Bwd Packet Length Std:
+    index: 15
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Standard deviation of backward-packet lengths in the flow.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 6402
+        frac_integral: 0.31641
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 5936.15380859375
+      val_value_type: numeric
+      val_type_confirmed: true
+  Flow Bytes/s:
+    index: 16
+    category: rate
+    units: bytes_per_second
+    derived: true
+    uncertain: false
+    description: Total flow bytes divided by flow duration in seconds.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 168255
+        frac_integral: 0.125035
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 8625000.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Flow Packets/s:
+    index: 17
+    category: rate
+    units: packets_per_second
+    derived: true
+    uncertain: false
+    description: Total flow packets per second (= Fwd Packets/s + Bwd Packets/s).
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 140469
+        frac_integral: 0.04225
+        frac_nonnegative: 1.0
+        observed_min: 0.01674327626824379
+        observed_max: 2000000.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Flow IAT Mean:
+    index: 18
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Mean inter-arrival time between consecutive packets of the flow.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 140301
+        frac_integral: 0.31523
+        frac_nonnegative: 1.0
+        observed_min: 1.0
+        observed_max: 119450928.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Flow IAT Std:
+    index: 19
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Std of inter-arrival time between consecutive flow packets.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 158865
+        frac_integral: 0.28804
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 80256040.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Flow IAT Max:
+    index: 20
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Maximum inter-arrival time between consecutive flow packets.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 115349
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 1.0
+        observed_max: 119932216.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Flow IAT Min:
+    index: 21
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Minimum inter-arrival time between consecutive flow packets.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 8937
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 119450928.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Fwd IAT Total:
+    index: 22
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Total time between forward packets (sum of forward inter-arrival
+      gaps).
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 129940
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 119999984.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Fwd IAT Mean:
+    index: 23
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Mean inter-arrival time between forward packets.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 134147
+        frac_integral: 0.426895
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 119450928.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Fwd IAT Std:
+    index: 24
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Std of inter-arrival time between forward packets.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 152910
+        frac_integral: 0.31151
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 84798136.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Fwd IAT Max:
+    index: 25
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Maximum inter-arrival time between forward packets.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 116466
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 119940496.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Fwd IAT Min:
+    index: 26
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Minimum inter-arrival time between forward packets.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 22710
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 119450928.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Bwd IAT Total:
+    index: 27
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Total time between backward packets (sum of backward inter-arrival
+      gaps).
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 125796
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 119999032.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Bwd IAT Mean:
+    index: 28
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Mean inter-arrival time between backward packets.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 128382
+        frac_integral: 0.43739
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 119911576.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Bwd IAT Std:
+    index: 29
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Std of inter-arrival time between backward packets.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 150474
+        frac_integral: 0.298715
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 84805456.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Bwd IAT Max:
+    index: 30
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Maximum inter-arrival time between backward packets.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 113270
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 119933024.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Bwd IAT Min:
+    index: 31
+    category: iat
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Minimum inter-arrival time between backward packets.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 21707
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 119911576.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Fwd PSH Flags:
+    index: 32
+    category: tcp_flags
+    units: count
+    derived: true
+    uncertain: false
+    description: Number of forward packets with the TCP PSH flag set.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 71
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 902.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Bwd PSH Flags:
+    index: 33
+    category: tcp_flags
+    units: count
+    derived: true
+    uncertain: false
+    description: Number of backward packets with the TCP PSH flag set.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 86
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 557.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Fwd URG Flags:
+    index: 34
+    category: tcp_flags
+    units: count
+    derived: true
+    uncertain: false
+    description: Number of forward packets with the TCP URG flag set (constant 0 in
+      train).
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 6
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 20.0
+      val_value_type: categorical
+      val_type_confirmed: false
+  Bwd URG Flags:
+    index: 35
+    category: tcp_flags
+    units: count
+    derived: true
+    uncertain: false
+    description: Number of backward packets with the TCP URG flag set (constant 0
+      in train).
+    value_type: constant
+    finite: true
+    constant_value: 0.0
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 1
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 0.0
+      val_value_type: constant
+      val_type_confirmed: true
+  Fwd Header Length:
+    index: 36
+    category: header_stats
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Total bytes used for headers in the forward direction.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: false
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 486
+        frac_integral: 1.0
+        frac_nonnegative: 0.999695
+        observed_min: -32488.0
+        observed_max: 32360.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Bwd Header Length:
+    index: 37
+    category: header_stats
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Total bytes used for headers in the backward direction.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: false
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 583
+        frac_integral: 1.0
+        frac_nonnegative: 0.999885
+        observed_min: -31336.0
+        observed_max: 29364.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Fwd Packets/s:
+    index: 38
+    category: rate
+    units: packets_per_second
+    derived: true
+    uncertain: false
+    description: Forward packets per second across the flow duration.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 139671
+        frac_integral: 0.04248
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 1000000.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Bwd Packets/s:
+    index: 39
+    category: rate
+    units: packets_per_second
+    derived: true
+    uncertain: false
+    description: Backward packets per second across the flow duration.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 137368
+        frac_integral: 0.05074
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 1000000.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Packet Length Min:
+    index: 40
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Smallest packet length over both directions of the flow.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 86
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 500.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Packet Length Max:
+    index: 41
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Largest packet length over both directions of the flow.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 1273
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 36500.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Packet Length Mean:
+    index: 42
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Mean packet length over both directions of the flow.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 9637
+        frac_integral: 0.265095
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 2845.741943359375
+      val_value_type: numeric
+      val_type_confirmed: true
+  Packet Length Std:
+    index: 43
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Standard deviation of packet length over both directions.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 11005
+        frac_integral: 0.121325
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 7070.55029296875
+      val_value_type: numeric
+      val_type_confirmed: true
+  Packet Length Variance:
+    index: 44
+    category: packet_size
+    units: bytes_squared
+    derived: true
+    uncertain: false
+    description: Variance of packet length over both directions (= Packet Length Std
+      squared).
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 11006
+        frac_integral: 0.277305
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 49992680.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  FIN Flag Count:
+    index: 45
+    category: tcp_flags
+    units: count
+    derived: true
+    uncertain: false
+    description: Number of packets in the flow with the TCP FIN flag set.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 13
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 20.0
+      val_value_type: integer
+      val_type_confirmed: true
+  SYN Flag Count:
+    index: 46
+    category: tcp_flags
+    units: count
+    derived: true
+    uncertain: false
+    description: Number of packets in the flow with the TCP SYN flag set.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 15
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 20.0
+      val_value_type: integer
+      val_type_confirmed: true
+  RST Flag Count:
+    index: 47
+    category: tcp_flags
+    units: count
+    derived: true
+    uncertain: false
+    description: Number of packets in the flow with the TCP RST flag set.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 6
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 5.0
+      val_value_type: categorical
+      val_type_confirmed: false
+  PSH Flag Count:
+    index: 48
+    category: tcp_flags
+    units: count
+    derived: true
+    uncertain: false
+    description: Number of packets in the flow with the TCP PSH flag set.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 128
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 910.0
+      val_value_type: integer
+      val_type_confirmed: true
+  ACK Flag Count:
+    index: 49
+    category: tcp_flags
+    units: count
+    derived: true
+    uncertain: false
+    description: Number of packets in the flow with the TCP ACK flag set.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 347
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 32651.0
+      val_value_type: integer
+      val_type_confirmed: true
+  URG Flag Count:
+    index: 50
+    category: tcp_flags
+    units: count
+    derived: true
+    uncertain: false
+    description: Number of packets in the flow with the TCP URG flag set (constant
+      0 in train).
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 6
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 20.0
+      val_value_type: categorical
+      val_type_confirmed: false
+  CWR Flag Count:
+    index: 51
+    category: tcp_flags
+    units: count
+    derived: true
+    uncertain: false
+    description: Number of packets in the flow with the TCP CWR flag set.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 8
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 7.0
+      val_value_type: categorical
+      val_type_confirmed: false
+  ECE Flag Count:
+    index: 52
+    category: tcp_flags
+    units: count
+    derived: true
+    uncertain: false
+    description: Number of packets in the flow with the TCP ECE flag set.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 10
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 13.0
+      val_value_type: categorical
+      val_type_confirmed: false
+  Down/Up Ratio:
+    index: 53
+    category: ratio
+    units: ratio
+    derived: true
+    uncertain: false
+    description: Ratio of download to upload activity for the flow (fractional-valued).
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 876
+        frac_integral: 0.68446
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 19.010562896728516
+      val_value_type: numeric
+      val_type_confirmed: true
+  Average Packet Size:
+    index: 54
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Average packet size of the flow (equals Packet Length Mean in this
+      release).
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 9637
+        frac_integral: 0.265095
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 2845.741943359375
+      val_value_type: numeric
+      val_type_confirmed: true
+  Fwd Segment Size Avg:
+    index: 55
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Average forward TCP segment size (equals Fwd Packet Length Mean in
+      this release).
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 6161
+        frac_integral: 0.41063
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 8207.640625
+      val_value_type: numeric
+      val_type_confirmed: true
+  Bwd Segment Size Avg:
+    index: 56
+    category: packet_size
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Average backward TCP segment size (equals Bwd Packet Length Mean
+      in this release).
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 6086
+        frac_integral: 0.744415
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 4353.92578125
+      val_value_type: numeric
+      val_type_confirmed: true
+  Fwd Bytes/Bulk Avg:
+    index: 57
+    category: bulk_stats
+    units: bytes
+    derived: true
+    uncertain: true
+    description: Average bytes per forward bulk transfer, from the CICFlowMeter bulk
+      state machine. Exact semantics/relationships not reliably established for this
+      DistriNet release.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 540
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 7435909.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Fwd Packet/Bulk Avg:
+    index: 58
+    category: bulk_stats
+    units: packets
+    derived: true
+    uncertain: true
+    description: Average packets per forward bulk transfer (bulk state machine). Semantics
+      UNRESOLVED for this release.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 119
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 221415.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Fwd Bulk Rate Avg:
+    index: 59
+    category: bulk_stats
+    units: bytes_per_second
+    derived: true
+    uncertain: true
+    description: Average forward bulk transfer rate (bulk state machine). Semantics
+      UNRESOLVED for this release.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 811
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 297000000.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Bwd Bytes/Bulk Avg:
+    index: 60
+    category: bulk_stats
+    units: bytes
+    derived: true
+    uncertain: true
+    description: Average bytes per backward bulk transfer (bulk state machine). Semantics
+      UNRESOLVED for this release.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 2045
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 35019120.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Bwd Packet/Bulk Avg:
+    index: 61
+    category: bulk_stats
+    units: packets
+    derived: true
+    uncertain: true
+    description: Average packets per backward bulk transfer (bulk state machine).
+      Semantics UNRESOLVED for this release.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 154
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 24287.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Bwd Bulk Rate Avg:
+    index: 62
+    category: bulk_stats
+    units: bytes_per_second
+    derived: true
+    uncertain: true
+    description: Average backward bulk transfer rate (bulk state machine). Semantics
+      UNRESOLVED for this release.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 3678
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 3622000128.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Subflow Fwd Packets:
+    index: 63
+    category: subflow_stats
+    units: packets
+    derived: true
+    uncertain: true
+    description: Forward subflow packet statistic. In this DistriNet release it does
+      NOT equal Total Fwd Packet (observed values are binary 0/1), so no equality
+      rule is asserted; semantics UNRESOLVED.
+    value_type: binary
+    finite: true
+    constant_value: null
+    domain:
+    - 0.0
+    - 1.0
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 2
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 1.0
+      val_value_type: binary
+      val_type_confirmed: true
+  Subflow Fwd Bytes:
+    index: 64
+    category: subflow_stats
+    units: bytes
+    derived: true
+    uncertain: true
+    description: Forward subflow byte statistic. Does NOT equal Total Length of Fwd
+      Packet in this release; semantics UNRESOLVED.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 409
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 2675.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Subflow Bwd Packets:
+    index: 65
+    category: subflow_stats
+    units: packets
+    derived: true
+    uncertain: true
+    description: Backward subflow packet statistic. Does NOT equal Total Bwd packets
+      in this release (observed binary 0/1); semantics UNRESOLVED.
+    value_type: binary
+    finite: true
+    constant_value: null
+    domain:
+    - 0.0
+    - 1.0
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 2
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 1.0
+      val_value_type: binary
+      val_type_confirmed: true
+  Subflow Bwd Bytes:
+    index: 66
+    category: subflow_stats
+    units: bytes
+    derived: true
+    uncertain: true
+    description: Backward subflow byte statistic. Does NOT equal Total Length of Bwd
+      Packet in this release; semantics UNRESOLVED.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 906
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 2399.0
+      val_value_type: integer
+      val_type_confirmed: true
+  FWD Init Win Bytes:
+    index: 67
+    category: window_stats
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Bytes in the initial TCP receive window of the forward direction.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 188
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 65535.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Bwd Init Win Bytes:
+    index: 68
+    category: window_stats
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Bytes in the initial TCP receive window of the backward direction.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 1254
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 65535.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Fwd Act Data Pkts:
+    index: 69
+    category: packet_count
+    units: packets
+    derived: true
+    uncertain: false
+    description: Number of forward packets carrying at least one byte of TCP payload.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 167
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 221414.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Fwd Seg Size Min:
+    index: 70
+    category: header_stats
+    units: bytes
+    derived: true
+    uncertain: false
+    description: Minimum forward TCP segment/header size observed (TCP header-size
+      codes, e.g. 20,32,40).
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 9
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 44.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Active Mean:
+    index: 71
+    category: active_idle
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Mean time the flow was active before going idle.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 23981
+        frac_integral: 0.97271
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 106287712.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Active Std:
+    index: 72
+    category: active_idle
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Std of active-period durations before idling.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 7626
+        frac_integral: 0.961795
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 42060264.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Active Max:
+    index: 73
+    category: active_idle
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Maximum active-period duration before idling.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 23885
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 106287712.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Active Min:
+    index: 74
+    category: active_idle
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Minimum active-period duration before idling.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 21552
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 106287712.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Idle Mean:
+    index: 75
+    category: active_idle
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Mean time the flow was idle before becoming active.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 24060
+        frac_integral: 0.999055
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 119932216.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Idle Std:
+    index: 76
+    category: active_idle
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Std of idle-period durations before reactivating.
+    value_type: numeric
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 8694
+        frac_integral: 0.967275
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 69328432.0
+      val_value_type: numeric
+      val_type_confirmed: true
+  Idle Max:
+    index: 77
+    category: active_idle
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Maximum idle-period duration before reactivating.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 23854
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 119932216.0
+      val_value_type: integer
+      val_type_confirmed: true
+  Idle Min:
+    index: 78
+    category: active_idle
+    units: microseconds
+    derived: true
+    uncertain: false
+    description: Minimum idle-period duration before reactivating.
+    value_type: integer
+    finite: true
+    constant_value: null
+    domain: null
+    nonnegative: true
+    inferred_on: X_train_pristine
+    evidence:
+      train:
+        rows_tested: 200000
+        n_distinct: 23726
+        frac_integral: 1.0
+        frac_nonnegative: 1.0
+        observed_min: 0.0
+        observed_max: 119932216.0
+      val_value_type: integer
+      val_type_confirmed: true

@@ -47,11 +47,13 @@ Local, dependency-free re-implementation (no `rtdl`); `arch_version = "ft_transf
   token → logits.
 - Defaults: `d_token=192`. Params: category 922,949 / binary 922,370. Test macro-F1 ≈
   **0.9780**.
-- **Status**: implemented, trained (artifacts exist in both `cicids2017distrinet/models`
-  and `cicids2017distrinet_ft/models`), 24 unit tests pass, and it is **in the attack
-  roster** (`run_cicids2017_primitive_attack.py:41`, `run_cicids2017_vae_attacks.py`).
-  Parity with MLP/CNN (not claimed superior); overfits (train acc ≈ 1.0). **However the
-  committed PrimAttack sweep artifacts cover mlp+cnn only** (see `00_OPEN_ISSUES.md#A5`).
+- **Status**: implemented, trained (artifacts exist in both
+  `cicids2017distrinet/models` and `cicids2017distrinet_ft/models`), covered by
+  dedicated tests, and present in the attack roster. The historical 72-artifact
+  budget sweep omitted FT-Transformer, but the completed
+  `outputs/full_adv_eval_primattack_v2/` campaign includes it on the same
+  clean-correct paired protocol as MLP/CNN. Performance is parity, not superiority;
+  training accuracy is approximately 1.0.
 
 ---
 
@@ -72,17 +74,21 @@ Local, dependency-free re-implementation (no `rtdl`); `arch_version = "ft_transf
   (input gradients still flow — needed by white-box attacks).
 
 Checkpoints (bytes): `mlp_{binary,category}.pt` ≈250k, `cnn_*` ≈160k,
-`ft_transformer_*` ≈3.7M. MLP/CNN checkpoints lack a metadata key (legacy); FT has full
-metadata. The attack `run_manifest` models list is `['mlp','cnn']`.
+`ft_transformer_*` ≈3.7M. MLP/CNN checkpoints lack a metadata key (legacy); FT has
+full metadata. The v2 paired campaign records all three victims in `config.json` and
+stores a separate clean-correct source roster and hash per victim/class.
 
 ---
 
 ## 5.5 Assumptions · Limitations · Claims
 - **Assumptions**: scaled+asinh features are adequate; class weights address imbalance
   enough for macro-F1; val macro-F1 is the selection metric.
-- **Limitations**: all three overfit (train ≈ 1.0); single seed; FT trained but not
-  included in the final PrimAttack sweep; no calibration/uncertainty reported.
-- **Can claim**: three strong closed-set victims (macro-F1 ≈ 0.975–0.978) with identity-
-  guarded checkpoints, trained train-only with balanced loss and early stopping.
-- **Must NOT claim**: FT-Transformer superiority (parity only); robustness; that FT was
-  evaluated under PrimAttack in the committed sweep.
+- **Limitations**: all three overfit (train ≈ 1.0); CICIDS2017 victims use one
+  training seed; no calibration/uncertainty analysis is reported. The three v2
+  attack seeds vary optimizer restarts, not victim training.
+- **Can claim**: three strong closed-set victims (macro-F1 ≈ 0.975–0.978) with
+  identity-guarded checkpoints, trained train-only with balanced loss and early
+  stopping, all evaluated by the PrimAttack-v2 campaign.
+- **Must NOT claim**: FT-Transformer superiority (parity only), calibrated
+  uncertainty, victim-training seed robustness, or general robustness outside the
+  evaluated attacks and frozen test roster.

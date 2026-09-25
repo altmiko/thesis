@@ -1,11 +1,11 @@
 """Analyze the full paired adversarial evaluation and emit the comprehensive report.
 
-Reads outputs/full_adv_eval/{config,selection,cells,failures}.json + artifacts/*.npz, computes
-mean +/- std summary/per-class tables, runs sample-level PAIRED McNemar tests (rows are identical
-across compared attacks by construction), and writes:
-  * FULL_ADVERSARIAL_EVALUATION_CICIDS2017.md  (repo root, comprehensive)
-  * outputs/full_adv_eval/analysis.json
-  * outputs/full_adv_eval/per_seed_cells.csv
+Reads outputs/full_adv_eval_primattack_v2/{config,selection,cells,failures}.json + artifacts/*.npz,
+computes mean +/- std summary/per-class tables, runs sample-level PAIRED McNemar tests (rows are
+identical across compared attacks by construction), and writes:
+  * FULL_ADVERSARIAL_EVALUATION_CICIDS2017_PRIMATTACK_V2.md  (repo root, comprehensive)
+  * outputs/full_adv_eval_primattack_v2/analysis.json
+  * outputs/full_adv_eval_primattack_v2/per_seed_cells.csv
 
 Paired tests use the reference seed (first seed) so every paired unit is an INDEPENDENT flow
 (no across-seed pseudo-replication); discordant counts (b,c) are also reported per seed to show
@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-OUT = REPO_ROOT / "outputs" / "full_adv_eval"
+OUT = REPO_ROOT / "outputs" / "full_adv_eval_primattack_v2"
 ART = OUT / "artifacts"
 
 try:
@@ -156,19 +156,24 @@ def main() -> None:
                         "per_seed_bc": bc})
             comparisons.append(res)
 
-        # baseline vs PrimAttack (targeted-benign, raw and valid)
+        # baseline vs upgraded PrimAttack (targeted-benign, raw and valid)
         for base in ("pgd_tb", "cw_tb"):
-            for prim in ("prim_opt_joint_p75", "prim_opt_joint_p50", "prim_opt_joint_unb"):
+            for prim in ("prim_search_joint_p75", "prim_search_joint_p50",
+                         "prim_search_joint_unb"):
                 add(base, prim, "targeted", f"{base} vs {prim} (raw targeted)")
                 add(base, prim, "targeted_valid", f"{base} vs {prim} (VALID targeted)")
-        # PrimAttack variants (raw targeted)
-        add("prim_opt_joint_p75", "prim_opt_timing_p75", "targeted", "joint vs timing (p75)")
-        add("prim_opt_joint_p75", "prim_opt_padding_p75", "targeted", "joint vs padding (p75)")
-        add("prim_opt_joint_p75", "prim_rand_joint_p75", "targeted", "optimized vs random (joint,p75)")
-        add("prim_opt_joint_p50", "prim_opt_joint_p75", "targeted", "budget p50 vs p75 (opt joint)")
-        add("prim_opt_joint_p75", "prim_opt_joint_unb", "targeted", "budget p75 vs unbounded (opt joint)")
+        add("prim_search_joint_p75", "prim_search_timing_p75", "targeted",
+            "joint vs timing (p75)")
+        add("prim_search_joint_p75", "prim_search_padding_p75", "targeted",
+            "joint vs padding (p75)")
+        add("prim_search_joint_p75", "prim_rand_joint_p75", "targeted",
+            "search vs random (joint,p75)")
+        add("prim_search_joint_p50", "prim_search_joint_p75", "targeted",
+            "budget p50 vs p75 (search joint)")
+        add("prim_search_joint_p75", "prim_search_joint_unb", "targeted",
+            "budget p75 vs unbounded (search joint)")
         # raw vs valid (within attack): compare targeted vs targeted_valid as A vs B
-        for atk in ("pgd_tb", "cw_tb", "prim_opt_joint_p75", "prim_opt_joint_unb"):
+        for atk in ("pgd_tb", "cw_tb", "prim_search_joint_p75", "prim_search_joint_unb"):
             ra = paired_rows(v, classes, atk, ref_seed, "targeted")
             rb = paired_rows(v, classes, atk, ref_seed, "targeted_valid")
             if ra is not None:
@@ -207,7 +212,7 @@ def main() -> None:
             w.writerow(c)
 
     _write_md(cfg, selection, cells, failures, summary, perclass, comparisons)
-    print(f"wrote {REPO_ROOT/'FULL_ADVERSARIAL_EVALUATION_CICIDS2017.md'}")
+    print(f"wrote {REPO_ROOT/'FULL_ADVERSARIAL_EVALUATION_CICIDS2017_PRIMATTACK_V2.md'}")
 
 
 def _write_md(cfg, selection, cells, failures, summary, perclass, comparisons):
@@ -263,7 +268,7 @@ def _write_md(cfg, selection, cells, failures, summary, perclass, comparisons):
     L.append(f"- Attack roster ({len(roster)}): {', '.join(roster)}.\n")
 
     # 3. Selection procedure + hashes
-    L.append("## 3. Sample selection (row IDs saved to `outputs/full_adv_eval/selection.json`)\n")
+    L.append(f"## 3. Sample selection (row IDs saved to `{(OUT / 'selection.json').relative_to(REPO_ROOT).as_posix()}`)\n")
     L.append("| Victim | Class | N eligible (total) | N used | sha256(sample_ids) |")
     L.append("|---|---|---|---|---|")
     for v in victims:
@@ -318,9 +323,9 @@ def _write_md(cfg, selection, cells, failures, summary, perclass, comparisons):
 
     # 6. Per-class (targeted-benign, valid, semantic)
     L.append("## 6. Per-class results (mean±std across seeds)\n")
-    key_attacks = ["pgd_tb", "cw_tb", "prim_opt_joint_unb", "prim_opt_joint_p75",
-                   "prim_opt_joint_p50", "prim_opt_timing_p75", "prim_opt_padding_p75",
-                   "prim_rand_joint_p75"]
+    key_attacks = ["pgd_tb", "cw_tb", "prim_search_joint_unb", "prim_search_joint_p75",
+                   "prim_search_joint_p50", "prim_search_timing_p75",
+                   "prim_search_padding_p75", "prim_rand_joint_p75"]
     for v in victims:
         L.append(f"### {v}\n")
         L.append("| Attack | Class | Tgt-Benign | Valid Tgt-Benign | Domain-valid | SemPreserve |")
@@ -345,12 +350,12 @@ def _write_md(cfg, selection, cells, failures, summary, perclass, comparisons):
                 c = idx.get((v, a, s))
                 vals.append(f"{c['valid_targeted_benign']*100:.2f}%" if c else "NA")
             L.append(f"| {v} | {a} | " + " | ".join(vals) + " |")
-    L.append("\n_Full per-seed metrics: `outputs/full_adv_eval/per_seed_cells.csv`._\n")
+    L.append("\n_Full per-seed metrics: `outputs/full_adv_eval_primattack_v2/per_seed_cells.csv`._\n")
 
     # 8. Failures / skipped
     L.append("## 8. Failures / skipped / not-testable\n")
     L.append(f"- Non-finite / eligibility failures logged: {len(failures)} "
-             "(`outputs/full_adv_eval/failures.json`).")
+             "(`outputs/full_adv_eval_primattack_v2/failures.json`).")
     used = {(v, cl): selection[v][cl]["n_used"] for v in victims for cl in classes}
     tot = {(v, cl): selection[v][cl]["n_eligible_total"] for v in victims for cl in classes}
     subsampled = [f"{v}/{cl} ({used[(v,cl)]}/{tot[(v,cl)]})" for v in victims for cl in classes
@@ -364,7 +369,7 @@ def _write_md(cfg, selection, cells, failures, summary, perclass, comparisons):
     L.append("## 9. Interpretation\n")
     L.append(_interpretation(cfg, summary, comparisons))
 
-    (REPO_ROOT / "FULL_ADVERSARIAL_EVALUATION_CICIDS2017.md").write_text(
+    (REPO_ROOT / "FULL_ADVERSARIAL_EVALUATION_CICIDS2017_PRIMATTACK_V2.md").write_text(
         "\n".join(L) + "\n", encoding="utf-8")
 
 
@@ -375,13 +380,13 @@ def _interpretation(cfg, summary, comparisons):
     for v in victims:
         pgd_raw = summary[v]["pgd_untargeted"]["raw_asr_untargeted"][0]
         pgd_valid = summary[v]["pgd_untargeted"]["valid_asr_untargeted"][0]
-        prim_tb = summary[v]["prim_opt_joint_p75"]["targeted_benign"][0]
-        prim_valid = summary[v]["prim_opt_joint_p75"]["valid_targeted_benign"][0]
-        prim_dom = summary[v]["prim_opt_joint_p75"]["domain_validity_rate"][0]
+        prim_tb = summary[v]["prim_search_joint_p75"]["targeted_benign"][0]
+        prim_valid = summary[v]["prim_search_joint_p75"]["valid_targeted_benign"][0]
+        prim_dom = summary[v]["prim_search_joint_p75"]["domain_validity_rate"][0]
         lines.append(
             f"- **{v}**: unconstrained input-PGD raw ASR ≈ {pgd_raw*100:.1f}% but VALID ASR ≈ "
             f"{pgd_valid*100:.1f}% (domain gate rejects the free perturbation). PrimAttack "
-            f"(opt-joint,p75) targeted-benign ≈ {prim_tb*100:.1f}%, valid targeted-benign ≈ "
+            f"(search-joint,p75) targeted-benign ≈ {prim_tb*100:.1f}%, valid targeted-benign ≈ "
             f"{prim_valid*100:.1f}%, domain-validity ≈ {prim_dom*100:.1f}%.")
     lines.append("")
     lines.append("- **Raw vs valid success** (paired, within attack): for the unconstrained "
@@ -392,11 +397,10 @@ def _interpretation(cfg, summary, comparisons):
     lines.append("- **Baseline vs PrimAttack** paired tests quantify the trade: baselines dominate "
                  "on RAW targeted success but PrimAttack dominates on VALID targeted success wherever "
                  "the sign of P(A)−P(B) flips between the raw and valid rows above.")
-    lines.append("- **Variants**: joint ≥ timing/padding (timing-only alone flips ~nothing; "
-                 "padding drives joint); optimized vs random-feasible is **victim-dependent** "
-                 "(optimized > random on mlp/ft_transformer, but random > optimized on cnn — see the "
-                 "signed prop-diff/OR in §5); budget p75 ≥ p50 (looser budget → marginally more "
-                 "success). Read the exact signs/CI from §5.")
+    lines.append("- **Variants**: exact integer padding search is followed by adaptive affine "
+                 "timing refinement only for unresolved rows. Paired mode rows isolate timing and "
+                 "padding; search-vs-random tests whether optimization dominates a feasible control. "
+                 "Read exact signed differences and confidence intervals in §5.")
     lines.append("- **Unbounded (envelope-only) PrimAttack**: removing the p25/p50/p75 empirical "
                  "budget and keeping only the p99 physical envelope leaves targeted-benign success "
                  "essentially unchanged vs p75 (see 'budget p75 vs unbounded' rows in §5) while "

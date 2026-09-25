@@ -98,6 +98,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("outputs/cicids2017distrinet"),
     )
+    parser.add_argument(
+        "--dataset-id",
+        default="cicids2017_distrinet",
+        help="Dataset provenance id recorded in checkpoints/reports (for example cicids2018_distrinet).",
+    )
     parser.add_argument("--models", default="all", help="Comma-separated model names or 'all'.")
     parser.add_argument("--device", default="auto", choices=("auto", "cpu", "cuda"))
     parser.add_argument("--epochs", type=int, default=5)
@@ -445,12 +450,20 @@ def compute_metrics(
         y_true, y_pred, labels=labels, zero_division=0
     )
     matrix = confusion_matrix(y_true, y_pred, labels=labels)
+    macro_precision = float(np.mean(precision))
+    macro_recall = float(np.mean(recall))
+    weighted_precision = float(np.average(precision, weights=support))
+    weighted_recall = float(np.average(recall, weights=support))
     return {
         "n": int(len(y_true)),
         "loss": float(loss),
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
+        "macro_precision": macro_precision,
+        "macro_recall": macro_recall,
         "macro_f1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+        "weighted_precision": weighted_precision,
+        "weighted_recall": weighted_recall,
         "weighted_f1": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
         "per_class": {
             name: {
@@ -658,7 +671,7 @@ def train_nn(
             "gradient_clip_norm": 5.0,
             "scaler": "RobustScaler(scaler.pkl)",
             "dataset": dataset_id,
-            "split_identifier": "CICIDS_2017_Distrinet/X_{train,val,test}.npy",
+            "split_identifier": f"{Path(args.processed_dir).name}/X_{{train,val,test}}.npy",
             "preprocessing_manifest_sha256": schema_sha256,
         },
     }
@@ -799,7 +812,10 @@ def summary_rows(results: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
             "test_inference_seconds": result["timing"]["test_inference_seconds"],
         }
         for split in ("validation", "test"):
-            for metric in ("loss", "accuracy", "balanced_accuracy", "macro_f1", "weighted_f1"):
+            for metric in (
+                "loss", "accuracy", "balanced_accuracy", "macro_precision", "macro_recall", "macro_f1",
+                "weighted_precision", "weighted_recall", "weighted_f1",
+            ):
                 row[f"{split}_{metric}"] = result[split][metric]
         rows.append(row)
     return rows
@@ -878,13 +894,15 @@ def write_markdown_report(
     started_at: str,
     finished_at: str,
     dos_ddos_rows: Sequence[dict[str, Any]],
+    dataset_id: str,
 ) -> Path:
     lines = [
-        "# CIC-IDS-2017 DistriNet classifier results",
+        f"# {dataset_id} classifier results",
         "",
         "## Experiment",
         "",
-        "All four supported neural architectures were trained independently for exactly two heads: binary and five-category. No fine-grained target, output layer, checkpoint, or report is produced.",
+        "Selected neural architectures were trained independently for exactly two heads: binary and "
+        "five-category. No fine-grained target, output layer, checkpoint, or report is produced.",
         "",
         f"- Started: `{started_at}`",
         f"- Finished: `{finished_at}`",
@@ -922,15 +940,16 @@ def write_markdown_report(
                 "",
                 "### Test summary",
                 "",
-                "| Rank | Model | Accuracy | Balanced accuracy | Macro F1 | Weighted F1 | Train time | Test inference |",
-                "|---:|---|---:|---:|---:|---:|---:|---:|",
+                "| Rank | Model | Accuracy | Balanced accuracy | Macro precision | Macro recall | Macro F1 | Weighted F1 | Train time | Test inference |",
+                "|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|",
             ]
         )
         for rank, result in enumerate(ordered, start=1):
             metrics = result["test"]
             lines.append(
                 f"| {rank} | {result['display_name']} | {format_percent(metrics['accuracy'])} | "
-                f"{format_percent(metrics['balanced_accuracy'])} | {format_percent(metrics['macro_f1'])} | "
+                f"{format_percent(metrics['balanced_accuracy'])} | {format_percent(metrics['macro_precision'])} | "
+                f"{format_percent(metrics['macro_recall'])} | {format_percent(metrics['macro_f1'])} | "
                 f"{format_percent(metrics['weighted_f1'])} | {result['timing']['training_seconds']:.1f}s | "
                 f"{result['timing']['test_inference_seconds']:.2f}s |"
             )
@@ -1018,7 +1037,7 @@ def write_markdown_report(
             "",
         ]
     )
-    path = output_dir / "cicids2017_classifier_results.md"
+    path = output_dir / f"{dataset_id}_classifier_results.md"
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
 
@@ -1121,7 +1140,7 @@ def main() -> None:
                 logger,
                 feature_names=feature_names,
                 schema_sha256=schema_sha256,
-                dataset_id="cicids2017_distrinet",
+                dataset_id=args.dataset_id,
             )
             save_model_outputs(result, data, output_dir)
             plot_confusion(result, output_dir)
@@ -1159,12 +1178,14 @@ def main() -> None:
         started_at,
         finished_at,
         dos_ddos_rows,
+        args.dataset_id,
     )
     manifest = {
         "started_at_utc": started_at,
         "finished_at_utc": finished_at,
         "processed_dir": str(processed_dir),
         "output_dir": str(output_dir),
+        "dataset_id": args.dataset_id,
         "models": models,
         "model_display_names": {model: DISPLAY_NAMES[model] for model in models},
         "heads": {

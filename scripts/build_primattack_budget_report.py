@@ -23,7 +23,8 @@ def _load_samples(root: Path) -> pd.DataFrame:
                 "relative_byte_change",
                 "rate_retention",
                 "primitive_p_projected",
-                "primitive_alpha_projected",
+                "primitive_delay_projected",
+                "primitive_shape_projected",
             )
             for field in numeric_fields:
                 if not np.isfinite(artifact[field]).all():
@@ -31,7 +32,7 @@ def _load_samples(root: Path) -> pd.DataFrame:
             mode = str(artifact["primitive_mode"][0])
             if mode == "timing-only" and np.any(artifact["primitive_p_projected"] != 0):
                 raise ValueError(f"padding active in timing-only artifact {path}")
-            if mode == "padding-only" and np.any(artifact["primitive_alpha_projected"] != 1):
+            if mode == "padding-only" and np.any(artifact["primitive_delay_projected"] != 0):
                 raise ValueError(f"timing active in padding-only artifact {path}")
             n = len(artifact["sample_id"])
             frames.append(pd.DataFrame({

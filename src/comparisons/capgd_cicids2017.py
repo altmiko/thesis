@@ -1,4 +1,4 @@
-"""CICIDS2017-DistriNet adapter for TabularBench's upstream CAPGD.
+"""CICIDS2017 / CSE-CIC-IDS-2018 DistriNet adapter for TabularBench's upstream CAPGD.
 
 The attack implementation is imported from the frozen repository at
 ``external/tabularbench``.  This module supplies only the dataset-specific pieces
@@ -29,7 +29,6 @@ from validation import load_validator
 
 CAPGD_METHOD_ID = "capgd_config_mask_l2_eps0.5"
 TABULARBENCH_COMMIT = "bfb75415a6a31a41ddfeef34478eea1da227d19c"
-DATASET_NAME = "cicids2017_distrinet"
 
 
 @dataclass(frozen=True)
@@ -149,8 +148,8 @@ def fit_train_minmax(
     return low.astype(np.float32), high.astype(np.float32)
 
 
-def _feature_types(repo_root: Path, feature_names: list[str]) -> np.ndarray:
-    profile_path = repo_root / "validation" / "schema" / "cicids2017_distrinet.yaml"
+def _feature_types(repo_root: Path, feature_names: list[str], dataset: str) -> np.ndarray:
+    profile_path = repo_root / "validation" / "schema" / f"{dataset}.yaml"
     profile = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
     if list(profile["feature_order"]) != feature_names:
         raise ValueError("validator schema feature order differs from dataset manifest")
@@ -243,9 +242,10 @@ def build_capgd_resources(
 
     train_path = adapter._processed / "X_train_pristine.npy"
     train_min, train_max = fit_train_minmax(train_path)
-    feature_types = _feature_types(repo, feature_names)
+    dataset = manifest.dataset_name
+    feature_types = _feature_types(repo, feature_names, dataset)
 
-    resolved = get_dataset_mask(DATASET_NAME).resolve(manifest)
+    resolved = get_dataset_mask(dataset).resolve(manifest)
     direct = np.zeros(manifest.n_features, dtype=bool)
     direct[list(resolved.perturbable_idx)] = True
     repairable = np.zeros(manifest.n_features, dtype=bool)
@@ -274,7 +274,7 @@ def build_capgd_resources(
 
     constants = np.flatnonzero(train_min == train_max).tolist()
     payload = {
-        "dataset": DATASET_NAME,
+        "dataset": dataset,
         "fit_split": "train",
         "fit_array": str(train_path),
         "n_features": manifest.n_features,
@@ -307,7 +307,7 @@ def build_capgd_resources(
         train_max=train_max,
         feature_types=feature_types,
         mutable_features=mutable,
-        validator=load_validator(DATASET_NAME),
+        validator=load_validator(dataset),
         manifest_payload=payload,
     )
 

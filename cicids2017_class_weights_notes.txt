@@ -17,7 +17,7 @@ prevents information from the evaluation splits from influencing model fitting.
 
 The preprocessing implementation is in:
 
-  scripts/preprocess_cicids2017_distrinet.py
+  src/preprocessing/preprocess_cicids2017_distrinet.py
 
 The relevant function is `balanced_class_weights`. For each class c, it computes:
 

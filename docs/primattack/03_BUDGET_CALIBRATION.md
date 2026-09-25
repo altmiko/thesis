@@ -1,5 +1,10 @@
 # PrimAttack budget calibration
 
+> **Partly superseded.** The frozen train-only calibration values remain applicable,
+> but the `alpha` conversion below belongs to the replaced timing model. The active
+> code bounds integer total `delay` and supports an evaluated envelope-only condition;
+> see [`../full_thesis_methodology/02_primattack.md`](../full_thesis_methodology/02_primattack.md).
+
 ## Frozen evidence source
 
 The calibration command reads only:

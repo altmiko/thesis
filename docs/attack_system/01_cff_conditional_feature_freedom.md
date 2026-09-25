@@ -188,9 +188,10 @@ selected, non-derived features receive a direct perturbation**; everything else 
 recomputed.
 
 > The **direct primitive attack** and the **VAE latent primitive attack**
-> (docs 07–08) do **not** use CFF masks. They perturb the two primitives `(p, alpha)`
-> and the *realizability model's roles* decide what changes. CFF governs the *masked
-> ablation ladder* (`run_cicids2017_vae_attacks.py`, `--mask-source cff`). This distinction
+> (docs 07–08) do **not** use CFF masks. They use the three controls
+> `(p, delay, shape)` and the realizability model's roles decide what changes. CFF
+> governs the masked ablation ladder (`run_cicids2017_vae_attacks.py`,
+> `--mask-source cff`). This distinction
 > matters for the report: CFF is one of two independent ways the codebase constrains the
 > attacker's degrees of freedom.
 

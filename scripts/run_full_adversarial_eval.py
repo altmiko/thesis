@@ -1,25 +1,35 @@
-"""Full paired adversarial evaluation on CICIDS2017-DistriNet.
+"""Full paired adversarial evaluation (all attack families) on a CICFlowMeter DistriNet dataset.
 
-Fixes the pairing/eligibility/denominator/cap defects found in the legacy runners (see
-FULL_ADVERSARIAL_EVALUATION_CICIDS2017.md audit section) by construction:
+Datasets: ``--dataset cicids2017`` (CICIDS2017-DistriNet; victims = the single checkpoint
+per architecture) or ``--dataset cicids2018`` (CSE-CIC-IDS-2018-DistriNet; victims = the
+three training-seed replicates per architecture, ``<arch>-s<seed>``).
+
+Pairing / eligibility / denominator by construction:
 
 * ELIGIBILITY = clean-correct (victim predicts the true malicious class on the CLEAN flow).
-  Selected ONCE per (victim, class) from the FULL test split (no pre-eligibility cap), then a
-  fixed max-N head slice in test order. Row IDs (sample_id) + positional indices + a sha256 are
-  saved to selection.json. EVERY attack/goal/seed attacks EXACTLY these rows in this order.
-* DENOMINATOR = that clean-correct eligible set (identical across every compared attack within a
-  victim). Rates are numerator/eligible with one consistent denominator.
-* No `_class_rows` true-label selection, no `--test-limit` cap, no broken `mined_valid`/`benign`
-  mask keys (uses the current evaluate_cell contract).
+  Selected ONCE per (victim, class) from the FULL test split, then at most N rows: by
+  default a seeded uniform sample (``--selection random``; the test split is ordered by
+  source label/time, so a head slice would cover a single attack variant), or the legacy
+  head slice in test order (``--selection head``). Row IDs (sample_id) + positional indices
+  + source-label mix + a sha256 are saved to selection.json. EVERY attack/seed attacks
+  EXACTLY these rows in this order.
+* DENOMINATOR = that clean-correct eligible set (identical across attacks within a victim).
 
-Attacks (all on the SAME eligible rows):
-  Unconstrained input-space baselines: PGD/C&W, untargeted AND targeted->Benign.
-  PrimAttack: {optimized, random-feasible} x {joint, timing-only, padding-only} x
-              {intermediate(p50), maximum-evaluated(p75)} budgets (targeted->Benign).
+Attack families (all on the SAME eligible rows, per-row outcomes in artifacts/*.npz):
+  1. Unconstrained input-space PGD/C&W, untargeted and targeted->Benign.
+  2. VAE latent + masked residual ablation ladder A1..A6 (targeted->Benign; A6 trains the
+     Stage-B residual head against the victim on TRAIN rows of the class).
+  3. PrimAttack {search, random-feasible} x {joint, timing-only, padding-only} x budgets
+     (targeted->Benign).
+  4. CAPGD (TabularBench, untargeted): native feature-space (config mask, L2 eps=0.5) and
+     restricted to PrimAttack's p75 primitive-control box.
+  5. FAB (AutoAttack ``FABAttack_PT``, untargeted, unconstrained minimum-norm) in the
+     train-fitted min-max box (default L2 eps=0.5, same attack space as CAPGD native).
 
-Per-row outcomes for every cell are written to artifacts/*.npz so the analysis step can run
-sample-level PAIRED McNemar tests. Run under the CUDA thesis env:
-    python scripts/run_full_adversarial_eval.py --device cuda
+Every cell is gated by the SAME validator_v2 profile of the dataset (hybrid_valid), the
+dataset's Stage-A per-class VAE IDR gate, and the primitive-transform realizability check.
+
+    python scripts/run_full_adversarial_eval.py --dataset cicids2018 --device cuda
 """
 from __future__ import annotations
 
@@ -34,6 +44,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
+from joblib import parallel_backend
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC = REPO_ROOT / "src"
@@ -42,27 +53,73 @@ for _p in (str(REPO_ROOT), str(SRC)):
         sys.path.insert(0, _p)
 
 from attack.input_baselines import input_cw_attack, input_pgd_attack  # noqa: E402
-from attack.realizability.cicids2017 import CICIDS2017PrimitiveModel, SCALER_ATOL  # noqa: E402
+from attack.masks import get_dataset_mask  # noqa: E402
+from attack.realizability.cicids2017 import CICIDS2017PrimitiveModel  # noqa: E402
 from attack.realizability.validator import RealizabilityValidator  # noqa: E402
 from attack.flow_semantics import FlowSemanticValidator, SemanticStatus  # noqa: E402
 from attack.primattack_budget import class_calibration, load_calibration, unbounded_calibration  # noqa: E402
 from attack.run_cicids2017_primitive_attack import (  # noqa: E402
-    evaluate_cell, optimize_primitives, random_feasible_primitives,
+    evaluate_cell, random_feasible_primitives,
     _apply_primitive_mode, _decompose_cost, _LENGTH_COLS, _TIMING_COLS, _RATE_COLS,
 )
-from datasets.cicids2017 import CICIDS2017Adapter  # noqa: E402
+from attack.run_cicids2017_vae_attacks import (  # noqa: E402
+    _assert_frozen_unchanged, _build_generator, _class_x, _subset, targeted_latent_attack,
+)
+from attack.primitive_optimizer import CANDIDATE_NAMES, optimize_primitive_candidates  # noqa: E402
+from attack.train_attack_head import StageBConfig, VictimGuidedTrainer  # noqa: E402
+from comparisons.capgd_cicids2017 import (  # noqa: E402
+    RawCICIDSVictim, build_capgd_resources, evaluate_capgd_output, finalize_capgd_output,
+    fit_train_minmax, make_capgd,
+)
+from comparisons.primitive_capgd import run_primitive_capgd  # noqa: E402
+from comparisons.fab_autoattack import AUTOATTACK_COMMIT, FABBox, load_fab_class, run_fab  # noqa: E402
+from datasets import get_adapter  # noqa: E402
+from experiments.ablations import build_ablation  # noqa: E402
 from experiments.provenance import deterministic_runtime  # noqa: E402
 from src.classifiers.cicids2017d_victims import load_category_victim  # noqa: E402
+from validation.attack_interface import structural_masks  # noqa: E402
 from vae.cicids2017_stage_a import ATTACK_CLASSES, load_stage_a  # noqa: E402
 
-VICTIM_CKPT = {
-    "mlp": REPO_ROOT / "outputs/cicids2017distrinet/models/mlp_category.pt",
-    "cnn": REPO_ROOT / "outputs/cicids2017distrinet/models/cnn_category.pt",
-    "ft_transformer": REPO_ROOT / "outputs/cicids2017distrinet_ft/models/ft_transformer_category.pt",
-}
 BUDGET_LABEL = {"intermediate": "p50", "maximum-evaluated": "p75", "restricted": "p25",
                 "unbounded": "unb"}
 BENIGN_ID = 0
+VAE_ABLATIONS = ("A1", "A2", "A3", "A4", "A5", "A6")
+FAMILIES = ("input", "vae", "primattack", "capgd", "fab")
+
+DATASET_DEFAULTS = {
+    "cicids2017_distrinet": {
+        "victims": "mlp,cnn,ft_transformer",
+        "calibration": REPO_ROOT / "artifacts/primattack/budget_calibration.json",
+        "stage_a_dir": REPO_ROOT / "outputs/cicids2017_vae_stage_a",
+    },
+    "cicids2018_distrinet": {
+        "victims": ",".join(f"{a}-s{s}" for a in ("mlp", "cnn", "ft_transformer")
+                            for s in (42, 123, 2024)),
+        "calibration": REPO_ROOT / "artifacts/primattack/budget_calibration_cicids2018.json",
+        "stage_a_dir": REPO_ROOT / "outputs/cicids2018_vae_stage_a",
+    },
+}
+
+
+def victim_checkpoint(dataset: str, victim: str) -> tuple[Path, str, int | None]:
+    """Resolve a victim id to (checkpoint, architecture, training seed)."""
+    if dataset == "cicids2017_distrinet":
+        ckpt = {
+            "mlp": REPO_ROOT / "outputs/cicids2017distrinet/models/mlp_category.pt",
+            "cnn": REPO_ROOT / "outputs/cicids2017distrinet/models/cnn_category.pt",
+            "ft_transformer": REPO_ROOT / "outputs/cicids2017distrinet_ft/models/ft_transformer_category.pt",
+        }
+        if victim not in ckpt:
+            raise KeyError(f"unknown CICIDS2017 victim {victim!r}")
+        return ckpt[victim], victim, None
+    if dataset == "cicids2018_distrinet":
+        arch, sep, seed = victim.rpartition("-s")
+        if not sep or not seed.isdigit():
+            raise KeyError(f"CICIDS2018 victim must be '<arch>-s<seed>', got {victim!r}")
+        path = (REPO_ROOT / "outputs/cicids2018distrinet/classifiers_multiseed/runs"
+                / f"seed_{seed}" / "models" / f"{arch}_category.pt")
+        return path, arch, int(seed)
+    raise KeyError(f"no victim registry for dataset {dataset!r}")
 
 
 # ----------------------------- targeted baselines ---------------------------------
@@ -121,37 +178,68 @@ def _sha_ids(ids: np.ndarray) -> str:
     return h.hexdigest()
 
 
-def build_attack_roster(budgets, modes, optimizers):
-    roster = [
-        {"name": "pgd_untargeted", "kind": "input_pgd", "goal": "untargeted"},
-        {"name": "cw_untargeted", "kind": "input_cw", "goal": "untargeted"},
-        {"name": "pgd_tb", "kind": "tpgd", "goal": "targeted_benign"},
-        {"name": "cw_tb", "kind": "tcw", "goal": "targeted_benign"},
-    ]
-    for budget in budgets:
-        for opt_name in optimizers:
-            for mode in modes:
-                short = {"optimized": "opt", "random-feasible": "rand"}[opt_name]
-                mshort = {"joint": "joint", "timing-only": "timing", "padding-only": "padding"}[mode]
-                roster.append({
-                    "name": f"prim_{short}_{mshort}_{BUDGET_LABEL[budget]}",
-                    "kind": "primattack", "goal": "targeted_benign",
-                    "optimizer": opt_name, "mode": mode, "budget": budget,
-                })
+def build_attack_roster(families, budgets, modes, optimizers):
+    roster = []
+    if "input" in families:
+        roster += [
+            {"name": "pgd_untargeted", "family": "input", "kind": "input_pgd", "goal": "untargeted"},
+            {"name": "cw_untargeted", "family": "input", "kind": "input_cw", "goal": "untargeted"},
+            {"name": "pgd_tb", "family": "input", "kind": "tpgd", "goal": "targeted_benign"},
+            {"name": "cw_tb", "family": "input", "kind": "tcw", "goal": "targeted_benign"},
+        ]
+    if "vae" in families:
+        roster += [{"name": f"vae_{a}", "family": "vae", "kind": "vae", "ablation": a,
+                    "goal": "targeted_benign"} for a in VAE_ABLATIONS]
+    if "primattack" in families:
+        for budget in budgets:
+            for opt_name in optimizers:
+                for mode in modes:
+                    short = {"search": "search", "random-feasible": "rand"}[opt_name]
+                    mshort = {"joint": "joint", "timing-only": "timing",
+                              "padding-only": "padding"}[mode]
+                    roster.append({
+                        "name": f"prim_{short}_{mshort}_{BUDGET_LABEL[budget]}",
+                        "family": "primattack", "kind": "primattack", "goal": "targeted_benign",
+                        "optimizer": opt_name, "mode": mode, "budget": budget,
+                    })
+    if "capgd" in families:
+        roster += [
+            {"name": "capgd_native", "family": "capgd", "kind": "capgd", "goal": "untargeted"},
+            {"name": "capgd_prim_p75", "family": "capgd", "kind": "prim_capgd",
+             "goal": "untargeted", "budget": "maximum-evaluated", "mode": "joint"},
+        ]
+    if "fab" in families:
+        roster.append({"name": "fab_untargeted", "family": "fab", "kind": "fab",
+                       "goal": "untargeted"})
     return roster
 
 
+def _csv(value: str) -> list[str]:
+    return [v.strip() for v in value.split(",") if v.strip()]
+
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__)
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--dataset", default="cicids2017", help="cicids2017 | cicids2018")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
-    ap.add_argument("--seeds", default="42,123,2024")
+    ap.add_argument("--seeds", default="42,123,2024",
+                    help="attack seeds (ignored for victims with a training seed when "
+                         "--match-victim-seed is set)")
+    ap.add_argument("--match-victim-seed", action="store_true",
+                    help="attack each '<arch>-s<seed>' victim with its own training seed only")
     ap.add_argument("--n-per-class", type=int, default=800)
-    ap.add_argument("--victims", default="mlp,cnn,ft_transformer")
+    ap.add_argument("--selection", choices=("random", "head"), default="random",
+                    help="random: seeded uniform sample of the clean-correct rows (covers every "
+                         "source label); head: first N in test order (legacy canonical)")
+    ap.add_argument("--selection-seed", type=int, default=42)
+    ap.add_argument("--victims", default=None, help="default: every victim of the dataset")
     ap.add_argument("--classes", default=",".join(ATTACK_CLASSES))
+    ap.add_argument("--families", default=",".join(FAMILIES))
     ap.add_argument("--budgets", default="intermediate,maximum-evaluated,unbounded")
     ap.add_argument("--modes", default="joint,timing-only,padding-only")
-    ap.add_argument("--optimizers", default="optimized,random-feasible")
-    # baseline hyperparams
+    ap.add_argument("--optimizers", default="search,random-feasible")
+    # input baselines
     ap.add_argument("--pgd-epsilon", type=float, default=0.5)
     ap.add_argument("--pgd-alpha", type=float, default=0.05)
     ap.add_argument("--pgd-steps", type=int, default=40)
@@ -160,32 +248,63 @@ def main() -> None:
     ap.add_argument("--cw-iters", type=int, default=60)
     ap.add_argument("--cw-lr", type=float, default=0.01)
     ap.add_argument("--cw-conv", type=float, default=1e-5)
-    # primattack hyperparams
+    # primattack
     ap.add_argument("--prim-steps", type=int, default=40)
     ap.add_argument("--prim-lr", type=float, default=0.1)
-    ap.add_argument("--prim-cost-weight", type=float, default=0.01)
-    ap.add_argument("--prim-init-noise", type=float, default=0.5)
-    ap.add_argument("--calibration", type=Path,
-                    default=REPO_ROOT / "artifacts/primattack/budget_calibration.json")
-    ap.add_argument("--stage-a-dir", type=Path,
-                    default=REPO_ROOT / "outputs/cicids2017_vae_stage_a")
-    ap.add_argument("--output-dir", type=Path, default=REPO_ROOT / "outputs/full_adv_eval")
+    ap.add_argument("--prim-restarts", type=int, default=2)
+    # vae latent
+    ap.add_argument("--vae-steps", type=int, default=40)
+    ap.add_argument("--vae-lr", type=float, default=0.1)
+    ap.add_argument("--vae-latent-epsilon", type=float, default=20.0)
+    ap.add_argument("--vae-constraint-weight", type=float, default=0.1)
+    ap.add_argument("--vae-layer1-fit-limit", type=int, default=200000)
+    ap.add_argument("--vae-stage-b-train-limit", type=int, default=20000)
+    # capgd
+    ap.add_argument("--capgd-epsilon", type=float, default=0.5)
+    ap.add_argument("--capgd-steps", type=int, default=10)
+    ap.add_argument("--capgd-batch-size", type=int, default=64)
+    ap.add_argument("--prim-capgd-steps", type=int, default=40)
+    # fab (AutoAttack)
+    ap.add_argument("--fab-norm", choices=("Linf", "L2", "L1"), default="L2")
+    ap.add_argument("--fab-epsilon", type=float, default=0.5,
+                    help="acceptance radius in the train min-max [0,1] box")
+    ap.add_argument("--fab-iter", type=int, default=100)
+    ap.add_argument("--fab-restarts", type=int, default=1)
+    ap.add_argument("--fab-batch-size", type=int, default=1024)
+    ap.add_argument("--calibration", type=Path, default=None)
+    ap.add_argument("--stage-a-dir", type=Path, default=None)
+    ap.add_argument("--output-dir", type=Path, default=None,
+                    help="default: outputs/adv_campaign/<dataset>")
     args = ap.parse_args()
 
-    device = args.device
-    seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
-    victims = [v.strip() for v in args.victims.split(",") if v.strip()]
-    classes = [c.strip() for c in args.classes.split(",") if c.strip()]
-    budgets = [b.strip() for b in args.budgets.split(",") if b.strip()]
-    modes = [m.strip() for m in args.modes.split(",") if m.strip()]
-    optimizers = [o.strip() for o in args.optimizers.split(",") if o.strip()]
-    roster = build_attack_roster(budgets, modes, optimizers)
+    adapter = get_adapter(args.dataset)
+    dataset = adapter.name
+    defaults = DATASET_DEFAULTS[dataset]
+    calibration_path = args.calibration or defaults["calibration"]
+    stage_a_dir = args.stage_a_dir or defaults["stage_a_dir"]
+    out = args.output_dir or (REPO_ROOT / "outputs/adv_campaign" / dataset)
 
-    out = args.output_dir
+    device = args.device
+    base_seeds = [int(s) for s in _csv(args.seeds)]
+    victims = _csv(args.victims or defaults["victims"])
+    classes = _csv(args.classes)
+    families = _csv(args.families)
+    unknown = sorted(set(families) - set(FAMILIES))
+    if unknown:
+        raise ValueError(f"unknown families {unknown}")
+    budgets, modes, optimizers = _csv(args.budgets), _csv(args.modes), _csv(args.optimizers)
+    roster = build_attack_roster(families, budgets, modes, optimizers)
+
+    victim_info = {}
+    for vname in victims:
+        ckpt, arch, train_seed = victim_checkpoint(dataset, vname)
+        seeds = [train_seed] if (args.match_victim_seed and train_seed is not None) else base_seeds
+        victim_info[vname] = {"checkpoint": ckpt, "arch": arch, "train_seed": train_seed,
+                              "attack_seeds": seeds}
+
     art = out / "artifacts"
     art.mkdir(parents=True, exist_ok=True)
 
-    adapter = CICIDS2017Adapter()
     manifest = adapter.feature_manifest()
     transform = adapter.feature_transform()
     mapping = adapter.class_mapping()
@@ -194,27 +313,31 @@ def main() -> None:
 
     model = CICIDS2017PrimitiveModel(manifest)
     realizability = RealizabilityValidator(model)
-    calibration = load_calibration(args.calibration)
+    calibration = load_calibration(calibration_path)
+    if calibration.get("dataset") != dataset:
+        raise ValueError(f"calibration {calibration_path} is for {calibration.get('dataset')!r}, "
+                         f"not {dataset!r}")
     semantic_validator = FlowSemanticValidator(model, calibration)
     groups_idx = {
         "padding": torch.tensor([model.i[n] for n in _LENGTH_COLS], device=device),
         "timing": torch.tensor([model.i[n] for n in _TIMING_COLS], device=device),
         "rate": torch.tensor([model.i[n] for n in _RATE_COLS], device=device),
     }
+    resolved = get_dataset_mask(dataset).resolve(manifest)
 
-    # ---- data + alignment assertions (Hazard 5) ----
-    raw_all = np.load(adapter._processed / "X_test_pristine.npy", mmap_mode="r")
-    x_scaled_disk = np.load(adapter._processed / "X_test.npy", mmap_mode="r")
-    y = np.load(adapter._processed / "y_test_cat.npy").astype(np.int64)
+    # ---- data + alignment assertions ----
+    processed = adapter._processed
+    raw_all = np.load(processed / "X_test_pristine.npy", mmap_mode="r")
+    x_scaled_disk = np.load(processed / "X_test.npy", mmap_mode="r")
+    y = np.load(processed / "y_test_cat.npy").astype(np.int64)
     y_split = np.asarray(adapter.load_split("test").y).astype(np.int64)
-    meta = pd.read_parquet(adapter._processed / "test.parquet",
-                           columns=["sample_id", "Src IP", "Dst IP"])
+    meta = pd.read_parquet(processed / "test.parquet",
+                           columns=["sample_id", "Src IP", "Dst IP", "source_label"])
     sample_ids_all = meta["sample_id"].astype(str).to_numpy(dtype="U128")
     n_rows = len(y)
     assert raw_all.shape[0] == n_rows == x_scaled_disk.shape[0] == len(sample_ids_all) == len(y_split), \
         "row-order/length mismatch across y/X_test/X_test_pristine/test.parquet"
     assert np.array_equal(y, y_split), "y_test_cat.npy disagrees with load_split('test').y"
-    # verify scaled == (pristine-center)/scale on a probe (preprocessing invariant)
     probe = np.asarray(raw_all[:2048], dtype=np.float64)
     recon = (probe - transform.center) / transform.scale
     assert np.allclose(recon, np.asarray(x_scaled_disk[:2048], dtype=np.float64), atol=1e-3), \
@@ -223,138 +346,266 @@ def main() -> None:
     raw_all_t = torch.tensor(np.ascontiguousarray(raw_all), dtype=torch.float32, device=device)
     scaled_all_t = (raw_all_t - center) / scale  # single source of truth for victim input
 
-    # per-class Stage-A VAE + IDR
-    base_vae, idr_path = {}, {}
+    # ---- per-class Stage-A VAE + IDR (+ VAE-attack train-only context) ----
+    base_vae, base_state, idr_path = {}, {}, {}
     for cname in classes:
-        vae, _ = load_stage_a(adapter, args.stage_a_dir / f"vae_{cname}.pt",
-                              expected_class_name=cname, device=device)
+        vae, ckpt = load_stage_a(adapter, stage_a_dir / f"vae_{cname}.pt",
+                                 expected_class_name=cname, device=device)
         base_vae[cname] = vae
-        idr_path[cname] = args.stage_a_dir / f"idr_{cname}.npz"
+        base_state[cname] = ckpt["state_dict"]
+        idr_path[cname] = stage_a_dir / f"idr_{cname}.npz"
+
+    raw_train = np.load(processed / "X_train_pristine.npy", mmap_mode="r")
+    layer1_fit_raw = _subset(raw_train, args.vae_layer1_fit_limit, 42)
+    layer2_path = REPO_ROOT / "old_constraints" / dataset / "mined.json"
+    perturbable = resolved.perturbable_mask().to(device)
+    # Independent A4 engine (Layer 0+1+2) scores EVERY attack's output for the ablation ladder.
+    engine = build_ablation("A4", adapter, encoder_input_transform="asinh",
+                            layer1_fit_x_raw=layer1_fit_raw, mutable_mask=perturbable,
+                            layer2_path=layer2_path).engine
+    stage_b_rows = {}
+    if "vae" in families:
+        train_split = adapter.load_split("train")
+        for cname in classes:
+            cid = mapping.name_to_id[cname]
+            stage_b_rows[cname] = _class_x(train_split, cid, args.vae_stage_b_train_limit, 142 + cid)
+    capgd_resources = build_capgd_resources(REPO_ROOT, adapter=adapter) if "capgd" in families else None
+    fab_cls = fab_box = None
+    if "fab" in families:
+        fab_cls = load_fab_class(REPO_ROOT)
+        fab_box = FABBox.from_minmax(*fit_train_minmax(processed / "X_train_pristine.npy"),
+                                     device=device)
 
     config = {
-        "seeds": seeds, "victims": victims, "classes": classes,
+        "dataset": dataset,
+        "victims": {v: {"checkpoint": str(i["checkpoint"]), "arch": i["arch"],
+                        "train_seed": i["train_seed"], "attack_seeds": i["attack_seeds"]}
+                    for v, i in victim_info.items()},
+        "classes": classes, "families": families,
         "budgets": {b: BUDGET_LABEL[b] for b in budgets}, "modes": modes,
         "optimizers": optimizers, "n_per_class_cap": args.n_per_class,
         "eligibility": "clean-correct (victim predicts true malicious class on clean flow)",
         "denominator": "clean-correct eligible set (identical across attacks within a victim)",
         "benign_id": BENIGN_ID,
+        "validator_v2_profile": dataset,
+        "stage_a_dir": str(stage_a_dir),
+        "layer2_rules": str(layer2_path),
         "pgd": {"epsilon": args.pgd_epsilon, "alpha": args.pgd_alpha, "steps": args.pgd_steps},
         "cw": {"lambda": args.cw_lambda, "kappa": args.cw_kappa, "iters": args.cw_iters,
                "lr": args.cw_lr, "conv": args.cw_conv},
-        "primattack": {"steps": args.prim_steps, "lr": args.prim_lr,
-                       "cost_weight": args.prim_cost_weight, "init_noise": args.prim_init_noise,
-                       "calibration": str(args.calibration),
+        "primattack": {"steps": args.prim_steps, "learning_rate": args.prim_lr,
+                       "restarts": args.prim_restarts, "calibration": str(calibration_path),
                        "calibration_fit_split": calibration["fit_split"]},
-        "attack_roster": [a["name"] for a in roster],
+        "vae": {"ablations": list(VAE_ABLATIONS), "steps": args.vae_steps, "lr": args.vae_lr,
+                "latent_epsilon": args.vae_latent_epsilon,
+                "constraint_weight": args.vae_constraint_weight,
+                "layer1_fit_rows": int(len(layer1_fit_raw)),
+                "stage_b": {"epochs": 5, "batch_size": 256, "lr": 1e-3, "lambda_delta": 0.1,
+                            "train_limit_per_class": args.vae_stage_b_train_limit,
+                            "fit_split": "train"},
+                "mask": "config mask (9 perturbable + 7 derived-exact)"},
+        "capgd": {"native": {"norm": "L2", "epsilon": args.capgd_epsilon,
+                             "steps": args.capgd_steps, "batch_size": args.capgd_batch_size},
+                  "primitive": {"norm": "Linf", "epsilon": 1.0, "box": "PrimAttack p75 joint",
+                                "steps": args.prim_capgd_steps}},
+        "fab": {"implementation": "autoattack.fab_pt.FABAttack_PT (external/auto-attack)",
+                "autoattack_commit": AUTOATTACK_COMMIT, "goal": "untargeted",
+                "norm": args.fab_norm, "epsilon": args.fab_epsilon, "n_iter": args.fab_iter,
+                "n_restarts": args.fab_restarts, "batch_size": args.fab_batch_size,
+                "attack_space": "train-fitted min-max box of pristine features, [0,1]^d; "
+                                "train-constant features pinned"},
+        "attack_roster": [{k: v for k, v in a.items()} for a in roster],
         "n_features": int(manifest.n_features), "n_test": int(n_rows),
         "class_names": list(mapping.names),
+        "selection": {"method": args.selection, "seed": args.selection_seed,
+                      "rule": ("per class, one seeded permutation of ALL class test rows; each "
+                               "victim takes the first n_per_class that it classifies correctly "
+                               "(max overlap across victims), re-sorted to test order"
+                               if args.selection == "random" else
+                               "first n_per_class clean-correct rows in test order")},
     }
     (out / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
 
     # ---- selection: clean-correct eligible set per (victim, class) ----
-    selection = {}
-    eligibility = {}  # (victim, class) -> dict(idx, sample_ids, raw_t, x0_t, meta)
-    victim_cache = {}
+    selection, eligibility, victim_cache = {}, {}, {}
     for vname in victims:
-        victim = load_category_victim(VICTIM_CKPT[vname], adapter=adapter,
-                                      expected_model_type=vname, device=device)
+        info = victim_info[vname]
+        victim = load_category_victim(info["checkpoint"], adapter=adapter,
+                                      expected_model_type=info["arch"], device=device)
         victim_cache[vname] = victim
         with torch.no_grad():
-            preds = []
-            for s in range(0, n_rows, 16384):
-                preds.append(victim(scaled_all_t[s:s + 16384]).argmax(1).cpu().numpy())
-        pred = np.concatenate(preds)
+            pred = np.concatenate([victim(scaled_all_t[s:s + 16384]).argmax(1).cpu().numpy()
+                                   for s in range(0, n_rows, 16384)])
         selection[vname] = {}
         for cname in classes:
             cid = int(mapping.name_to_id[cname])
-            elig = np.flatnonzero((pred == cid) & (y == cid))  # test-order, clean-correct
-            n_elig_total = int(len(elig))
-            idx = elig[: args.n_per_class]  # head slice in test order (deterministic)
+            correct = (pred == cid) & (y == cid)
+            elig = np.flatnonzero(correct)  # test-order, clean-correct
+            if args.selection == "random":
+                order = np.random.default_rng(args.selection_seed + cid).permutation(
+                    np.flatnonzero(y == cid))
+                idx = np.sort(order[correct[order]][: args.n_per_class])
+            else:
+                idx = elig[: args.n_per_class]
             sids = sample_ids_all[idx]
+            raw_t = raw_all_t[torch.tensor(idx, device=device)]
+            clean_valid = structural_masks(raw_t.cpu().numpy(), dataset=dataset)["hybrid_valid"]
             selection[vname][cname] = {
                 "class_id": cid,
-                "n_eligible_total": n_elig_total,
+                "n_class_test": int((y == cid).sum()),
+                "n_eligible_total": int(len(elig)),
                 "n_used": int(len(idx)),
+                "clean_hybrid_valid_rate": float(np.mean(clean_valid)) if len(idx) else float("nan"),
+                "source_label_counts": {str(k): int(v) for k, v in
+                                        meta.iloc[idx]["source_label"].value_counts().items()},
                 "sha256_sample_ids": _sha_ids(sids),
                 "positional_idx": idx.tolist(),
                 "sample_ids": sids.tolist(),
             }
-            raw_t = raw_all_t[torch.tensor(idx, device=device)]
             eligibility[(vname, cname)] = {
-                "idx": idx, "sids": sids, "raw": raw_t,
-                "x0": (raw_t - center) / scale,
+                "idx": idx, "sids": sids, "raw": raw_t, "x0": (raw_t - center) / scale,
                 "src": {"Src IP": meta.iloc[idx]["Src IP"].astype(str).to_numpy(),
                         "Dst IP": meta.iloc[idx]["Dst IP"].astype(str).to_numpy()},
             }
     (out / "selection.json").write_text(json.dumps(selection, indent=2), encoding="utf-8")
 
     # ---- run attacks ----
-    cells = []
-    failures = []
+    cells, failures = [], []
     t0 = time.time()
     for vname in victims:
         victim = victim_cache[vname]
+        seeds = victim_info[vname]["attack_seeds"]
+        raw_victim = RawCICIDSVictim(victim, transform.center, transform.scale).to(device).eval()
         for cname in classes:
             cid = int(mapping.name_to_id[cname])
             E = eligibility[(vname, cname)]
             raw, x0, sids = E["raw"], E["x0"], E["sids"]
             n = raw.shape[0]
             labels = np.full(n, cid, dtype=np.int64)
-            # primitive scaffolding (per victim,class; reused across seeds/modes)
+            labels_t = torch.full((n,), cid, dtype=torch.long, device=device)
             caps = model.infer_capabilities(raw)
             for atk in roster:
                 for seed in seeds:
                     deterministic_runtime(seed)
                     semantic = None
-                    if atk["kind"] == "input_pgd":
+                    requested = projected = optimization = bounds = ccfg = None
+                    extra: dict[str, np.ndarray] = {}
+                    attack_t0 = time.perf_counter()
+                    kind = atk["kind"]
+                    if kind == "input_pgd":
                         x_adv, _ = input_pgd_attack(
-                            classifier=victim, x_original=x0,
-                            y_true=torch.full((n,), cid, dtype=torch.long, device=device),
+                            classifier=victim, x_original=x0, y_true=labels_t,
                             epsilon=args.pgd_epsilon, alpha=args.pgd_alpha,
                             num_steps=args.pgd_steps, random_start=True, device=device)
-                    elif atk["kind"] == "input_cw":
+                    elif kind == "input_cw":
                         x_adv, _ = input_cw_attack(
-                            classifier=victim, x_original=x0,
-                            y_true=torch.full((n,), cid, dtype=torch.long, device=device),
+                            classifier=victim, x_original=x0, y_true=labels_t,
                             lambda_conf=args.cw_lambda, kappa=args.cw_kappa,
                             num_iterations=args.cw_iters, learning_rate=args.cw_lr,
                             convergence_threshold=args.cw_conv, device=device)
-                    elif atk["kind"] == "tpgd":
+                    elif kind == "tpgd":
                         x_adv = targeted_pgd_benign(
                             victim, x0, epsilon=args.pgd_epsilon, steps=args.pgd_steps,
                             alpha=args.pgd_alpha, device=device)
-                    elif atk["kind"] == "tcw":
+                    elif kind == "tcw":
                         x_adv = targeted_cw_benign(
                             victim, x0, lambda_conf=args.cw_lambda, kappa=args.cw_kappa,
                             iters=args.cw_iters, lr=args.cw_lr, device=device)
-                    else:  # primattack
+                    elif kind == "vae":
+                        bundle = build_ablation(
+                            atk["ablation"], adapter, encoder_input_transform="asinh",
+                            layer1_fit_x_raw=layer1_fit_raw, mutable_mask=perturbable,
+                            layer2_path=layer2_path)
+                        bundle.vae.load_state_dict(base_state[cname], strict=True)
+                        bundle.vae.to(device).eval()
+                        for parameter in bundle.vae.parameters():
+                            parameter.requires_grad_(False)
+                        generator = _build_generator(bundle, device, resolved=resolved,
+                                                     mutable_mask=perturbable)
+                        if atk["ablation"] == "A6":
+                            VictimGuidedTrainer(
+                                generator, victim, transform, bundle.engine,
+                                StageBConfig(epochs=5, batch_size=256, lr=1e-3,
+                                             lambda_attack=1.0, lambda_delta=0.1,
+                                             lambda_c1=args.vae_constraint_weight,
+                                             lambda_c2=args.vae_constraint_weight, seed=seed),
+                                device=device,
+                            ).fit(stage_b_rows[cname])
+                        parts = []
+                        for s in range(0, n, 256):
+                            adv_b, _ = targeted_latent_attack(
+                                generator, bundle.engine, victim, x0[s:s + 256],
+                                steps=args.vae_steps, learning_rate=args.vae_lr,
+                                latent_epsilon=args.vae_latent_epsilon,
+                                lambda_constraints=args.vae_constraint_weight,
+                                resolved=resolved)
+                            parts.append(adv_b)
+                        x_adv = torch.cat(parts, dim=0)
+                        _assert_frozen_unchanged(resolved, base_vae[cname], x0, x_adv)
+                    elif kind == "capgd":
+                        attack = make_capgd(capgd_resources, raw_victim, device=device, seed=seed,
+                                            norm="L2", eps=args.capgd_epsilon,
+                                            steps=args.capgd_steps)
+                        chunks = []
+                        for s in range(0, n, args.capgd_batch_size):
+                            batch = raw[s:s + args.capgd_batch_size]
+                            with parallel_backend("threading"):
+                                cand = attack(batch, labels_t[s:s + args.capgd_batch_size])
+                            chunks.append(finalize_capgd_output(capgd_resources, batch, cand).detach())
+                        adv_raw = torch.cat(chunks, dim=0).float()
+                        checked = evaluate_capgd_output(
+                            capgd_resources, raw.cpu().numpy(), adv_raw.cpu().numpy(),
+                            norm="L2", eps=args.capgd_epsilon)
+                        extra["capgd_internal_valid"] = np.asarray(checked["internal_constraint_valid"], bool)
+                        extra["capgd_distance_ok"] = np.asarray(checked["distance_ok"], bool)
+                    elif kind == "fab":
+                        adv_raw = run_fab(
+                            fab_cls, victim, raw, labels_t, box=fab_box, center=center,
+                            scale=scale, norm=args.fab_norm, eps=args.fab_epsilon,
+                            n_iter=args.fab_iter, n_restarts=args.fab_restarts, seed=seed,
+                            batch_size=args.fab_batch_size, device=device)
+                    else:  # primattack / prim_capgd
                         ccfg = (unbounded_calibration(calibration, cname)
                                 if atk["budget"] == "unbounded"
                                 else class_calibration(calibration, cname, atk["budget"]))
                         bounds = _apply_primitive_mode(
                             model.per_flow_bounds(raw, ccfg.bounds_config(), capabilities=caps),
                             atk["mode"])
-                        if atk["optimizer"] == "optimized":
-                            requested = optimize_primitives(
+                        if kind == "prim_capgd":
+                            with parallel_backend("threading"):
+                                result = run_primitive_capgd(
+                                    repo_root=REPO_ROOT, primitive_model=model, victim=victim,
+                                    raw=raw, bounds=bounds, capabilities=caps, center=center,
+                                    scale=scale, true_labels=labels_t, seed=seed,
+                                    steps=args.prim_capgd_steps)
+                            requested, projected = result.requested, result.projected
+                            adv_raw = result.adversarial_raw
+                        elif atk["optimizer"] == "search":
+                            optimization = optimize_primitive_candidates(
                                 model, victim, raw, center, scale, bounds, caps,
-                                steps=args.prim_steps, lr=args.prim_lr,
-                                cost_weight=args.prim_cost_weight,
-                                init_noise=args.prim_init_noise, seed=seed)
+                                steps=args.prim_steps, learning_rate=args.prim_lr,
+                                restarts=args.prim_restarts, seed=seed,
+                            )
+                            requested = optimization.requested
+                            projected = optimization.projected
+                            adv_raw = optimization.adversarial_raw
                         else:
                             requested = random_feasible_primitives(bounds, seed)
-                        projected = model.project_controls(raw, requested, bounds)
-                        adv_raw = model.generate(raw, projected, quantize=True).detach()
+                            projected = model.project_controls(raw, requested, bounds, capabilities=caps)
+                            adv_raw = model.generate(raw, projected, quantize=True,
+                                                     capabilities=caps).detach()
                         semantic = semantic_validator.evaluate(
                             raw, adv_raw, requested, projected, bounds,
                             class_name=cname, budget=ccfg.budget,
                             original_labels=labels, adversarial_labels=labels.copy(),
                             original_metadata=E["src"], adversarial_metadata=E["src"])
-                        x_adv = (adv_raw - center) / scale
 
-                    if atk["kind"] in ("input_pgd", "input_cw", "tpgd", "tcw"):
+                    if kind in ("input_pgd", "input_cw", "tpgd", "tcw", "vae"):
                         adv_raw = (x_adv * scale + center).detach()
+                    x_adv = (adv_raw - center) / scale
+                    elapsed_seconds = time.perf_counter() - attack_t0
 
-                    if not bool(np.isfinite(adv_raw.detach().cpu().numpy()).all()):
+                    if not bool(torch.isfinite(adv_raw).all()):
                         failures.append({"attack": atk["name"], "victim": vname,
                                          "class": cname, "seed": seed, "reason": "nonfinite_adv"})
                         continue
@@ -363,6 +614,8 @@ def main() -> None:
                         model, realizability, victim, base_vae[cname], raw, adv_raw,
                         center, scale, cid, idr_path[cname], groups_idx)
                     cost = _decompose_cost(adv_raw, raw, scale, groups_idx)
+                    with torch.no_grad():
+                        ladder = engine.validate(adv_raw)
 
                     cc = masks["clean_correct"]
                     if int(cc.sum().item()) != n:
@@ -370,8 +623,8 @@ def main() -> None:
                                          "seed": seed, "reason": "eligible_not_all_clean_correct",
                                          "n_clean_correct": int(cc.sum().item()), "n": n})
 
-                    evasion = (adv_pred != cid)
-                    targeted = (adv_pred == BENIGN_ID)
+                    evasion = adv_pred != cid
+                    targeted = adv_pred == BENIGN_ID
                     domain_valid = masks["domain_valid"]
                     realizable = masks["primitive_transform_consistent"]
                     in_dist = masks["in_dist"]
@@ -381,38 +634,53 @@ def main() -> None:
                         prim_feasible = torch.as_tensor(
                             semantic.primitive_feasible, device=device) & realizable
                     else:
-                        sem_pass = None
-                        prim_feasible = None
+                        sem_pass = prim_feasible = None
+                    np_ = lambda t: t.detach().cpu().numpy()  # noqa: E731
+                    nan = np.full(n, np.nan, np.float32)
+                    l2 = (x_adv - x0).reshape(n, -1).norm(dim=1)
 
                     npz = art / f"{vname}__{cname}__{atk['name']}__seed{seed}.npz"
                     np.savez_compressed(
                         npz,
-                        sample_id=sids,
-                        positional_idx=E["idx"],
-                        true_class=labels,
-                        clean_pred=clean_pred.cpu().numpy().astype(np.int64),
-                        adv_pred=adv_pred.cpu().numpy().astype(np.int64),
-                        clean_correct=cc.cpu().numpy(),
-                        evasion=evasion.cpu().numpy(),
-                        targeted_success=targeted.cpu().numpy(),
-                        domain_valid=domain_valid.cpu().numpy(),
-                        realizable=realizable.cpu().numpy(),
-                        in_dist=in_dist.cpu().numpy(),
-                        semantic_pass=(sem_pass.cpu().numpy() if sem_pass is not None
+                        sample_id=sids, positional_idx=E["idx"], true_class=labels,
+                        clean_pred=np_(clean_pred).astype(np.int64),
+                        adv_pred=np_(adv_pred).astype(np.int64),
+                        clean_correct=np_(cc), evasion=np_(evasion), targeted_success=np_(targeted),
+                        domain_valid=np_(domain_valid),
+                        hard_structural_valid=np_(masks["hard_structural_valid"]),
+                        realizable=np_(realizable), in_dist=np_(in_dist),
+                        engine_l0=np_(ladder["pass_l0"]), engine_l0_l1=np_(ladder["pass_l0_l1"]),
+                        engine_l0_l1_l2=np_(ladder["pass_l0_l1_l2"]),
+                        semantic_pass=(np_(sem_pass) if sem_pass is not None
                                        else np.full(n, -1, dtype=np.int8)),
-                        primitive_feasible=(prim_feasible.cpu().numpy() if prim_feasible is not None
+                        primitive_feasible=(np_(prim_feasible) if prim_feasible is not None
                                             else np.full(n, -1, dtype=np.int8)),
-                        cost_total=cost["total"].cpu().numpy().astype(np.float32),
-                        cost_padding=cost["padding"].cpu().numpy().astype(np.float32),
-                        cost_timing=cost["timing"].cpu().numpy().astype(np.float32),
-                        l2_scaled=(x_adv - x0).reshape(n, -1).norm(dim=1).cpu().numpy().astype(np.float32),
-                        attack=atk["name"], victim=vname, attack_class=cname, seed=seed,
-                        goal=atk["goal"],
+                        cost_total=np_(cost["total"]).astype(np.float32),
+                        cost_padding=np_(cost["padding"]).astype(np.float32),
+                        cost_timing=np_(cost["timing"]).astype(np.float32),
+                        l2_scaled=np_(l2).astype(np.float32),
+                        primitive_p=(np_(projected["p"]).astype(np.float32) if projected is not None else nan),
+                        primitive_delay=(np_(projected["delay"]).astype(np.float32) if projected is not None else nan),
+                        primitive_shape=(np_(projected["shape"]).astype(np.float32) if projected is not None else nan),
+                        primitive_p_hi=(np_(bounds["p"]).astype(np.float32) if bounds is not None else nan),
+                        primitive_delay_hi=(np_(bounds["delay"]).astype(np.float32) if bounds is not None else nan),
+                        optimizer_target_margin=(
+                            np_(optimization.target_margin).astype(np.float32)
+                            if optimization is not None else nan),
+                        optimizer_candidate_source=(
+                            np.asarray([CANDIDATE_NAMES[int(v)] for v in np_(optimization.candidate_source)])
+                            if optimization is not None else np.full(n, "not-applicable")),
+                        **extra,
+                        elapsed_seconds=np.asarray(elapsed_seconds, np.float64),
+                        attack=atk["name"], family=atk["family"], victim=vname,
+                        victim_arch=victim_info[vname]["arch"], attack_class=cname, seed=seed,
+                        goal=atk["goal"], dataset=dataset,
                     )
 
-                    rate = lambda m: float((m & cc).sum().item()) / n
+                    rate = lambda m: float((m & cc).sum().item()) / n  # noqa: E731
                     cell = {
-                        "victim": vname, "class": cname, "attack": atk["name"],
+                        "dataset": dataset, "victim": vname, "arch": victim_info[vname]["arch"],
+                        "class": cname, "attack": atk["name"], "family": atk["family"],
                         "goal": atk["goal"], "seed": seed, "n_eligible": n,
                         "n_eligible_total": selection[vname][cname]["n_eligible_total"],
                         "sha256_sample_ids": selection[vname][cname]["sha256_sample_ids"],
@@ -423,8 +691,12 @@ def main() -> None:
                         "domain_validity_rate": rate(domain_valid),
                         "realizable_rate": rate(realizable),
                         "idr": rate(in_dist),
+                        "true_idsr_untargeted": rate(evasion & domain_valid & in_dist),
+                        "true_idsr_targeted": rate(targeted & domain_valid & in_dist),
+                        "engine_l0_l1_l2_rate": rate(ladder["pass_l0_l1_l2"]),
                         "mean_cost_total": float(cost["total"].mean().item()),
-                        "mean_l2_scaled": float((x_adv - x0).reshape(n, -1).norm(dim=1).mean().item()),
+                        "mean_l2_scaled": float(l2.mean().item()),
+                        "elapsed_seconds": elapsed_seconds,
                     }
                     if sem_pass is not None:
                         cell["semantic_pass_rate"] = rate(sem_pass)
@@ -433,26 +705,26 @@ def main() -> None:
                     cells.append(cell)
             print(f"[{time.time()-t0:6.0f}s] {vname}/{cname}: {len(roster)} attacks x "
                   f"{len(seeds)} seeds done (n={n})", flush=True)
+            (out / "cells.json").write_text(json.dumps(cells, indent=2), encoding="utf-8")
 
     (out / "cells.json").write_text(json.dumps(cells, indent=2), encoding="utf-8")
     (out / "failures.json").write_text(json.dumps(failures, indent=2), encoding="utf-8")
 
-    # ---- runtime PAIRING ASSERTIONS (requirement 11) ----
-    assert_pairing(out, victims, classes, seeds, roster, selection)
+    assert_pairing(out, victim_info, classes, roster, selection)
     print(f"[done] {len(cells)} cells, {len(failures)} failures; "
           f"pairing assertions PASSED; artifacts in {art}", flush=True)
 
 
-def assert_pairing(out: Path, victims, classes, seeds, roster, selection):
+def assert_pairing(out: Path, victim_info, classes, roster, selection):
     """Fail loudly if any two attacks on the same (victim,class,seed) used different rows,
     order, labels, clean predictions, or counts."""
     art = out / "artifacts"
-    for vname in victims:
+    for vname, info in victim_info.items():
         for cname in classes:
             ref_sids = np.asarray(selection[vname][cname]["sample_ids"], dtype="U128")
             n_ref = len(ref_sids)
             ref_clean = None
-            for seed in seeds:
+            for seed in info["attack_seeds"]:
                 for atk in roster:
                     npz = art / f"{vname}__{cname}__{atk['name']}__seed{seed}.npz"
                     if not npz.exists():

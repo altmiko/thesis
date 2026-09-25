@@ -1,17 +1,16 @@
 # 7. Attack Metrics & Evaluation (MODERATE DETAIL)
 
 All PrimAttack metrics share **one denominator**: eligible clean-correct malicious rows.
-Defined in `run_cicids2017_primitive_attack.py` (`evaluate_cell`, `run`) and
-`validation/metrics.py` (`targeted_asr_suite`). Let, per (class, victim, seed) cell:
+The canonical paired driver selects and freezes this set once per `(victim,class)`;
+every attack and seed reuses the same row IDs and order. The standalone runner computes
+clean-correct eligibility inside its class-sampled batch. Let, per cell:
 
-- `E` = **clean-correct eligibility**: `victim(scale(x₀)).argmax == class_id` (`:164`).
-- `N_elig = Σ E`. `_rate(mask, E) = Σ(mask ∧ E)/Σ E` (`:190-192`).
-- **targeted** `T`: `adv_pred == 0` (Benign) (`:166`).
-- **evasion** (untargeted) `U`: `adv_pred ≠ class_id` (`:165`) — any misclassification.
-  Note `T ⊆ U`.
-- `V` = domain validity = validator_v2 `hybrid_valid` (`:167`).
-- `P` = primitive feasibility = `semantic.primitive_feasible ∧
-  primitive_transform_consistent` (`:368-374`).
+- `E` = **clean-correct eligibility**: `victim(scale(x0)).argmax == class_id`.
+- `N_elig = sum(E)` and every rate divides by `N_elig`.
+- **targeted** `T`: `adv_pred == 0` (Benign).
+- **evasion** (untargeted) `U`: `adv_pred != class_id`; `T` is a subset of `U`.
+- `V` = domain validity = validator_v2 `hybrid_valid`.
+- `P` = `semantic.primitive_feasible & primitive_transform_consistent`.
 - `S` = semantic status; `[S=PASS]` (doc 6).
 
 ## 7.1 ASR family (all over `N_elig`)
@@ -24,9 +23,10 @@ $$
 \subseteq\;\text{primitive-feasible ASR}=\frac{\sum(T\wedge V\wedge P)}{N_{elig}}\;
 \subseteq\;\text{SP-ASR}=\frac{\sum(T\wedge V\wedge P\wedge[S{=}PASS])}{N_{elig}}
 $$
-Numerators are **strictly nested** (`run :511-519`): raw ⊇ valid ⊇ feasible ⊇ SP. In the
-committed sweep raw=valid=feasible (validator/feasibility rejected no classifier success),
-and SP=0.
+Numerators are **strictly nested**: raw ⊇ valid ⊇ feasible ⊇ SP. In the current
+v2 artifacts, domain validity and primitive feasibility are 100% for every PrimAttack
+cell, so raw targeted = valid targeted = primitive-feasible targeted. SP-ASR is lower
+where the semantic proxy is not `PASS`; it is not zero in the current campaign.
 
 `validation/metrics.py:targeted_asr_suite` mirrors this for the generic attack adapter:
 `raw = e/denom`, `hard_valid = (e∧hard)/denom`, `hybrid_valid = (e∧hybrid)/denom`,
@@ -42,11 +42,14 @@ and SP=0.
   reported but not gated.
 
 ## 7.3 Per-class / per-victim / pooling
-- **PrimAttack runner**: computes metrics **per (class, victim, seed) cell**, per-cell
-  denominator; no cross-victim pooling at write time (each cell → one npz + one JSON
-  `cell`).
-- **Sweep statistics** (`analyze_primattack_experiments.py`): pools victims + classes for
-  the paired tests (doc 4) — the pseudoreplication concern.
+- **Standalone runner**: computes one cell per `(class,victim,seed)`.
+- **Full paired driver**: freezes at most 800 clean-correct rows per
+  `(victim,class)` and writes one NPZ per `(victim,class,attack,seed)`.
+- **Current v2 optimizer comparison**: concatenates the four classes only within each
+  victim for paired tests; victims are never pooled as independent rows. Seed 42 is the
+  paired reference and seeds 42/123/2024 are summarized descriptively.
+- **Historical sweep statistics** (`analyze_primattack_experiments.py`): pool
+  victims/classes and therefore carry the pseudoreplication concern in doc 4.
 - **`validation/evaluation/attack_artifact_validity.py`**: sample-weighted pooling
   (overall = Σ successes / Σ clean-correct across cells; by_class pools victims+seeds).
   **STALE** — expects fields the runner doesn't save; do not use (see

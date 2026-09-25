@@ -1,5 +1,12 @@
 # 08 — The VAE Latent-Space Primitive-Constrained Attack (proposed method)
 
+> **Superseded control contract.** This page still describes the former `(p, alpha)`
+> collapse. The active primitive layer uses `(p, delay, shape)`. See
+> [`../full_thesis_methodology/09_vae_adversarial_method.md`](../full_thesis_methodology/09_vae_adversarial_method.md)
+> for current VAE status and
+> [`../full_thesis_methodology/02_primattack.md`](../full_thesis_methodology/02_primattack.md)
+> for the primitive contract.
+
 **Sources:** `src/attack/vae_latent_primitive.py` (algorithm),
 `src/attack/run_cicids2017_vae_latent_attack.py` (runner).
 

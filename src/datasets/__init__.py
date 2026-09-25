@@ -44,4 +44,8 @@ def get_adapter(name: str, **kwargs) -> DatasetAdapter:
         from datasets.cicids2017 import CICIDS2017Adapter
 
         return CICIDS2017Adapter(**kwargs)
+    if key in {"cicids2018", "cicids2018_distrinet", "cse-cic-ids-2018"}:
+        from datasets.cicids2018 import CICIDS2018Adapter
+
+        return CICIDS2018Adapter(**kwargs)
     raise KeyError(f"unknown dataset adapter {name!r}")

@@ -13,17 +13,16 @@ threats-to-validity / limitations section. Each item names the evidence.
    local `FTTransformer` exists (`src/classifiers/ft_transformer.py`) with trained
    checkpoints. Treat `CLAUDE.md` as legacy context, not current spec.
 
-2. **"Original / non-budget PrimAttack" does not exist as a separate experiment.**
-   The prompt asks to compare an *original/non-budget* PrimAttack against the three
-   budgets. The runner (`run_cicids2017_primitive_attack.py:run`) *always* requires
-   a `budget_name ∈ {restricted, intermediate, maximum-evaluated}` and always
-   applies a calibrated hard box. There is no committed "unbudgeted" run. The word
-   "original" throughout `primattack_sp_budget_explained.md` refers to the *original
-   source flow* x₀, not an attack variant. Doc 2 explains the mechanism by which
-   removing the budget cap would enlarge the feasible box, and identifies
-   `maximum-evaluated` (p75) as the largest evaluated budget. The historically high
-   ASRs were against the now-**retired** LSTM/serial victims
-   (`old_root_files/retired_lstm_cnn_lstm_2026-09-24/`), not the current MLP/CNN.
+2. **"Original / non-budget" is not a PrimAttack method name.** The standalone
+   runner still requires `budget_name ∈ {restricted, intermediate,
+   maximum-evaluated}`. The full paired driver now additionally evaluates
+   `unbounded_calibration`: it sets the class `p_max` and relative-duration cap to
+   infinity while retaining the same train-p99 envelope, capability gates, integer
+   projection, and DoS/DDoS rate floor. This committed condition appears as `unb`
+   in `outputs/full_adv_eval_primattack_v2`. Call it **envelope-only**, not
+   unconstrained or original. `maximum-evaluated` (p75) remains the largest named
+   empirical budget; input-space PGD/C&W are the genuinely non-primitive-constrained
+   baselines.
 
 3. **`validation/evaluation/attack_artifact_validity.py` is STALE.** It expects npz
    fields `evasion`/`benign` and output dirs `outputs/v2_validity_*` that the
@@ -37,10 +36,11 @@ threats-to-validity / limitations section. Each item names the evidence.
    `adversarial Flow Packets/s ≥ class-train p05`. The ratio is only a reported
    `PrimitiveCosts` metric and gates nothing.
 
-5. **Victim roster mismatch in PrimAttack.** `VICTIMS = ("mlp","cnn","ft_transformer")`
-   (`run_cicids2017_primitive_attack.py:41`) but the committed sweep artifacts cover
-   **mlp and cnn only** (72 npz; no ft_transformer PrimAttack npz). FT-Transformer is
-   attack-ready and in the roster constant, but the final sweep did not include it.
+5. **Historical versus current victim coverage.** The old 72-artifact
+   `outputs/primattack_budget_sensitivity_full/` sweep contains MLP/CNN, seed 42
+   only. The current paired v2 campaign in `outputs/full_adv_eval_primattack_v2/`
+   contains MLP, CNN, and FT-Transformer for attack seeds `42,123,2024`. Do not use
+   the historical sweep's coverage limitations to describe the v2 campaign.
 
 6. **Argparse defaults ≠ shipped training.** Classifier trainer argparse defaults are
    `epochs=5, patience=2`, but the checkpoints were trained with `epochs=10,
@@ -48,6 +48,12 @@ threats-to-validity / limitations section. Each item names the evidence.
    actually used, not the argparse defaults.
 
 ## B. Statistical-validity concerns (see doc 4)
+
+Items 7–10 describe the **historical Adam/sigmoid budget sweep and its report**.
+The v2 optimizer comparison instead keeps analyses within victim, uses a frozen
+800-row/class roster, reports three attack seeds descriptively, and includes paired
+rate differences with Newcombe CIs. Attack-seed variation still does not replace
+victim-training seed replication.
 
 7. **Victim pseudoreplication / non-independence (primary concern).** In
    `analyze_primattack_experiments.py`, the pairing key is
@@ -80,12 +86,21 @@ threats-to-validity / limitations section. Each item names the evidence.
 
 ## C. Substantive result boundaries
 
-11. **Budgeted PrimAttack essentially fails to evade the current victims.**
-    `docs/primattack_budget_results.md`: timing-only 0/4064; padding-only and joint
-    10/4064 raw/valid/feasible at the maximum budget, **0** surviving the SP proxy
-    (all 10 are BruteForce, whose critical semantics are `NOT_FULLY_TESTABLE`). SP-ASR
-    = 0 everywhere. Frame PrimAttack as a *robustness-evaluation and validity-methodology*
-    contribution, not as a high-success evasion attack against MLP/CNN.
+11. **Budgeted PrimAttack: structurally valid evasion is victim-dependent, and in-distribution
+    evasion is ≈0.** The earlier conclusion ("essentially fails to evade", from the replaced
+    Adam/sigmoid `(p, α)` optimizer — `docs/primattack_budget_results.md`,
+    `outputs/full_adv_eval` `prim_opt_*`) was an optimizer artifact. With the v2 search
+    (`outputs/full_adv_eval_primattack_v2`, `PRIMATTACK_V2_OPTIMIZER_COMPARISON.md`; 800 frozen
+    clean-correct flows/class, reference seed 42, classes pooled within victim) joint p75
+    targeted ∧ hybrid_valid ∧ feasible is mlp 6.28%, cnn 34.91%, ft_transformer 5.19%
+    (old: 0.16%, 1.19%, 4.66%; McNemar Holm p ≤ 1.7e-4 for every victim). Joint p75
+    targeted ∧ valid ∧ feasible ∧ SP is mlp 6.19%, cnn 10.97%, ft 0.22%.
+    **True-IDSR (∧ in_distribution) remains 0–0.09% for every victim/budget/mode**: the
+    successful flows are structurally valid and within the calibrated box but lie outside
+    the per-class VAE IDR gate. Validity and primitive feasibility were observed at 100%
+    in every v2 PrimAttack cell; this is an empirical campaign result, not a construction guarantee.
+    Caveat: the frozen roster was inspected diagnostically before the v2 design, so the
+    old-vs-new contrast is post-hoc on the same rows.
 
 12. **Feature-space PGD/C&W: high raw ASR, zero valid ASR.**
     `outputs/cicids2017_baseline_pgd_cw/`: raw ASR ≈ 1.0 but domain-valid /

@@ -171,15 +171,13 @@ def main() -> None:
                 test_limit=args.test_limit,
                 steps=args.steps,
                 lr=0.1,
-                cost_weight=0.01,
                 stage_a_dir=None,
                 output_dir=run_dir,
                 seeds=seeds,
-                init_noise=0.5,
                 calibration_path=args.calibration,
                 budget_name=budget_name,
                 primitive_mode=mode,
-                optimizer_name="optimized",
+                optimizer_name="search",
             )
             _assert_same_source_ids(reference_ids, result["cells"])
             rows.append({

@@ -1,9 +1,9 @@
 """Calibrated primitive-domain white-box attack on CICIDS2017-DistriNet.
 
-Only two controls are optimized: forward packet-length augmentation ``p`` and forward timing
-Dilation ``alpha``. The canonical primitive map recomputes dependent features, final controls
-are projected into a train-calibrated hard budget, and the realized vector is reclassified.
-Domain validity, primitive feasibility, and flow-level semantic preservation remain separate.
+PrimAttack searches integer forward padding ``p`` and affine forward-delay controls
+``(delay, shape)``. The canonical map recomputes every dependent feature; final controls
+are projected into train-calibrated hard bounds and selected only after quantized victim
+evaluation. Validity, primitive feasibility, and flow-level semantics remain separate.
 No packet-level realization or replay is performed.
 """
 from __future__ import annotations
@@ -15,7 +15,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as F
 
 from attack.flow_semantics import FlowSemanticValidator, SemanticStatus
 from attack.primattack_budget import (
@@ -27,6 +26,7 @@ from attack.realizability.base import NullPacketBackend
 from attack.realizability.cicids2017 import CICIDS2017PrimitiveModel, SCALER_ATOL
 from attack.realizability.validator import RealizabilityValidator
 from attack.run_cicids2017_vae_attacks import _idr_mask
+from attack.primitive_optimizer import CANDIDATE_NAMES, optimize_primitive_candidates
 from datasets.cicids2017 import CICIDS2017Adapter
 from validation.attack_interface import structural_masks
 from experiments.provenance import (
@@ -40,7 +40,7 @@ from vae.cicids2017_stage_a import ATTACK_CLASSES, load_stage_a
 
 VICTIMS = ("mlp", "cnn", "ft_transformer")
 PRIMITIVE_MODES = ("timing-only", "padding-only", "joint")
-OPTIMIZERS = ("optimized", "random-feasible")
+OPTIMIZERS = ("search", "random-feasible")
 _LENGTH_COLS = (
     "Total Length of Fwd Packet", "Fwd Packet Length Min", "Fwd Packet Length Max",
     "Fwd Packet Length Mean", "Fwd Segment Size Avg", "Packet Length Min",
@@ -62,61 +62,20 @@ def _class_rows(y: np.ndarray, class_id: int, limit: int | None, seed: int) -> n
     return idx
 
 
-def optimize_primitives(
-    model, victim, raw, center, scale, bounds, caps, *, steps, lr, cost_weight,
-    init_noise, seed,
-):
-    """Adam over only two unconstrained leaves, mapped into the hard primitive box."""
-    n = raw.shape[0]
-    generator = torch.Generator(device=raw.device).manual_seed(seed)
-    u = (
-        -2.0
-        + init_noise * torch.randn(n, generator=generator, device=raw.device, dtype=raw.dtype)
-    ).requires_grad_(True)
-    v = (
-        -2.0
-        + init_noise * torch.randn(n, generator=generator, device=raw.device, dtype=raw.dtype)
-    ).requires_grad_(True)
-    optimizer = torch.optim.Adam([u, v], lr=lr)
-    target = torch.zeros(n, dtype=torch.long, device=raw.device)
-    pad_active = caps.pad_allowed.to(raw.dtype)
-    timing_active = caps.timing_allowed.to(raw.dtype)
-
-    def controls() -> dict[str, torch.Tensor]:
-        return {
-            "p": bounds["p"] * torch.sigmoid(u) * pad_active,
-            "alpha": 1.0
-            + (bounds["alpha"] - 1.0) * torch.sigmoid(v) * timing_active,
-        }
-
-    for _ in range(steps):
-        optimizer.zero_grad(set_to_none=True)
-        requested = controls()
-        transformed = model.generate(raw, requested, quantize=False)
-        logits = victim((transformed - center) / scale)
-        loss = (
-            F.cross_entropy(logits, target, reduction="none")
-            + cost_weight
-            * (torch.sigmoid(u) * pad_active + torch.sigmoid(v) * timing_active)
-        )
-        loss.sum().backward()
-        optimizer.step()
-    with torch.no_grad():
-        requested = controls()
-    return {name: value.detach() for name, value in requested.items()}
 
 
 def random_feasible_primitives(bounds: dict[str, torch.Tensor], seed: int) -> dict[str, torch.Tensor]:
-    """Uniform random control inside the exact same hard box as optimized PrimAttack."""
+    """Uniform random controls inside the same hard box as search PrimAttack."""
     first = bounds["p"]
     generator = torch.Generator(device=first.device).manual_seed(seed)
-    p_fraction = torch.rand(first.shape, generator=generator, device=first.device, dtype=first.dtype)
-    alpha_fraction = torch.rand(
-        first.shape, generator=generator, device=first.device, dtype=first.dtype
-    )
+    fractions = [
+        torch.rand(first.shape, generator=generator, device=first.device, dtype=first.dtype)
+        for _ in range(3)
+    ]
     return {
-        "p": bounds["p"] * p_fraction,
-        "alpha": 1.0 + (bounds["alpha"] - 1.0) * alpha_fraction,
+        "p": bounds["p"] * fractions[0],
+        "delay": bounds["delay"] * fractions[1],
+        "shape": bounds["shape"] * fractions[2],
     }
 
 
@@ -130,8 +89,10 @@ def _apply_primitive_mode(
         result["p"].zero_()
         result["p_numeric"].zero_()
     elif mode == "padding-only":
-        result["alpha"].fill_(1.0)
-        result["alpha_numeric"].fill_(1.0)
+        result["delay"].zero_()
+        result["delay_numeric"].zero_()
+        result["shape"].zero_()
+        result["shape_numeric"].zero_()
     return result
 
 
@@ -154,7 +115,7 @@ def evaluate_cell(model, val, victim, base_vae, raw, adv_raw, center, scale,
         x_adv = (adv_raw - center) / scale
         clean_pred = victim(x_clean).argmax(1)
         adv_pred = victim(x_adv).argmax(1)
-        validator = structural_masks(adv_raw.detach().cpu().numpy())
+        validator = structural_masks(adv_raw.detach().cpu().numpy(), dataset=model.dataset)
         in_dist = _idr_mask(base_vae, x_adv, idr_path)
         report = val.validate(adv_raw, raw)
         categories = report.categories
@@ -193,9 +154,9 @@ def _rate(mask: torch.Tensor, eligible: torch.Tensor) -> float:
 
 
 def run(
-    *, classes, victims, device, test_limit, steps, lr, cost_weight, stage_a_dir,
-    output_dir, seeds, init_noise, calibration_path, budget_name,
-    primitive_mode="joint", optimizer_name="optimized",
+    *, classes, victims, device, test_limit, steps, lr, stage_a_dir,
+    output_dir, seeds, calibration_path, budget_name, restarts=2,
+    primitive_mode="joint", optimizer_name="search",
 ):
     if budget_name not in BUDGET_NAMES:
         raise ValueError(f"budget name must be one of {BUDGET_NAMES}")
@@ -231,14 +192,13 @@ def run(
     all_row_ids = metadata["sample_id"].astype(str).to_numpy(dtype="U128")
     stage_a_dir = stage_a_dir or (repo / "outputs" / "cicids2017_vae_stage_a")
     victim_dir = repo / "outputs" / "cicids2017distrinet" / "models"
-    method_id = "primitive_direct" if optimizer_name == "optimized" else "primitive_random"
+    method_id = "primitive_search" if optimizer_name == "search" else "primitive_random"
     config = {
         "test_limit_per_class": test_limit,
         "attack_steps": steps,
         "learning_rate": lr,
-        "cost_weight": cost_weight,
+        "restarts": restarts,
         "seeds": seeds,
-        "init_noise": init_noise,
         "budget_name": budget_name,
         "primitive_mode": primitive_mode,
         "optimizer": optimizer_name,
@@ -332,16 +292,23 @@ def run(
             )
             for seed in seeds:
                 deterministic_runtime(seed)
-                if optimizer_name == "optimized":
-                    requested = optimize_primitives(
+                optimization = None
+                if optimizer_name == "search":
+                    optimization = optimize_primitive_candidates(
                         model, victim, raw, center, scale, bounds, caps,
-                        steps=steps, lr=lr, cost_weight=cost_weight,
-                        init_noise=init_noise, seed=seed,
+                        steps=steps, learning_rate=lr, restarts=restarts, seed=seed,
                     )
+                    requested = optimization.requested
+                    projected = optimization.projected
+                    adv_raw = optimization.adversarial_raw
                 else:
                     requested = random_feasible_primitives(bounds, seed)
-                projected = model.project_controls(raw, requested, bounds)
-                adv_raw = model.generate(raw, projected, quantize=True).detach()
+                    projected = model.project_controls(
+                        raw, requested, bounds, capabilities=caps
+                    )
+                    adv_raw = model.generate(
+                        raw, projected, quantize=True, capabilities=caps
+                    ).detach()
                 frozen_idx = torch.tensor(
                     [model.i[name] for name in realizability.frozen_names], device=device
                 )
@@ -445,23 +412,47 @@ def run(
                     normalized_padding_magnitude=costs.normalized_padding_magnitude,
                     normalized_timing_magnitude=costs.normalized_timing_magnitude,
                     primitive_p_requested=requested["p"].cpu().numpy(),
-                    primitive_alpha_requested=requested["alpha"].cpu().numpy(),
+                    primitive_delay_requested=requested["delay"].cpu().numpy(),
+                    primitive_shape_requested=requested["shape"].cpu().numpy(),
                     primitive_p_projected=projected["p"].cpu().numpy(),
-                    primitive_alpha_projected=projected["alpha"].cpu().numpy(),
+                    primitive_delay_projected=projected["delay"].cpu().numpy(),
+                    primitive_shape_projected=projected["shape"].cpu().numpy(),
                     primitive_values_requested=np.asarray([
-                        json.dumps({"p": float(p), "alpha": float(alpha)})
-                        for p, alpha in zip(
-                            requested["p"].cpu().numpy(), requested["alpha"].cpu().numpy()
+                        json.dumps({"p": float(p), "delay": float(delay), "shape": float(shape)})
+                        for p, delay, shape in zip(
+                            requested["p"].cpu().numpy(),
+                            requested["delay"].cpu().numpy(),
+                            requested["shape"].cpu().numpy(),
                         )
                     ]),
                     primitive_values_projected=np.asarray([
-                        json.dumps({"p": float(p), "alpha": float(alpha)})
-                        for p, alpha in zip(
-                            projected["p"].cpu().numpy(), projected["alpha"].cpu().numpy()
+                        json.dumps({"p": float(p), "delay": float(delay), "shape": float(shape)})
+                        for p, delay, shape in zip(
+                            projected["p"].cpu().numpy(),
+                            projected["delay"].cpu().numpy(),
+                            projected["shape"].cpu().numpy(),
                         )
                     ]),
                     p_hi=bounds["p"].cpu().numpy(),
-                    alpha_hi=bounds["alpha"].cpu().numpy(),
+                    delay_hi=bounds["delay"].cpu().numpy(),
+                    shape_hi=bounds["shape"].cpu().numpy(),
+                    optimizer_target_margin=(
+                        optimization.target_margin.cpu().numpy()
+                        if optimization is not None else np.full(len(raw), np.nan)
+                    ),
+                    optimizer_candidate_source=(
+                        np.asarray([
+                            CANDIDATE_NAMES[int(value)]
+                            for value in optimization.candidate_source.cpu().numpy()
+                        ])
+                        if optimization is not None else np.full(len(raw), "random-feasible")
+                    ),
+                    optimizer_forward_evaluations=np.asarray(
+                        optimization.forward_evaluations if optimization is not None else 1
+                    ),
+                    optimizer_backward_evaluations=np.asarray(
+                        optimization.backward_evaluations if optimization is not None else 0
+                    ),
                     features_changed=changed_features,
                     number_features_changed=semantic.number_features_changed,
                     clean_correct=eligible.cpu().numpy(),
@@ -537,6 +528,12 @@ def run(
                     "primitive_feasibility_rate": float(values(primitive_feasible_np).mean()),
                     "domain_validity_rate": _rate(domain_valid, eligible),
                     "calibrated_budget": class_cfg.budget.__dict__,
+                    "optimizer_forward_evaluations": (
+                        optimization.forward_evaluations if optimization is not None else 1
+                    ),
+                    "optimizer_backward_evaluations": (
+                        optimization.backward_evaluations if optimization is not None else 0
+                    ),
                 }
                 results["cells"].append(cell)
                 print(json.dumps(cell, default=str), flush=True)
@@ -554,9 +551,8 @@ def main() -> None:
     parser.add_argument("--test-limit", type=int, default=1024)
     parser.add_argument("--steps", type=int, default=40)
     parser.add_argument("--learning-rate", type=float, default=0.1)
-    parser.add_argument("--cost-weight", type=float, default=0.01)
-    parser.add_argument("--seeds", default="42,43,44")
-    parser.add_argument("--init-noise", type=float, default=0.5)
+    parser.add_argument("--restarts", type=int, default=2)
+    parser.add_argument("--seeds", default="42,123,2024")
     parser.add_argument("--stage-a-dir", type=Path, default=None)
     parser.add_argument(
         "--calibration",
@@ -565,7 +561,7 @@ def main() -> None:
     )
     parser.add_argument("--budget", choices=BUDGET_NAMES, default="maximum-evaluated")
     parser.add_argument("--primitive-mode", choices=PRIMITIVE_MODES, default="joint")
-    parser.add_argument("--optimizer", choices=OPTIMIZERS, default="optimized")
+    parser.add_argument("--optimizer", choices=OPTIMIZERS, default="search")
     parser.add_argument(
         "--output-dir", type=Path, default=Path("outputs/primattack_calibrated")
     )
@@ -577,11 +573,10 @@ def main() -> None:
         test_limit=args.test_limit,
         steps=args.steps,
         lr=args.learning_rate,
-        cost_weight=args.cost_weight,
         stage_a_dir=args.stage_a_dir,
         output_dir=args.output_dir,
         seeds=[int(value) for value in args.seeds.split(",") if value.strip()],
-        init_noise=args.init_noise,
+        restarts=args.restarts,
         calibration_path=args.calibration,
         budget_name=args.budget,
         primitive_mode=args.primitive_mode,

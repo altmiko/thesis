@@ -96,7 +96,7 @@ def test_decoder_movement_changes_controls_and_adversarial_vector(setup):
         c1 = model.infer_primitives_from_decoded(raw, d1, d0, bounds)
         a0 = model.generate(raw, c0); a1 = model.generate(raw, c1)
     assert not torch.allclose(d0, d1)
-    assert (not torch.allclose(c0["p"], c1["p"])) or (not torch.allclose(c0["alpha"], c1["alpha"]))
+    assert any(not torch.allclose(c0[name], c1[name]) for name in ("p", "delay", "shape"))
     assert not torch.allclose(a0, a1)
 
 
@@ -106,7 +106,7 @@ def test_optimizer_parameter_list_contains_only_z_adv(setup):
     params = attack.optimizer_parameters(z)
     assert params == [z]
     assert z.is_leaf and z.requires_grad
-    assert not controls["p"].is_leaf and not controls["alpha"].is_leaf
+    assert all(not control.is_leaf for control in controls.values())
 
 
 def test_single_packet_timing_disabled_in_latent_graph(setup):
@@ -127,15 +127,16 @@ def test_single_packet_timing_disabled_in_latent_graph(setup):
     z = (z0 + torch.ones_like(z0)).detach().requires_grad_(True)
     d1 = vae.decode(z)["continuous_mu_raw"]
     controls = model.infer_primitives_from_decoded(raw, d1, d0, bounds)
-    alpha_grad = torch.autograd.grad(controls["alpha"].sum(), z, retain_graph=True)[0]
+    delay_grad = torch.autograd.grad(controls["delay"].sum(), z, retain_graph=True)[0]
     adv = model.generate(raw, controls)
     timing_names = (
         "Fwd IAT Total", "Fwd IAT Mean", "Fwd IAT Std", "Fwd IAT Max",
         "Fwd IAT Min", "Flow Duration", "Flow IAT Mean", "Flow IAT Max",
     )
     timing_idx = [model.i[name] for name in timing_names]
-    assert torch.equal(controls["alpha"], torch.ones_like(controls["alpha"]))
-    assert torch.equal(alpha_grad, torch.zeros_like(alpha_grad))
+    assert torch.equal(controls["delay"], torch.zeros_like(controls["delay"]))
+    assert torch.equal(controls["shape"], torch.zeros_like(controls["shape"]))
+    assert torch.equal(delay_grad, torch.zeros_like(delay_grad))
     assert torch.allclose(adv[:, timing_idx], raw[:, timing_idx], atol=1e-3, rtol=1e-4)
 
 
@@ -181,8 +182,12 @@ def test_no_movement_controls_are_identity(setup, steps, epsilon_z, init_noise):
         torch.zeros_like(result.controls_realized["p"]),
     )
     assert torch.equal(
-        result.controls_realized["alpha"],
-        torch.ones_like(result.controls_realized["alpha"]),
+        result.controls_realized["delay"],
+        torch.zeros_like(result.controls_realized["delay"]),
+    )
+    assert torch.equal(
+        result.controls_realized["shape"],
+        torch.zeros_like(result.controls_realized["shape"]),
     )
     assert torch.allclose(result.x_adv_realized_raw, raw[:8], atol=1e-3, rtol=1e-4)
     assert torch.equal(result.realized_logits.argmax(1), result.clean_logits.argmax(1))

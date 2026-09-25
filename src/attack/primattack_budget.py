@@ -1,7 +1,8 @@
 """Train-only calibration and hard budget loading for PrimAttack.
 
-Numerical budgets are derived from the corrected CICIDS2017-DistriNet training split. The
-module never loads validation/test data and never observes victim predictions or attack success.
+Numerical budgets are derived from the training split of the selected CICFlowMeter DistriNet
+dataset (CICIDS2017 or CSE-CIC-IDS-2018; same 79-feature layout). The module never loads
+validation/test data and never observes victim predictions or attack success.
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ from typing import Any, Mapping
 
 import numpy as np
 
+from datasets import DatasetAdapter, get_adapter
 from datasets.cicids2017 import CICIDS2017Adapter
 
 SCHEMA_VERSION = 1
@@ -149,7 +151,7 @@ def _rounded_empirical_budget(values: np.ndarray, probability: float) -> float:
     return float(max(0, int(np.rint(np.quantile(values, probability)))))
 
 
-def calibrate(adapter: CICIDS2017Adapter | None = None) -> dict[str, Any]:
+def calibrate(adapter: DatasetAdapter | None = None) -> dict[str, Any]:
     """Fit the complete artifact from ``X_train_pristine`` and ``y_train_cat`` only."""
     adapter = adapter or CICIDS2017Adapter()
     processed = adapter._processed
@@ -287,7 +289,7 @@ def calibrate(adapter: CICIDS2017Adapter | None = None) -> dict[str, Any]:
     }
 
 
-def write_calibration(output: Path, adapter: CICIDS2017Adapter | None = None) -> dict[str, Any]:
+def write_calibration(output: Path, adapter: DatasetAdapter | None = None) -> dict[str, Any]:
     payload = calibrate(adapter)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -361,13 +363,15 @@ def unbounded_calibration(payload: Mapping[str, Any], class_name: str) -> ClassC
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dataset", default="cicids2017",
+                        help="adapter name for datasets.get_adapter (cicids2017 | cicids2018)")
     parser.add_argument(
         "--output",
         type=Path,
         default=Path("artifacts/primattack/budget_calibration.json"),
     )
     args = parser.parse_args()
-    payload = write_calibration(args.output)
+    payload = write_calibration(args.output, get_adapter(args.dataset))
     print(
         json.dumps(
             {

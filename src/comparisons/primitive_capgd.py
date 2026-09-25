@@ -1,9 +1,9 @@
-"""CAPGD adapted to PrimAttack's exact two normalized primitive controls.
+"""CAPGD adapted to PrimAttack's exact three normalized primitive controls.
 
 This is an optimizer-control experiment, not native tabular CAPGD. CAPGD searches
-``q_p,q_alpha in [0,1]``; the wrapper maps them into the exact per-flow PrimAttack
-padding/timing box, applies the canonical differentiable primitive transform during
-optimization, and uses PrimAttack projection/quantization for final evaluation.
+``q_padding,q_delay,q_shape in [0,1]`` and maps them into PrimAttack's exact
+per-flow control box. The canonical transform remains responsible for generation,
+projection, quantization, and final evaluation.
 """
 from __future__ import annotations
 
@@ -35,6 +35,7 @@ class PrimitiveControlVictim(nn.Module):
         victim: nn.Module,
         raw: torch.Tensor,
         bounds: dict[str, torch.Tensor],
+        capabilities: Any,
         center: torch.Tensor,
         scale: torch.Tensor,
     ) -> None:
@@ -42,26 +43,31 @@ class PrimitiveControlVictim(nn.Module):
         self.primitive_model = primitive_model
         self.victim = victim
         self.register_buffer("raw", raw)
+        self.capabilities = capabilities
         self.register_buffer("p_hi", bounds["p"])
-        self.register_buffer("alpha_hi", bounds["alpha"])
+        self.register_buffer("delay_hi", bounds["delay"])
+        self.register_buffer("shape_hi", bounds["shape"])
         self.register_buffer("center", center)
         self.register_buffer("scale", scale)
 
     def controls(self, normalized: torch.Tensor) -> dict[str, torch.Tensor]:
-        if normalized.ndim != 2 or normalized.shape != (self.raw.shape[0], 2):
+        if normalized.ndim != 2 or normalized.shape != (self.raw.shape[0], 3):
             raise ValueError(
-                f"normalized controls must have shape {(self.raw.shape[0], 2)}, "
+                f"normalized controls must have shape {(self.raw.shape[0], 3)}, "
                 f"got {tuple(normalized.shape)}"
             )
         q = normalized.clamp(0.0, 1.0)
         return {
             "p": self.p_hi * q[:, 0],
-            "alpha": 1.0 + (self.alpha_hi - 1.0) * q[:, 1],
+            "delay": self.delay_hi * q[:, 1],
+            "shape": self.shape_hi * q[:, 2],
         }
 
     def forward(self, normalized: torch.Tensor) -> torch.Tensor:
         controls = self.controls(normalized)
-        generated = self.primitive_model.generate(self.raw, controls, quantize=False)
+        generated = self.primitive_model.generate(
+            self.raw, controls, quantize=False, capabilities=self.capabilities
+        )
         return self.victim((generated - self.center) / self.scale)
 
 
@@ -76,11 +82,11 @@ def _unit_scaler(api: Any, device: torch.device) -> Any:
     scaler = DeviceAwareUnitScaler(num_scaler="min_max", one_hot_encode=False)
     scaler.fit_scaler_data(
         api.ScalerData(
-            x_min=torch.zeros(2),
-            x_max=torch.ones(2),
+            x_min=torch.zeros(3),
+            x_max=torch.ones(3),
             categories=[],
             cat_idx=[],
-            num_idx=[0, 1],
+            num_idx=[0, 1, 2],
         )
     )
     return scaler
@@ -93,6 +99,7 @@ def run_primitive_capgd(
     victim: nn.Module,
     raw: torch.Tensor,
     bounds: dict[str, torch.Tensor],
+    capabilities: Any,
     center: torch.Tensor,
     scale: torch.Tensor,
     true_labels: torch.Tensor,
@@ -101,7 +108,7 @@ def run_primitive_capgd(
 ) -> PrimitiveCAPGDResult:
     """Run upstream CAPGD in the full normalized PrimAttack p75 box.
 
-    ``Linf eps=1`` over a clean control vector ``(0,0)`` exposes the complete
+    ``Linf eps=1`` over a clean control vector ``(0,0,0)`` exposes the complete
     per-flow hard box. ``eps_margin=0`` avoids shrinking PrimAttack's bounds.
     """
 
@@ -111,15 +118,15 @@ def run_primitive_capgd(
     api = load_tabularbench_api(repo_root)
     scaler = _unit_scaler(api, device)
     constraints = api.Constraints(
-        feature_types=np.asarray(["real", "real"]),
-        mutable_features=np.asarray([True, True]),
-        lower_bounds=np.asarray([0.0, 0.0]),
-        upper_bounds=np.asarray([1.0, 1.0]),
+        feature_types=np.asarray(["real", "real", "real"]),
+        mutable_features=np.asarray([True, True, True]),
+        lower_bounds=np.asarray([0.0, 0.0, 0.0]),
+        upper_bounds=np.asarray([1.0, 1.0, 1.0]),
         relation_constraints=None,
-        feature_names=np.asarray(["q_padding", "q_timing"]),
+        feature_names=np.asarray(["q_padding", "q_delay", "q_shape"]),
     )
     wrapped = PrimitiveControlVictim(
-        primitive_model, victim, raw, bounds, center, scale
+        primitive_model, victim, raw, bounds, capabilities, center, scale
     ).to(device).eval()
     objective = numpy_predict_proba(wrapped, device=device)
     attack = api.CAPGD(
@@ -152,7 +159,7 @@ def run_primitive_capgd(
     # primitive mapping; the ``best_loss`` path is separately bugged upstream
     # (missing ``n_restart``). Selecting per-sample by best loss across restarts uses
     # the exact same optimizer, momentum, adaptive step schedule, and initialization.
-    identity = torch.zeros((raw.shape[0], 2), dtype=raw.dtype, device=device)
+    identity = torch.zeros((raw.shape[0], 3), dtype=raw.dtype, device=device)
     x_scaled = scaler.transform(identity)
     best_loss = torch.full((raw.shape[0],), -float("inf"), device=device)
     best_scaled = x_scaled.clone()
@@ -165,8 +172,12 @@ def run_primitive_capgd(
         best_scaled = torch.where(improved.unsqueeze(1), adv_restart, best_scaled)
     normalized = scaler.inverse_transform(best_scaled).detach().clamp(0.0, 1.0)
     requested = wrapped.controls(normalized)
-    projected = primitive_model.project_controls(raw, requested, bounds)
-    adversarial_raw = primitive_model.generate(raw, projected, quantize=True).detach()
+    projected = primitive_model.project_controls(
+        raw, requested, bounds, capabilities=capabilities
+    )
+    adversarial_raw = primitive_model.generate(
+        raw, projected, quantize=True, capabilities=capabilities
+    ).detach()
     return PrimitiveCAPGDResult(
         normalized_controls=normalized,
         requested={key: value.detach() for key, value in requested.items()},

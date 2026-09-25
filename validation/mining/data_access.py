@@ -15,6 +15,11 @@ import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CICIDS_DIR = REPO_ROOT / "data" / "processed" / "CICIDS_2017_Distrinet"
+# validator_v2 profile key -> processed-array directory (same 79-feature layout).
+DATASET_DIRS: dict[str, Path] = {
+    "cicids2017_distrinet": CICIDS_DIR,
+    "cicids2018_distrinet": REPO_ROOT / "data" / "processed" / "CSECICIDS_2018_Distrinet",
+}
 
 
 def feature_names(data_dir: Path = CICIDS_DIR) -> list[str]:
@@ -24,8 +29,11 @@ def feature_names(data_dir: Path = CICIDS_DIR) -> list[str]:
 
 def dataset_name(data_dir: Path = CICIDS_DIR) -> str:
     # Profile key for validator_v2 (schema/rules/reports dirs). Distinct from the
-    # legacy artifact path old_constraints/cicids2017_distrinet/mined.json.
-    return "cicids2017_distrinet"
+    # legacy artifact path old_constraints/<dataset>/mined.json.
+    for name, path in DATASET_DIRS.items():
+        if Path(data_dir).resolve() == path.resolve():
+            return name
+    raise KeyError(f"no validator_v2 profile key registered for {data_dir}")
 
 
 def load_split(split: str, data_dir: Path = CICIDS_DIR, mmap: bool = True,

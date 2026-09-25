@@ -27,7 +27,7 @@
   Doc total raw ≈ 2,100,814 rows / 1,148,542,377 bytes.
 
 ### 1.2 Preprocessing pipeline (exact order)
-Source: `scripts/preprocess_cicids2017_distrinet.py` + `preprocessing_manifest.json` (`methodological_description`, `cleaning_policy`, `split_policy`).
+Source: `src/preprocessing/preprocess_cicids2017_distrinet.py` + `preprocessing_manifest.json` (`methodological_description`, `cleaning_policy`, `split_policy`).
 1. Validate inventory/schema (5 identical 84-column headers).
 2. Row-local deterministic cleaning per file: drop non-finite numerics (`finite_numeric`), drop unparseable timestamps (`valid_timestamp`), drop negative physical values (`~negative_physical`), drop unsupported categories. **No imputation, no winsorization, no balancing** (`cleaning_policy.imputation=null, winsorization=null, balancing=null`).
 3. Label normalization; source→category map; `Attempted`→BENIGN (`attempted_policy="benign"`).

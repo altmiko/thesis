@@ -1,4 +1,4 @@
-"""Train per-attack-class typed beta-VAEs for CICIDS2017-DistriNet.
+"""Train per-attack-class typed beta-VAEs for a CICFlowMeter DistriNet dataset.
 
 Stage A is victim-independent. VAE weights are fit on TRAIN rows of one attack class;
 validation rows select the checkpoint and calibrate the Mahalanobis realism gate.
@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from constraints.engine import ConstraintEngine
 from constraints.layer0 import Layer0Projector
+from datasets import DatasetAdapter, get_adapter
 from datasets.cicids2017 import CICIDS2017Adapter
 from vae.losses import BetaScheduler, compute_manifold_elbo
 from vae.model import MixedInputBetaVAE
@@ -342,6 +343,8 @@ def load_stage_a(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dataset", default="cicids2017",
+                        help="adapter name for datasets.get_adapter (cicids2017 | cicids2018)")
     parser.add_argument("--classes", default=",".join(ATTACK_CLASSES))
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/cicids2017_vae_stage_a"))
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
@@ -353,7 +356,7 @@ def main() -> None:
     classes = [name.strip() for name in args.classes.split(",") if name.strip()]
     config = StageAConfig(epochs=args.epochs, batch_size=args.batch_size, patience=args.patience)
     _seed(config.seed)
-    adapter = CICIDS2017Adapter()
+    adapter = get_adapter(args.dataset)
     results = [train_class(adapter, name, args.output_dir, config, args.device) for name in classes]
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / "stage_a_summary.json").write_text(

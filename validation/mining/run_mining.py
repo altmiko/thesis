@@ -1,4 +1,4 @@
-"""End-to-end mining orchestrator for CICIDS2017.
+"""End-to-end validator_v2 mining orchestrator (CICIDS2017 / CSE-CIC-IDS-2018 DistriNet).
 
 Pipeline (strict TRAIN -> VAL separation; TEST never touched):
 
@@ -14,7 +14,14 @@ Pipeline (strict TRAIN -> VAL separation; TEST never touched):
   9. emit rules/<ds>/mined_rules.json, rules/<ds>/protocol_rules.yaml,
      rules/<ds>/plausibility_profile.json, and reports/<ds>/mining_report.md
 
-Run:  python -m validation.mining.run_mining
+Run:  python -m validation.mining.run_mining [--dataset cicids2018_distrinet]
+
+EXTRACTOR rules are CICFlowMeter definitions, not mined. A dataset without its own
+``extractor_rules.yaml`` inherits the reference (CICIDS2017) definitions, but each one is
+kept ONLY if it has 100% support on this dataset's full TRAIN and VAL splits; the
+per-dataset evidence is written next to the rule. PROTOCOL non-negativity is a hard domain
+fact and is emitted only for features where it holds on EVERY TRAIN and VAL row
+(CSE-CIC-IDS-2018 ``Fwd/Bwd Header Length`` are int16-wrapped and legitimately negative).
 """
 from __future__ import annotations
 
@@ -111,16 +118,16 @@ def _full_support(rule: Rule, X: np.ndarray, idx: dict[str, int], step: int = 20
     return (sat / elig if elig else 0.0), elig
 
 
-def main() -> dict:
+def main(dataset: str = "cicids2017_distrinet") -> dict:
     t0 = time.time()
-    dataset = da.dataset_name()
-    names = da.feature_names()
+    data_dir = da.DATASET_DIRS[dataset]
+    names = da.feature_names(data_dir)
     idx = {f: i for i, f in enumerate(names)}
     category_of = lambda f: registry_for(f).get("category", "unknown")  # noqa: E731
 
     print(f"[mining] dataset={dataset} features={len(names)}")
-    Xtr = da.load_split("train")           # mmap, full
-    Xva = da.load_split("val")             # mmap, full
+    Xtr = da.load_split("train", data_dir)           # mmap, full
+    Xva = da.load_split("val", data_dir)             # mmap, full
     tr_sample = da.sample_rows(Xtr, DISCOVERY_SAMPLE, seed=SEED)
     va_sample = da.sample_rows(Xva, VAL_SAMPLE, seed=SEED)
     pre_sample = tr_sample[:PREFILTER_SAMPLE]
@@ -228,7 +235,7 @@ def main() -> dict:
     print(f"[mining] accepted (pre-prune): {len(accepted)}  rejected: {len(rejected)}")
 
     # ---- 7. prune (needs extractor rules for domination) ----
-    ext_rules = _load_extractor_rules(dataset)
+    ext_rules = _load_extractor_rules(dataset, Xtr, Xva, idx)
     kept, pruned = prune(accepted, ext_rules)
     print(f"[mining] kept after prune: {len(kept)}  pruned: {len(pruned)}")
 
@@ -284,8 +291,13 @@ def main() -> dict:
             "retained": len(kept), "pruned": len(pruned), "rejected": len(rejected)}
 
 
-def _load_extractor_rules(dataset: str) -> list[Rule]:
+REFERENCE_EXTRACTOR_DATASET = "cicids2017_distrinet"
+
+
+def _load_extractor_rules(dataset: str, Xtr=None, Xva=None, idx=None) -> list[Rule]:
     path = PKG / "rules" / dataset / "extractor_rules.yaml"
+    if not path.exists() and dataset != REFERENCE_EXTRACTOR_DATASET and Xtr is not None:
+        _verify_reference_extractor_rules(dataset, path, Xtr, Xva, idx)
     if not path.exists():
         return []
     doc = yaml.safe_load(path.read_text())
@@ -296,8 +308,35 @@ def _load_extractor_rules(dataset: str) -> list[Rule]:
     return out
 
 
+def _verify_reference_extractor_rules(dataset: str, path: Path, Xtr, Xva, idx) -> None:
+    """Inherit CICFlowMeter extractor identities, keeping only 100%-support ones."""
+    ref = yaml.safe_load((PKG / "rules" / REFERENCE_EXTRACTOR_DATASET /
+                          "extractor_rules.yaml").read_text())
+    kept, dropped = [], []
+    for d in ref.get("rules", []):
+        d = dict(d)
+        r = Rule.from_dict({**d, "source_type": "EXTRACTOR"})
+        ts, te = _full_support(r, Xtr, idx)
+        vs, ve = _full_support(r, Xva, idx)
+        d["evidence"] = {"train_rows_tested": int(Xtr.shape[0]), "train_support": ts,
+                         "train_eligible_rows": te, "validation_rows_tested": int(Xva.shape[0]),
+                         "validation_support": vs, "validation_eligible_rows": ve}
+        (kept if (ts == 1.0 and vs == 1.0) else dropped).append(d)
+    doc = {"dataset": dataset,
+           "note": (f"CICFlowMeter extractor identities inherited from "
+                    f"{REFERENCE_EXTRACTOR_DATASET}; each kept only with 100% support on the "
+                    f"full {dataset} TRAIN and VAL splits (evidence per rule)."),
+           "dropped": [{"id": d["id"], "name": d["name"], "evidence": d["evidence"]}
+                       for d in dropped],
+           "rules": kept}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(doc, sort_keys=False))
+    print(f"[mining] extractor rules verified on {dataset}: kept {len(kept)}, dropped "
+          f"{[d['name'] for d in dropped]}")
+
+
 def _build_protocol_rules(dataset, names, category_of, Xtr, Xva, idx) -> dict:
-    rules = []
+    rules, excluded = [], []
     for i, f in enumerate(names):
         r = Rule(id=f"PROTO_{i+1:04d}", name=f"nonnegative::{f}", source_type="PROTOCOL",
                  rule_type="nonnegative", params={"feature": f}, features=[f],
@@ -307,16 +346,24 @@ def _build_protocol_rules(dataset, names, category_of, Xtr, Xva, idx) -> dict:
                              f"cannot be negative by construction.")
         ts, _ = _full_support(r, Xtr, idx)
         vs, _ = _full_support(r, Xva, idx)
+        if ts < 1.0 or vs < 1.0:  # hard domain fact: must hold on EVERY train/val row
+            excluded.append({"feature": f, "train_support_full": ts,
+                             "validation_support_full": vs,
+                             "reason": "non-negativity does not hold on this extractor release"})
+            continue
         r.provenance = {"origin": "networking / extractor domain knowledge",
                         "external_reference": "non-negativity of flow statistics",
                         "automatically_mined": False}
         r.evidence = {"train_support_full": ts, "validation_support_full": vs}
         rules.append(r.to_dict())
-    return {"dataset": dataset,
-            "note": "Minimal, domain-justified PROTOCOL layer: a single principled "
-                    "template (non-negativity) instantiated per feature. Not hand-invented "
-                    "per feature; verified to hold on train and validation.",
-            "rules": rules}
+    doc = {"dataset": dataset,
+           "note": "Minimal, domain-justified PROTOCOL layer: a single principled "
+                   "template (non-negativity) instantiated per feature. Not hand-invented "
+                   "per feature; verified to hold on train and validation.",
+           "rules": rules}
+    if excluded:
+        doc["excluded"] = excluded
+    return doc
 
 
 def _write_mining_report(dataset, names, profile, families, fam_counts, n_candidates,
@@ -331,4 +378,8 @@ def _write_mining_report(dataset, names, profile, families, fam_counts, n_candid
 
 
 if __name__ == "__main__":
-    print(main())
+    import argparse
+
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--dataset", default="cicids2017_distrinet", choices=sorted(da.DATASET_DIRS))
+    print(main(ap.parse_args().dataset))

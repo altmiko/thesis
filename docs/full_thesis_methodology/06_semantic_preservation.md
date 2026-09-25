@@ -9,11 +9,12 @@ CICIDS2017 aggregate rows actually expose. It is **not** packet-level functional
 
 ## 6.1 Three distinct gates (do not conflate)
 
-1. **Domain validity** — validator_v2 `hybrid_valid` (doc 3). "Is this a legal
-   CICFlowMeter vector near the training distribution?" *Not in this file.*
-2. **Primitive feasibility** — projected controls + realized costs inside the calibrated
-   hard budget, plus internal transform consistency (doc 2 §2.5, `flow_semantics.py`
-   `primitive_budget_compliance` + `RealizabilityValidator`).
+1. **Domain validity** — validator_v2 `hybrid_valid` (doc 3). "Does this row satisfy
+   the structural schema/extractor/protocol/mined rules?" *Not in this file; the
+   separate VAE IDR gate measures distributional realism.*
+2. **Primitive feasibility** — projected controls + realized costs inside the hard
+   per-flow box, plus internal transform consistency (doc 2 §2.10,
+   `flow_semantics.py` `primitive_budget_compliance` + `RealizabilityValidator`).
 3. **Flow-level semantic preservation** — `FlowSemanticValidator.evaluate` (this file):
    did the edit preserve the attack-related and structural flow properties?
 
@@ -47,8 +48,9 @@ Pkts, subflow packets); TCP control/flag aggregates unchanged; source/dst IP end
 direction unchanged; all generated features finite; represented traffic volume not
 decreased (`added_byte_quantity ≥ −atol`); **only declared primitive dependencies
 changed** (`:348-368` — φ may write only features declared by active primitives);
-**primitive budget compliance** (`:370-385` — p integral & ≤⌊p_hi⌋, 1≤α≤α_hi, realized
-relative-duration ≤ budget). Endpoint/label checks become NOT_TESTABLE if metadata is
+**primitive budget compliance** (`:370-386` — p and delay integral, `0≤p≤⌊p_hi⌋`,
+`0≤delay≤⌊delay_hi⌋`, `0≤shape≤shape_hi`, realized relative-duration ≤ budget,
+added bytes ≥ 0). Endpoint/label checks become NOT_TESTABLE if metadata is
 absent.
 
 ---
@@ -80,15 +82,17 @@ per sample, used for medians in results, and (rate_retention) for interpretation
 
 $$\mathrm{SP\text{-}ASR}=\frac{\sum(E \wedge V \wedge P \wedge [S=\text{PASS}])}{N_{\text{eligible}}}$$
 where E = targeted-Benign success, V = validator_v2 `hybrid_valid`, P = primitive
-feasibility, S = semantic status. Computed at `run_cicids2017_primitive_attack.py:516-519`
-(and in the sweep analysis, `budget_sweep_primitive.py`, `analyze_primattack_experiments.py`).
+feasibility, and S = semantic status. The standalone runner and full paired driver
+compute the same conjunction.
 
-**Observed**: SP-ASR = 0 everywhere. The only classifier successes (10/4064 at
-maximum-evaluated) are all BruteForce, whose semantics are `NOT_FULLY_TESTABLE`, so they
-never reach `S=PASS` — SP-ASR is 0 not because they *failed* semantics but because they
-could not be *fully tested*. Report the semantic PASS/FAIL/NOT_FULLY_TESTABLE breakdown
-alongside SP-ASR (never drop untestable rows from the denominator — that would inflate SP
-results, `docs/primattack/06_RESULTS_GUIDE.md`).
+**Observed in the current v2 campaign** (reference seed 42, joint p75, 3,200
+clean-correct rows per victim): SP-ASR is 6.19% for MLP, 10.97% for CNN, and 0.22%
+for FT-Transformer. These rates are lower than valid targeted ASR because semantic
+`PASS` is an additional gate; Recon/BruteForce successes are
+`NOT_FULLY_TESTABLE`, not silently counted as passes. The historical replaced
+`(p, alpha)` sweep had SP-ASR 0 and only 10/4064 classifier successes. Always report
+PASS/FAIL/NOT_FULLY_TESTABLE coverage and never drop untestable rows from the
+denominator.
 
 ---
 

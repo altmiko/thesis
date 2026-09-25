@@ -1,8 +1,8 @@
 # 9. VAE Adversarial Method (MODERATE DETAIL)
 
 A per-class β-VAE generator plus a **latent-space attack** that steers the latent code,
-decodes to a traffic-modification proposal, collapses that proposal into the two
-realizable primitives (p, α), and re-uses PrimAttack's φ. Status: **generators are
+decodes to a traffic-modification proposal, collapses that proposal into the three
+realizable primitive controls (p, delay, shape), and re-uses PrimAttack's φ. Status: **generators are
 complete and current; the final aggregated attack run against the current victim roster
 is missing.**
 
@@ -27,10 +27,11 @@ training + IDR fit), `src/attack/vae_latent_primitive.py` (`LatentPrimitiveAttac
 ## 9.2 Latent attack (`LatentPrimitiveAttack`, `vae_latent_primitive.py:90-313`)
 - Optimize **only `z_adv`** (the latent code), not features.
 - Decoder proposes a *direction*; `CICIDS2017PrimitiveModel.infer_primitives_from_decoded`
-  (`realizability/cicids2017.py:436-491`) reads that direction through the reconstructable
-  forward-length / forward-timing signals and collapses it into `p ≥ 0` (relu of length
-  movement) and `α ≥ 1` (exp of relu of mean-log timing ratios), each clamped to the
-  per-flow feasible caps. Movement is measured relative to `decode(z₀)` so the VAE
+  reads that direction through the reconstructable forward-length / forward-timing
+  signals and collapses it into `p ≥ 0` (relu of length movement), `delay ≥ 0` (relu of
+  mean Fwd IAT Total / Flow Duration movement), and `shape ∈ [0,1]` (one minus the
+  proportional share implied by the Fwd IAT Std movement), each clamped to the per-flow
+  feasible caps. Movement is measured relative to `decode(z₀)` so the VAE
   reconstruction bias cancels.
 - **Loss**: C&W-style targeted→Benign + latent-, cost-, and realism-regularizers;
   **latent L2-ball projection** (`eps_z`). Classifier feedback via the victim logits, same

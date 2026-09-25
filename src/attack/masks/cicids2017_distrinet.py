@@ -128,9 +128,14 @@ DERIVED: tuple[DerivedFeature, ...] = (
 )
 
 
-def build_mask() -> DatasetMask:
+def build_mask(dataset_name: str = "cicids2017_distrinet") -> DatasetMask:
+    """Same 79-feature CICFlowMeter mask for CICIDS2017 and CSE-CIC-IDS-2018 DistriNet.
+
+    Every DERIVED identity above also has zero violations (``atol=1e-3, rtol=1e-4``) on
+    all 583,487 CSE-CIC-IDS-2018 TRAIN rows, so the 2018 manifest reuses it unchanged.
+    """
     return DatasetMask(
-        dataset_name="cicids2017_distrinet",
+        dataset_name=dataset_name,
         n_features=79,
         perturbable=PERTURBABLE,
         derived=DERIVED,

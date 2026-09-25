@@ -27,22 +27,28 @@ def setup():
     return model, val, raw, model.i
 
 
-def _ctl(n, p, a):
-    return {"p": torch.full((n,), float(p), dtype=torch.float64),
-            "alpha": torch.full((n,), float(a), dtype=torch.float64)}
+def _ctl(n, p, delay, shape=0.0):
+    return {
+        "p": torch.full((n,), float(p), dtype=torch.float64),
+        "delay": torch.full((n,), float(delay), dtype=torch.float64),
+        "shape": torch.full((n,), float(shape), dtype=torch.float64),
+    }
 
 
 def test_identity_is_realizable(setup):
     model, val, raw, _ = setup
-    adv = model.generate(raw, _ctl(raw.shape[0], 0.0, 1.0))
+    adv = model.generate(raw, _ctl(raw.shape[0], 0.0, 0.0))
     assert all(int(v.sum()) == 0 for v in val.validate(adv, raw).categories.values())
     assert torch.allclose(adv, raw, atol=1e-9)
 
 
-@pytest.mark.parametrize("p_val,alpha_val", [(0.0, 1.0), (50.0, 2.0), (250.0, 3.0), (800.0, 20.0)])
-def test_padding_and_dilation_stay_realizable(setup, p_val, alpha_val):
+@pytest.mark.parametrize(
+    "p_val,delay_val,shape_val",
+    [(0.0, 0.0, 0.0), (50.0, 100.0, 0.0), (250.0, 1000.0, 0.5), (800.0, 5000.0, 1.0)],
+)
+def test_padding_and_delay_stay_realizable(setup, p_val, delay_val, shape_val):
     model, val, raw, _ = setup
-    adv = model.generate(raw, _ctl(raw.shape[0], p_val, alpha_val))
+    adv = model.generate(raw, _ctl(raw.shape[0], p_val, delay_val, shape_val), quantize=True)
     cats = val.validate(adv, raw).categories
     assert all(int(v.sum()) == 0 for v in cats.values()), {k: int(v.sum()) for k, v in cats.items()}
 
@@ -51,7 +57,7 @@ def test_uniform_padding_shift_identities(setup):
     """new_total = old_total + n_fwd*p; new_fwd_mean = old_mean + p; fwd_std invariant."""
     model, _, raw, i = setup
     p = 37.0
-    adv = model.generate(raw, _ctl(raw.shape[0], p, 1.0))
+    adv = model.generate(raw, _ctl(raw.shape[0], p, 0.0))
     nf = raw[:, i["Total Fwd Packet"]]
     active = model.active_mask(raw, "p")  # semantic: fwd packets AND fwd payload present
     tl0, tl1 = raw[:, i["Total Length of Fwd Packet"]], adv[:, i["Total Length of Fwd Packet"]]
@@ -66,7 +72,7 @@ def test_uniform_padding_shift_identities(setup):
 def test_combined_length_stats_recomputed(setup):
     """Previously-frozen combined packet-length stats must move & stay consistent under padding."""
     model, _, raw, i = setup
-    adv = model.generate(raw, _ctl(raw.shape[0], 40.0, 1.0))
+    adv = model.generate(raw, _ctl(raw.shape[0], 40.0, 0.0))
     # Packet Length Mean must change on at least some flows (was a bug when frozen).
     changed = (adv[:, i["Packet Length Mean"]] - raw[:, i["Packet Length Mean"]]).abs() > 1e-3
     assert bool(changed.any())
@@ -79,7 +85,7 @@ def test_combined_length_stats_recomputed(setup):
 
 def test_rates_nonneg_and_correct(setup):
     model, _, raw, i = setup
-    adv = model.generate(raw, _ctl(raw.shape[0], 60.0, 4.0))
+    adv = model.generate(raw, _ctl(raw.shape[0], 60.0, 4000.0, 0.5))
     dur_s = (adv[:, i["Flow Duration"]] / 1e6).clamp(min=1e-12)
     nf = raw[:, i["Total Fwd Packet"]]
     for r in ("Flow Bytes/s", "Flow Packets/s", "Fwd Packets/s", "Bwd Packets/s"):
@@ -89,7 +95,7 @@ def test_rates_nonneg_and_correct(setup):
 
 def test_timing_ordering(setup):
     model, _, raw, i = setup
-    adv = model.generate(raw, _ctl(raw.shape[0], 0.0, 6.0))
+    adv = model.generate(raw, _ctl(raw.shape[0], 0.0, 5000.0, 1.0))
     assert bool((adv[:, i["Flow Duration"]] > 0).all())
     assert bool((adv[:, i["Fwd IAT Max"]] <= adv[:, i["Fwd IAT Total"]] + 1e-3).all())
     assert bool((adv[:, i["Fwd IAT Total"]] <= adv[:, i["Flow Duration"]] + 1e-3).all())
@@ -97,13 +103,13 @@ def test_timing_ordering(setup):
 
 
 def test_single_forward_packet_disables_timing(setup):
-    """n_fwd < 2 => alpha has no effect (no forward IAT sequence)."""
+    """n_fwd < 2 => delay has no effect (no forward IAT sequence)."""
     model, _, raw, i = setup
     nf = raw[:, i["Total Fwd Packet"]]
     single = nf < 2
     if not bool(single.any()):
         pytest.skip("no single-forward-packet flows in sample")
-    adv = model.generate(raw, _ctl(raw.shape[0], 0.0, 50.0))
+    adv = model.generate(raw, _ctl(raw.shape[0], 0.0, 5000.0, 1.0))
     for f in ("Fwd IAT Total", "Fwd IAT Max", "Fwd IAT Min", "Flow Duration"):
         assert torch.allclose(adv[single, i[f]], raw[single, i[f]], atol=1e-6)
 
@@ -118,7 +124,7 @@ def test_no_forward_payload_disables_padding(setup):
     caps = model.infer_capabilities(raw)
     assert not bool(caps.pad_allowed[no_payload].any())  # never admissible without payload
     # requesting a large p on these flows must not change the forward length block
-    adv = model.generate(raw, _ctl(raw.shape[0], 28.0, 1.0))
+    adv = model.generate(raw, _ctl(raw.shape[0], 28.0, 0.0))
     for f in ("Total Length of Fwd Packet", "Fwd Packet Length Max",
               "Fwd Packet Length Min", "Fwd Packet Length Mean"):
         assert torch.allclose(adv[no_payload, i[f]], raw[no_payload, i[f]], atol=1e-6)
@@ -135,10 +141,12 @@ def test_bounds_gated_by_capabilities(setup):
            **{f"env_{n}": float(raw[:, i[n]].max()) + 1e6 for n in env_feats}}
     caps = model.infer_capabilities(raw)
     b = model.per_flow_bounds(raw, cfg, capabilities=caps)
-    # inadmissible padding => p_hi == 0; inadmissible timing => alpha_hi == 1 (identity)
+    # inadmissible padding/timing are forced to identity
     assert bool((b["p"][~caps.pad_allowed] == 0).all())
-    assert torch.allclose(b["alpha"][~caps.timing_allowed],
-                          torch.ones_like(b["alpha"][~caps.timing_allowed]))
+    assert torch.equal(
+        b["delay"][~caps.timing_allowed],
+        torch.zeros_like(b["delay"][~caps.timing_allowed]),
+    )
     # semantic cap never exceeds the numeric cap; equals it where admissible
     assert bool((b["p"] <= b["p_numeric"] + 1e-6).all())
     assert torch.allclose(b["p"][caps.pad_allowed], b["p_numeric"][caps.pad_allowed], atol=1e-6)
@@ -165,13 +173,15 @@ def test_capability_reasons_are_consistent(setup):
 
 def test_projection_makes_integer_fields_integral(setup):
     model, val, raw, _ = setup
-    ctl = _ctl(raw.shape[0], 42.7, 3.3)
+    ctl = _ctl(raw.shape[0], 42.7, 3300.4, 0.7)
     bounds = {
         "p": torch.full((raw.shape[0],), 100.0, dtype=raw.dtype),
-        "alpha": torch.full((raw.shape[0],), 5.0, dtype=raw.dtype),
+        "delay": torch.full((raw.shape[0],), 5000.0, dtype=raw.dtype),
+        "shape": torch.ones((raw.shape[0],), dtype=raw.dtype),
     }
     proj = model.project_controls(raw, ctl, bounds)
-    assert torch.allclose(proj["p"], torch.round(proj["p"]))  # p is integer bytes
+    assert torch.allclose(proj["p"], torch.round(proj["p"]))
+    assert torch.allclose(proj["delay"], torch.round(proj["delay"]))
     adv = model.generate(raw, proj, quantize=True)
     for name in model.integer_features():
         v = adv[:, model.i[name]]
@@ -181,7 +191,7 @@ def test_projection_makes_integer_fields_integral(setup):
 
 def test_frozen_features_exactly_preserved(setup):
     model, val, raw, _ = setup
-    adv = model.generate(raw, _ctl(raw.shape[0], 300.0, 8.0), quantize=True)
+    adv = model.generate(raw, _ctl(raw.shape[0], 300.0, 8000.0, 0.5), quantize=True)
     fidx = torch.tensor([model.i[n] for n in val.frozen_names], dtype=torch.long)
     assert torch.equal(adv[:, fidx], raw[:, fidx])
     # Level-C held-constant (Fᶜ) and proven-invariant (I) features are preserved & labelled.
@@ -196,9 +206,12 @@ def test_gradient_flows_into_primitives(setup):
     model, _, raw, i = setup
     n = raw.shape[0]
     p = torch.full((n,), 40.0, dtype=torch.float64, requires_grad=True)
-    alpha = torch.full((n,), 2.0, dtype=torch.float64, requires_grad=True)
-    adv = model.generate(raw, {"p": p, "alpha": alpha})
+    delay = torch.full((n,), 2000.0, dtype=torch.float64, requires_grad=True)
+    shape = torch.full((n,), 0.5, dtype=torch.float64, requires_grad=True)
+    adv = model.generate(raw, {"p": p, "delay": delay, "shape": shape})
     (adv[:, i["Flow Bytes/s"]].sum() + adv[:, i["Fwd IAT Mean"]].sum()
-     + adv[:, i["Fwd Packet Length Mean"]].sum() + adv[:, i["Packet Length Std"]].sum()).backward()
+     + adv[:, i["Fwd IAT Std"]].sum() + adv[:, i["Fwd Packet Length Mean"]].sum()
+     + adv[:, i["Packet Length Std"]].sum()).backward()
     assert torch.isfinite(p.grad).all() and float(p.grad.abs().sum()) > 0
-    assert torch.isfinite(alpha.grad).all() and float(alpha.grad.abs().sum()) > 0
+    assert torch.isfinite(delay.grad).all() and float(delay.grad.abs().sum()) > 0
+    assert torch.isfinite(shape.grad).all() and float(shape.grad.abs().sum()) > 0

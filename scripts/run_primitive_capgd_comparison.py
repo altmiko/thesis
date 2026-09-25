@@ -54,7 +54,7 @@ VICTIM_CKPT = {
 DEFAULT_VICTIMS = ("mlp", "cnn", "ft_transformer")
 DEFAULT_CLASSES = ("DoS", "DDoS", "Recon", "BruteForce")
 DEFAULT_SEEDS = (42, 123, 2024)
-PRIM_REFERENCE = "prim_opt_joint_p75"
+PRIM_REFERENCE = "prim_search_joint_p75"
 METHOD_PREFIX = "primitive_capgd"
 
 
@@ -139,15 +139,15 @@ def run(args: argparse.Namespace) -> Path:
     config = {
         "dataset": adapter.name,
         "method": METHOD_PREFIX,
-        "description": "upstream TabularBench CAPGD over normalized PrimAttack p and alpha only",
+        "description": "upstream TabularBench CAPGD over normalized PrimAttack controls",
         "goal": "untargeted",
         "victims": victims,
         "classes": classes,
         "seeds": seeds,
         "steps": steps_list,
         "n_per_class": None if limit is None else limit,
-        "controls": ["q_padding", "q_timing"],
-        "control_box": "[0,1]^2 mapped per row to the exact PrimAttack p75 (p_hi, alpha_hi) box",
+        "controls": ["q_padding", "q_delay", "q_shape"],
+        "control_box": "[0,1]^3 mapped per row to PrimAttack's p75 hard control box",
         "capgd": {"norm": "Linf", "epsilon": 1.0, "eps_margin": 0.0, "n_restarts": 2, "loss": "ce", "rho": 0.75},
         "budget": "maximum-evaluated (p75)",
         "budget_calibration": str(calibration_path),
@@ -210,8 +210,9 @@ def run(args: argparse.Namespace) -> Path:
                     with parallel_backend("threading"):
                         result = run_primitive_capgd(
                             repo_root=REPO_ROOT, primitive_model=primitive_model,
-                            victim=victim, raw=raw, bounds=bounds, center=center,
-                            scale=scale, true_labels=labels_t, seed=seed, steps=steps,
+                            victim=victim, raw=raw, bounds=bounds, capabilities=caps,
+                            center=center, scale=scale, true_labels=labels_t, seed=seed,
+                            steps=steps,
                         )
                     elapsed = time.perf_counter() - t0
                     adv_raw = result.adversarial_raw
@@ -244,13 +245,17 @@ def run(args: argparse.Namespace) -> Path:
                         semantic_status=semantic.semantic_status,
                         primitive_transform_consistent=transform_ok,
                         q_padding=result.normalized_controls[:, 0].cpu().numpy().astype(np.float32),
-                        q_timing=result.normalized_controls[:, 1].cpu().numpy().astype(np.float32),
+                        q_delay=result.normalized_controls[:, 1].cpu().numpy().astype(np.float32),
+                        q_shape=result.normalized_controls[:, 2].cpu().numpy().astype(np.float32),
                         p_requested=result.requested["p"].cpu().numpy().astype(np.float32),
-                        alpha_requested=result.requested["alpha"].cpu().numpy().astype(np.float32),
+                        delay_requested=result.requested["delay"].cpu().numpy().astype(np.float32),
+                        shape_requested=result.requested["shape"].cpu().numpy().astype(np.float32),
                         p_projected=result.projected["p"].cpu().numpy().astype(np.float32),
-                        alpha_projected=result.projected["alpha"].cpu().numpy().astype(np.float32),
+                        delay_projected=result.projected["delay"].cpu().numpy().astype(np.float32),
+                        shape_projected=result.projected["shape"].cpu().numpy().astype(np.float32),
                         p_hi=bounds["p"].cpu().numpy().astype(np.float32),
-                        alpha_hi=bounds["alpha"].cpu().numpy().astype(np.float32),
+                        delay_hi=bounds["delay"].cpu().numpy().astype(np.float32),
+                        shape_hi=bounds["shape"].cpu().numpy().astype(np.float32),
                         elapsed_seconds=np.asarray(elapsed, np.float64),
                         method=np.asarray(method), victim=np.asarray(victim_name),
                         attack_class=np.asarray(class_name), seed=np.asarray(seed, np.int64),
@@ -270,7 +275,8 @@ def run(args: argparse.Namespace) -> Path:
                         "primitive_feasibility": _rate(primitive_feasible),
                         "semantic_pass_rate": _rate(sem_pass),
                         "median_q_padding": float(np.median(result.normalized_controls[:, 0].cpu().numpy())),
-                        "median_q_timing": float(np.median(result.normalized_controls[:, 1].cpu().numpy())),
+                        "median_q_delay": float(np.median(result.normalized_controls[:, 1].cpu().numpy())),
+                        "median_q_shape": float(np.median(result.normalized_controls[:, 2].cpu().numpy())),
                         "elapsed_seconds": elapsed, "artifact": str(artifact),
                     }
                     cells.append(cell)
@@ -280,7 +286,7 @@ def run(args: argparse.Namespace) -> Path:
     summary = {
         "dataset": adapter.name, "method_id": METHOD_PREFIX, "cells": cells,
         "elapsed_seconds": time.perf_counter() - started,
-        "comparison_reference": f"outputs/full_adv_eval artifacts for {PRIM_REFERENCE}",
+        "comparison_reference": f"outputs/full_adv_eval_primattack_v2 artifacts for {PRIM_REFERENCE}",
     }
     (out / "attack_results.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return out

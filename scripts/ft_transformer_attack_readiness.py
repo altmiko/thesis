@@ -160,23 +160,25 @@ def main() -> None:
     dos_id = class_map.name_to_id["DoS"]
     active = None
     raw_rows = np.flatnonzero(y == dos_id)
-    # keep only rows where p and alpha primitives are active (perturbable)
+    # keep only rows where padding and timing controls are active
     raw_probe = torch.tensor(
         np.ascontiguousarray(raw_all[raw_rows[:512]]), dtype=torch.float32, device=device
     )
-    active = (prim.active_mask(raw_probe, "p") & prim.active_mask(raw_probe, "alpha"))
+    active = (prim.active_mask(raw_probe, "p") & prim.active_mask(raw_probe, "delay"))
     idx = torch.nonzero(active, as_tuple=False).flatten()[: min(64, int(active.sum()))]
     raw = raw_probe[idx]
     p = torch.full((len(raw),), 2.25, dtype=torch.float32, device=device, requires_grad=True)
-    alpha = torch.full((len(raw),), 1.01, dtype=torch.float32, device=device, requires_grad=True)
-    adv = prim.generate(raw, {"p": p, "alpha": alpha})
-    scaled_once = (adv - center) / scale  # scaler applied exactly once
+    delay = torch.full((len(raw),), 10.0, dtype=torch.float32, device=device, requires_grad=True)
+    shape = torch.full((len(raw),), 0.5, dtype=torch.float32, device=device, requires_grad=True)
+    adv = prim.generate(raw, {"p": p, "delay": delay, "shape": shape})
+    scaled_once = (adv - center) / scale
     prim_target = torch.full((len(raw),), benign_id, dtype=torch.long, device=device)
     prim_loss = F.cross_entropy(victim(scaled_once), prim_target, reduction="sum")
-    grad_p, grad_alpha = torch.autograd.grad(prim_loss, (p, alpha))
+    grad_p, grad_delay, grad_shape = torch.autograd.grad(prim_loss, (p, delay, shape))
     report["primattack_rows"] = int(len(raw))
     report["primattack_dLdp_finite"] = bool(torch.isfinite(grad_p).all())
-    report["primattack_dLdalpha_finite"] = bool(torch.isfinite(grad_alpha).all())
+    report["primattack_dLddelay_finite"] = bool(torch.isfinite(grad_delay).all())
+    report["primattack_dLdshape_finite"] = bool(torch.isfinite(grad_shape).all())
     report["primattack_dLdp_nonzero"] = bool((grad_p != 0).any())
     report["primattack_scaler_applied_once"] = True
 
@@ -185,7 +187,8 @@ def main() -> None:
             "benign_index_is_zero", "feature_order_matches_schema", "returns_raw_logits",
             "logits_finite", "input_grad_shape_ok", "input_grad_finite", "input_grad_nonzero",
             "pgd_ran", "cw_ran", "targeted_benign_grad_finite",
-            "primattack_dLdp_finite", "primattack_dLdalpha_finite", "primattack_dLdp_nonzero",
+            "primattack_dLdp_finite", "primattack_dLddelay_finite",
+            "primattack_dLdshape_finite", "primattack_dLdp_nonzero",
         )
     )
     report["ALL_READINESS_CHECKS_PASS"] = bool(all_pass)

@@ -1,5 +1,10 @@
 # 05 — The Realizability Model (the `(p, alpha) -> 79 features` map)
 
+> **Superseded PrimAttack-v1 explanation.** This page documents the replaced
+> `(p, alpha)` map. The current `(p, delay, shape)` canonical map, bounds, equations,
+> roles, tests, and limitations are documented in
+> [`../full_thesis_methodology/02_primattack.md`](../full_thesis_methodology/02_primattack.md).
+
 **Source:** `src/attack/realizability/cicids2017.py` (`CICIDS2017PrimitiveModel`),
 `src/attack/realizability/base.py` (contracts).
 

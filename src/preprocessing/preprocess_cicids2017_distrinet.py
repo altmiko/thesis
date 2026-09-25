@@ -6,7 +6,7 @@ Filtering and category mapping happen before chronological 70/15/15 splits
 within each source attack label. All fitted statistics use training rows only.
 
 Run from the repository root:
-    python scripts/preprocess_cicids2017_distrinet.py
+    python src/preprocessing/preprocess_cicids2017_distrinet.py
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ import pandas as pd
 from pandas.util import hash_pandas_object
 from sklearn.preprocessing import RobustScaler
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 

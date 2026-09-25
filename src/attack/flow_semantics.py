@@ -168,9 +168,9 @@ def primitive_costs(
     o = original.detach().cpu().numpy().astype(np.float64, copy=False)
     a = adversarial.detach().cpu().numpy().astype(np.float64, copy=False)
     p = projected["p"].detach().cpu().numpy().astype(np.float64, copy=False)
-    alpha = projected["alpha"].detach().cpu().numpy().astype(np.float64, copy=False)
+    delay = projected["delay"].detach().cpu().numpy().astype(np.float64, copy=False)
     p_hi = bounds["p"].detach().cpu().numpy().astype(np.float64, copy=False)
-    alpha_hi = bounds["alpha"].detach().cpu().numpy().astype(np.float64, copy=False)
+    delay_hi = bounds["delay"].detach().cpu().numpy().astype(np.float64, copy=False)
 
     d0 = o[:, i["Flow Duration"]]
     d1 = a[:, i["Flow Duration"]]
@@ -196,10 +196,10 @@ def primitive_costs(
             p, p_hi, out=np.zeros_like(p), where=p_hi > 0
         ),
         normalized_timing_magnitude=np.divide(
-            alpha - 1.0,
-            alpha_hi - 1.0,
-            out=np.zeros_like(alpha),
-            where=alpha_hi > 1.0,
+            delay,
+            delay_hi,
+            out=np.zeros_like(delay),
+            where=delay_hi > 0,
         ),
     )
 
@@ -352,8 +352,8 @@ class FlowSemanticValidator:
             allowed: set[str] = set()
             if proj["p"][row] > 0:
                 allowed.update(self._specs["p"].dependencies)
-            if proj["alpha"][row] > 1.0:
-                allowed.update(self._specs["alpha"].dependencies)
+            if proj["delay"][row] > 0:
+                allowed.update(self._specs["delay"].dependencies)
             changed = [
                 name for name, column in i.items() if delta[row, column] > self.atol
             ]
@@ -368,13 +368,19 @@ class FlowSemanticValidator:
         ))
 
         p_integer = np.isclose(proj["p"], np.rint(proj["p"]), atol=self.atol, rtol=0.0)
+        delay_integer = np.isclose(
+            proj["delay"], np.rint(proj["delay"]), atol=self.atol, rtol=0.0
+        )
         primitive_ok = (
-            np.isfinite(proj["p"]) & np.isfinite(proj["alpha"])
+            np.isfinite(proj["p"]) & np.isfinite(proj["delay"]) & np.isfinite(proj["shape"])
             & (proj["p"] >= -self.atol)
             & (proj["p"] <= np.floor(cap["p"]) + self.atol)
             & p_integer
-            & (proj["alpha"] >= 1.0 - self.atol)
-            & (proj["alpha"] <= cap["alpha"] + self.atol)
+            & (proj["delay"] >= -self.atol)
+            & (proj["delay"] <= np.floor(cap["delay"]) + self.atol)
+            & delay_integer
+            & (proj["shape"] >= -self.atol)
+            & (proj["shape"] <= cap["shape"] + self.atol)
             & (costs.relative_duration_change <= budget.max_relative_duration_change + self.atol)
             & (costs.added_byte_quantity >= -self.atol)
         )

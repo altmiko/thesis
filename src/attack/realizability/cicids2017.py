@@ -1,15 +1,21 @@
 """CICIDS2017-DistriNet realization of the primitive-control attack.
 
-Two attacker-controlled primitives per flow, both differentiable:
+Two attacker operations are represented by three differentiable controls:
 
-* ``p >= 0``  -- **forward packet-length augmentation** (bytes added to every forward
-  packet's *length*). This is a feature-level model of forward padding (e.g. TCP/MSS
-  padding or filler segments). It is NOT asserted to insert application-layer *data*: the
-  data-bearing-packet count (``Fwd Act Data Pkts``) is therefore held frozen and flagged as
-  a Level-C (packet-trace) limitation, not overclaimed. See ``roles``.
-* ``alpha >= 1`` -- **forward timing dilation**: stretch every forward inter-arrival gap by
-  ``alpha`` (delay only; can never compress a flow, so duration stays positive and rates
-  stay finite). Masked to ``1`` for single-packet flows (no forward IAT sequence).
+* ``p >= 0`` -- forward packet-length augmentation in integer bytes per packet.
+* ``delay >= 0`` -- total additional forward inter-arrival delay in microseconds.
+* ``shape in [0,1]`` -- allocation of ``delay`` between proportional dilation
+  (``shape=0``) and an equal additive shift of every forward gap (``shape=1``).
+
+For ``m=Nf-1`` forward gaps with original total ``T``, the timing map is
+
+    scale = 1 + (1-shape)*delay/T
+    offset = shape*delay/m
+    iat_i' = scale*iat_i + offset
+
+so the new total is exactly ``T+delay``. Both endpoints are delay-only, preserve
+packet order and content, and are masked to identity for flows without a non-zero
+forward-IAT sequence.
 
 Dependency semantics were mined on the pristine TRAIN split (leakage-safe); every identity
 below had 0% violation across 400k-600k train rows:
@@ -25,13 +31,10 @@ below had 0% violation across 400k-600k train rows:
     <dir> Packets/s        = count / (duration_us / 1e6)                           (exact)
     Flow Bytes/s           = (TL_fwd + TL_bwd) / (duration_us / 1e6)               (exact)
 
-Padding shift identities (fwd min/max/mean += p, fwd std invariant, TL_fwd += Nf*p) follow
-from adding a constant to every forward packet length -- a *threat-model definition*, not an
-extractor identity. Flow Duration under dilation is a conservative packet-sequence
-projection (all added forward delay extends the flow); Flow IAT Max is grown by the same
-delay so ``mean <= max <= duration`` stays exact -- both are labelled CONDITIONAL_DERIVED /
-Level-C-approximate. Subflow bytes, bulk stats, Flow IAT Std/Min are NOT reconstructable
-from the aggregate flow and are held frozen (Level-C limitation), never fabricated.
+Padding identities follow from adding a constant to every forward packet length.
+Flow Duration and Flow IAT Max under added delay remain conservative packet-sequence
+projections. Subflow bytes, bulk stats, Flow IAT Std/Min, and active/idle features are
+not reconstructable from aggregate flows and remain explicit Level-C limitations.
 """
 from __future__ import annotations
 
@@ -92,12 +95,16 @@ _QUANTIZE_TIMING = ("Fwd IAT Total", "Fwd IAT Max", "Fwd IAT Min", "Flow Duratio
 
 
 class CICIDS2017PrimitiveModel:
-    """Differentiable (p, alpha) -> 79-feature map with complete dependency recomputation."""
+    """Differentiable ``(p, delay, shape) -> 79-feature`` canonical map.
 
-    dataset = "cicids2017_distrinet"
+    Shared by CICIDS2017 and CSE-CIC-IDS-2018 DistriNet (same extractor and 79-feature
+    layout); every identity above also has zero violations on the CSE-CIC-IDS-2018 TRAIN
+    split. ``dataset`` follows the manifest and keys the validator_v2 profile.
+    """
 
     def __init__(self, manifest: FeatureManifest, *, dur_floor_us: float = _DUR_FLOOR_US) -> None:
         self.manifest = manifest
+        self.dataset = manifest.dataset_name
         self.dur_floor_us = float(dur_floor_us)
         self._names = tuple(manifest.names)
         self.i = {n: manifest.index_by_name(n) for n in self._names}
@@ -163,20 +170,36 @@ class CICIDS2017PrimitiveModel:
                 description="uniform forward packet-length augmentation",
             ),
             PrimitiveSpec(
-                name="alpha",
-                units="dimensionless_ratio",
-                dtype="continuous",
+                name="delay",
+                units="microseconds_total_forward_delay",
+                dtype="discrete_integer",
                 direction="increase_only",
-                identity=1.0,
-                absolute_lower_bound=1.0,
+                identity=0.0,
+                absolute_lower_bound=0.0,
                 absolute_upper_bound=None,
                 dependencies=timing_dependencies,
-                projection_function="clamp_to_continuous_budget_then_quantize_derived_microseconds",
+                projection_function="round_to_integer_microseconds_then_clamp_to_floor_budget",
                 semantic_risk=(
                     "aggregate flow data lacks merged packet order; duration and flow-IAT "
                     "effects are conservative flow-level projections"
                 ),
-                description="uniform forward inter-arrival timing dilation",
+                description="total additional forward inter-arrival delay",
+            ),
+            PrimitiveSpec(
+                name="shape",
+                units="proportional_to_uniform_delay_mix",
+                dtype="continuous",
+                direction="increase_only",
+                identity=0.0,
+                absolute_lower_bound=0.0,
+                absolute_upper_bound=1.0,
+                dependencies=timing_dependencies,
+                projection_function="clamp_to_unit_interval_and_zero_when_delay_is_inactive",
+                semantic_risk=(
+                    "aggregate summaries validate the affine gap map but not the hidden "
+                    "packet-level schedule"
+                ),
+                description="allocation of total delay across forward gaps",
             ),
         )
 
@@ -184,17 +207,17 @@ class CICIDS2017PrimitiveModel:
         return _INTEGER_FEATURES
 
     def roles(self) -> dict[str, tuple[FeatureRole, str]]:
-        """Precise role of every feature w.r.t. the two primitives.
+        """Precise role of every feature w.r.t. padding and affine delay allocation.
 
-        Reminder: no CICFlowMeter feature is optimized directly -- only ``p`` and ``alpha``
-        are attack variables. ``Dp/Dt`` = exactly derived from p / alpha; ``D`` = other exact
-        derived; ``C`` = conditional/conservative reconstruction; ``R`` = rate; ``I`` = PROVEN
-        invariant under the relevant primitive; ``F`` = genuinely unaffected; ``Fᶜ`` = UNRESOLVED
-        and held constant (would change under real packet edits, not aggregate-reconstructable).
+        No CICFlowMeter feature is optimized directly. ``Dp/Dt`` are exactly derived from
+        the primitive controls; ``C`` is a conservative aggregate reconstruction; ``Fᶜ`` is
+        unresolved at packet level and deliberately held constant.
         """
         R = FeatureRole
-        roles: dict[str, tuple[FeatureRole, str]] = {n: (R.FROZEN, "genuinely unaffected by p or alpha")
-                                                      for n in self._names}
+        roles: dict[str, tuple[FeatureRole, str]] = {
+            n: (R.FROZEN, "genuinely unaffected by padding or forward delay")
+            for n in self._names
+        }
         # --- derived from packet-length primitive p (Dp) ---
         roles["Total Length of Fwd Packet"] = (R.DERIVED_P, "= TL_fwd0 + Nf*p (padding accumulator)")
         roles["Fwd Packet Length Min"] = (R.DERIVED_P, "= min0 + p (uniform fwd length shift)")
@@ -209,15 +232,15 @@ class CICIDS2017PrimitiveModel:
         roles["Packet Length Std"] = (R.DERIVED_P, "= sqrt(Packet Length Variance)")
         roles["Packet Length Max"] = (R.CONDITIONAL, "= ext(fwd_max+p, bwd_max), branch on direction presence")
         roles["Packet Length Min"] = (R.CONDITIONAL, "= ext(fwd_min+p, bwd_min), branch on direction presence")
-        # --- derived from timing primitive alpha (Dt) ---
-        roles["Fwd IAT Total"] = (R.DERIVED_T, "= alpha * Fwd IAT Total0 (uniform fwd IAT dilation)")
-        roles["Fwd IAT Max"] = (R.DERIVED_T, "= alpha * Fwd IAT Max0")
-        roles["Fwd IAT Min"] = (R.DERIVED_T, "= alpha * Fwd IAT Min0")
-        roles["Fwd IAT Std"] = (R.DERIVED_T, "= alpha * Fwd IAT Std0 (scale-equivariant)")
+        # --- derived from total delay and its proportional/uniform allocation (Dt) ---
+        roles["Fwd IAT Total"] = (R.DERIVED_T, "= Fwd IAT Total0 + delay")
+        roles["Fwd IAT Max"] = (R.DERIVED_T, "= scale*max0 + offset")
+        roles["Fwd IAT Min"] = (R.DERIVED_T, "= scale*min0 + offset")
+        roles["Fwd IAT Std"] = (R.DERIVED_T, "= scale*std0 (offset invariant)")
         roles["Fwd IAT Mean"] = (R.DERIVED_T, "= Fwd IAT Total/(Nf-1) (exact)")
-        roles["Flow Duration"] = (R.CONDITIONAL, "conservative delay projection (Level-C approximate)")
+        roles["Flow Duration"] = (R.CONDITIONAL, "= duration0 + delay (Level-C approximate)")
         roles["Flow IAT Mean"] = (R.DERIVED_T, "= Flow Duration/(Nf+Nb-1) (exact)")
-        roles["Flow IAT Max"] = (R.CONDITIONAL, "= Flow IAT Max0 + added delay (preserves mean<=max<=dur)")
+        roles["Flow IAT Max"] = (R.CONDITIONAL, "= Flow IAT Max0 + delay")
         # --- rates (depend on both primitives via totals/duration) ---
         for r in ("Flow Bytes/s", "Flow Packets/s", "Fwd Packets/s", "Bwd Packets/s"):
             roles[r] = (R.RATE, "count/byte over projected duration")
@@ -290,20 +313,7 @@ class CICIDS2017PrimitiveModel:
 
     # -- semantic capabilities, activity & bounds -----------------------------
     def infer_capabilities(self, raw: torch.Tensor) -> PrimitiveCapabilities:
-        """Per-flow semantic admissibility of (p, alpha) from the source flow statistics.
-
-        Conservative feature-level model of *primitive realizability*: aggregate CICFlowMeter
-        features do not reveal which forward packets carry modifiable application data, so we
-        gate on the strongest evidence they DO carry -- forward payload presence and a forward
-        inter-arrival sequence. Uncertain flows fall to the identity (fail closed).
-
-        * ``p`` (forward-length augmentation) is admissible iff the source has enough forward
-          packets AND non-zero forward payload (total and mean length > 0). A flow with
-          ``Total Length of Fwd Packet == 0`` (e.g. a single-SYN Recon probe) has no forward
-          data to augment -> ``pad_allowed = False`` -> ``p_hi = 0``.
-        * ``alpha`` (forward timing dilation) is admissible iff there are >= 2 forward packets
-          (a forward IAT sequence exists) AND that sequence is non-zero (something to dilate).
-        """
+        """Infer conservative per-flow admissibility and materialize audit reasons once."""
         i = self.i
         Nf = raw[:, i["Total Fwd Packet"]]
         tl_fwd = raw[:, i["Total Length of Fwd Packet"]]
@@ -313,7 +323,6 @@ class CICIDS2017PrimitiveModel:
         has_fwd_packets = Nf >= MIN_FWD_PACKETS_FOR_PADDING
         has_fwd_payload = (tl_fwd > 0.0) & (mean_fwd > 0.0)
         pad_allowed = has_fwd_packets & has_fwd_payload
-
         has_fwd_iat_seq = Nf >= 2.0
         has_timing_headroom = fit > 0.0
         timing_allowed = has_fwd_iat_seq & has_timing_headroom
@@ -331,39 +340,44 @@ class CICIDS2017PrimitiveModel:
             for ok, seq in zip(timing_np, seq_np)
         ]
         return PrimitiveCapabilities(
-            pad_allowed=pad_allowed, timing_allowed=timing_allowed,
-            pad_reason=pad_reason, timing_reason=timing_reason,
+            pad_allowed=pad_allowed,
+            timing_allowed=timing_allowed,
+            pad_reason=pad_reason,
+            timing_reason=timing_reason,
         )
 
     def active_mask(
-        self, raw: torch.Tensor, primitive: str,
+        self,
+        raw: torch.Tensor,
+        primitive: str,
         capabilities: PrimitiveCapabilities | None = None,
     ) -> torch.Tensor:
         caps = capabilities if capabilities is not None else self.infer_capabilities(raw)
         if primitive == "p":
             return caps.pad_allowed
-        if primitive == "alpha":
+        if primitive in {"delay", "shape"}:
             return caps.timing_allowed
         raise KeyError(primitive)
 
     def per_flow_bounds(
-        self, raw: torch.Tensor, config: Mapping[str, float],
+        self,
+        raw: torch.Tensor,
+        config: Mapping[str, float],
         capabilities: PrimitiveCapabilities | None = None,
     ) -> dict[str, torch.Tensor]:
-        """Per-flow hard feasible upper bounds for ``p`` and ``alpha``.
+        """Build a hard box valid for every affine delay-allocation shape.
 
-        Padding intersects the named class budget with global-training p99 feature headroom.
-        Timing intersects the named relative-duration budget, global-training p99 timing
-        headroom, and (for DoS/DDoS) the class-specific minimum flow-rate threshold. These
-        limits are fitted before attack evaluation and are hard constraints, not penalties.
-
-        Semantic capability gates then force unsupported primitives to identity. Pre-gate
-        numeric caps are returned separately for provenance.
+        ``delay`` is total added forward-IAT time. Its cap intersects the class relative
+        duration budget, global train-p99 feature headroom, and the DoS/DDoS rate floor.
+        Min/max/std caps use the worst coefficient across ``shape in [0,1]`` so every point
+        in the returned ``delay × shape`` box is feasible without a soft penalty.
         """
         i = self.i
         col = lambda name: raw[:, i[name]]
         eps = 1e-9
-        Nf = col("Total Fwd Packet").clamp(min=1.0)
+        Nf_raw = col("Total Fwd Packet")
+        Nf = Nf_raw.clamp(min=1.0)
+        gaps = (Nf_raw - 1.0).clamp(min=1.0)
         p_max = float(config["p_max"])
         max_relative_duration_change = float(config["max_relative_duration_change"])
         if p_max < 0.0 or max_relative_duration_change < 0.0:
@@ -382,28 +396,28 @@ class CICIDS2017PrimitiveModel:
 
         fit = col("Fwd IAT Total")
         duration = col("Flow Duration")
-        relative_cap = torch.where(
-            fit > 0,
-            1.0
-            + max_relative_duration_change
-            * duration.clamp(min=self.dur_floor_us)
-            / fit.clamp(min=eps),
-            torch.ones_like(fit),
+        relative_delay_cap = (
+            max_relative_duration_change * duration.clamp(min=self.dur_floor_us)
         )
-        a_list = [relative_cap]
-        for name in ("Fwd IAT Total", "Fwd IAT Max", "Fwd IAT Std", "Fwd IAT Mean"):
-            current = col(name)
-            a_list.append(torch.where(
-                current > 0,
-                float(config[f"env_{name}"]) / current.clamp(min=eps),
-                relative_cap,
-            ))
-        a_list.append(torch.where(
-            fit > 0,
-            (
-                float(config["env_Flow Duration"]) - duration
-            ) / fit.clamp(min=eps) + 1.0,
-            torch.ones_like(fit),
+        delay_caps = [
+            relative_delay_cap,
+            float(config["env_Fwd IAT Total"]) - fit,
+            gaps * (float(config["env_Fwd IAT Mean"]) - col("Fwd IAT Mean")),
+            float(config["env_Flow Duration"]) - duration,
+        ]
+        # Fwd IAT Min never exceeds the capped Fwd IAT Max, so only the calibrated maximum
+        # envelope is needed; the worst coefficient covers every shape in [0, 1].
+        current_max = col("Fwd IAT Max")
+        max_coeff = torch.maximum(current_max / fit.clamp(min=eps), 1.0 / gaps)
+        delay_caps.append(
+            (float(config["env_Fwd IAT Max"]) - current_max) / max_coeff.clamp(min=eps)
+        )
+        current_std = col("Fwd IAT Std")
+        std_coeff = current_std / fit.clamp(min=eps)
+        delay_caps.append(torch.where(
+            std_coeff > 0,
+            (float(config["env_Fwd IAT Std"]) - current_std) / std_coeff.clamp(min=eps),
+            relative_delay_cap,
         ))
 
         min_rate = config.get("min_flow_packets_per_second")
@@ -411,25 +425,22 @@ class CICIDS2017PrimitiveModel:
             min_rate = float(min_rate)
             if min_rate <= 0.0:
                 raise ValueError("semantic minimum flow rate must be positive")
-            total_packets = col("Total Fwd Packet") + col("Total Bwd packets")
+            total_packets = Nf_raw + col("Total Bwd packets")
             duration_cap = total_packets * 1.0e6 / min_rate
-            a_list.append(torch.where(
-                fit > 0,
-                (duration_cap - duration) / fit.clamp(min=eps) + 1.0,
-                torch.ones_like(fit),
-            ))
-        alpha_hi = torch.stack(a_list, 0).amin(0).clamp(min=1.0)
+            delay_caps.append(duration_cap - duration)
 
+        delay_hi = torch.stack(delay_caps, 0).amin(0).clamp(min=0.0)
         caps = capabilities if capabilities is not None else self.infer_capabilities(raw)
         p_hi_semantic = p_hi * caps.pad_allowed.to(p_hi.dtype)
-        alpha_hi_semantic = torch.where(
-            caps.timing_allowed, alpha_hi, torch.ones_like(alpha_hi)
-        )
+        delay_hi_semantic = delay_hi * caps.timing_allowed.to(delay_hi.dtype)
+        shape_hi = caps.timing_allowed.to(raw.dtype)
         return {
             "p": p_hi_semantic,
-            "alpha": alpha_hi_semantic,
+            "delay": delay_hi_semantic,
+            "shape": shape_hi,
             "p_numeric": p_hi,
-            "alpha_numeric": alpha_hi,
+            "delay_numeric": delay_hi,
+            "shape_numeric": torch.ones_like(shape_hi),
         }
 
     # -- decoder -> primitive inference (VAE latent attack) --------------------
@@ -439,56 +450,48 @@ class CICIDS2017PrimitiveModel:
         decoded_adv_raw: torch.Tensor,
         decoded_base_raw: torch.Tensor,
         bounds: Mapping[str, torch.Tensor],
+        capabilities: PrimitiveCapabilities | None = None,
     ) -> dict[str, torch.Tensor]:
-        """Deterministic, differentiable map: VAE decoder proposal -> (p, alpha).
-
-        The decoder proposes a *direction* of traffic modification; we read that direction
-        only through the reconstructable forward-length / forward-timing signals and collapse
-        it into the two realizable primitives. Movement is measured relative to the decoded
-        source ``decode(z0)`` (not raw0) so the constant VAE reconstruction bias cancels and
-        the primitive is driven purely by the latent displacement ``z_adv - z0``.
-
-        p is a least-squares-consistent non-negative padding from the fwd-length signals;
-        alpha is a non-negative-log dilation from the fwd-timing ratios. Both are clamped to
-        the per-flow feasible caps ``bounds``. For single-forward-packet flows alpha is forced
-        to the identity 1 *inside the graph* (no forward IAT sequence exists).
-        """
+        """Collapse decoder movement into feasible padding and affine timing controls."""
         i = self.i
         da = lambda n: decoded_adv_raw[:, i[n]]
         db = lambda n: decoded_base_raw[:, i[n]]
         r0 = lambda n: raw0[:, i[n]]
         eps = 1e-6
-        Nf_raw = r0("Total Fwd Packet"); Nf = Nf_raw.clamp(min=1.0)
+        Nf_raw = r0("Total Fwd Packet")
+        Nf = Nf_raw.clamp(min=1.0)
+        caps = capabilities if capabilities is not None else self.infer_capabilities(raw0)
 
-        # --- p_hat: average of the four fwd-length movement signals (each estimates p) ---
         p_signals = torch.stack([
             da("Fwd Packet Length Mean") - db("Fwd Packet Length Mean"),
             da("Fwd Packet Length Max") - db("Fwd Packet Length Max"),
             da("Fwd Packet Length Min") - db("Fwd Packet Length Min"),
             (da("Total Length of Fwd Packet") - db("Total Length of Fwd Packet")) / Nf,
         ], 0).mean(0)
-        # Differentiable projection to the feasible (non-negative) padding direction:
-        # identity (no decoder movement) maps exactly to p=0, while positive proposed
-        # length increases pass through with full gradient. Padding cannot shorten packets,
-        # so clamping the negative direction to 0 is the correct (not merely convenient) map.
-        p_hat = torch.relu(p_signals)
-        p_hat = torch.minimum(p_hat, bounds["p"].clamp(min=0.0))
-        p_hat = torch.where(self.active_mask(raw0, "p"), p_hat, torch.zeros_like(p_hat))
+        p_hat = torch.minimum(torch.relu(p_signals), bounds["p"].clamp(min=0.0))
+        p_hat = torch.where(caps.pad_allowed, p_hat, torch.zeros_like(p_hat))
 
-        # Geometric mean of timing ratios. Averaging log ratios and exponentiating is
-        # the exact conversion back to a multiplicative delay factor.
-        def ratio(n):
-            base = db(n)
-            return torch.where(base.abs() > eps, da(n) / base.clamp(min=eps), torch.ones_like(base))
-        mean_log_ratio = torch.stack([
-            torch.log(ratio("Fwd IAT Total").clamp(min=eps)),
-            torch.log(ratio("Fwd IAT Mean").clamp(min=eps)),
-            torch.log(ratio("Flow Duration").clamp(min=eps)),
+        delay_signals = torch.stack([
+            da("Fwd IAT Total") - db("Fwd IAT Total"),
+            da("Flow Duration") - db("Flow Duration"),
         ], 0).mean(0)
-        alpha_hat = torch.exp(torch.relu(mean_log_ratio))
-        alpha_hat = torch.minimum(alpha_hat, bounds["alpha"].clamp(min=1.0))
-        alpha_hat = torch.where(self.active_mask(raw0, "alpha"), alpha_hat, torch.ones_like(alpha_hat))
-        return {"p": p_hat, "alpha": alpha_hat}
+        delay_hat = torch.minimum(torch.relu(delay_signals), bounds["delay"].clamp(min=0.0))
+        delay_hat = torch.where(caps.timing_allowed, delay_hat, torch.zeros_like(delay_hat))
+
+        base_std = db("Fwd IAT Std")
+        proportional_delay = torch.where(
+            base_std.abs() > eps,
+            torch.relu((da("Fwd IAT Std") / base_std.clamp(min=eps) - 1.0) * r0("Fwd IAT Total")),
+            torch.zeros_like(delay_hat),
+        )
+        proportional_fraction = torch.where(
+            delay_hat > eps,
+            (proportional_delay / delay_hat.clamp(min=eps)).clamp(0.0, 1.0),
+            torch.ones_like(delay_hat),
+        )
+        shape_hat = (1.0 - proportional_fraction).clamp(0.0, 1.0)
+        shape_hat = torch.where(delay_hat > 0.0, shape_hat, torch.zeros_like(shape_hat))
+        return {"p": p_hat, "delay": delay_hat, "shape": shape_hat}
 
     # -- projection ------------------------------------------------------------
     def project_controls(
@@ -496,84 +499,112 @@ class CICIDS2017PrimitiveModel:
         raw: torch.Tensor,
         controls: Mapping[str, torch.Tensor],
         bounds: Mapping[str, torch.Tensor],
+        *,
+        capabilities: PrimitiveCapabilities | None = None,
     ) -> dict[str, torch.Tensor]:
-        """Project requested controls into the hard per-flow primitive budget.
-
-        Integer padding is rounded and then capped by ``floor(p_hi)`` so projection can never
-        exceed a fractional budget. Timing remains continuous; integer microsecond fields are
-        quantized by :meth:`generate`.
-        """
-        required = ("p", "alpha")
+        """Project controls into the hard per-flow box and timestamp resolution."""
+        required = ("p", "delay", "shape")
         if any(name not in controls or name not in bounds for name in required):
-            raise KeyError("controls and bounds must both contain p and alpha")
+            raise KeyError("controls and bounds must contain p, delay, and shape")
         if any(not bool(torch.isfinite(controls[name]).all()) for name in required):
             raise ValueError("primitive controls contain NaN or Inf")
         if any(not bool(torch.isfinite(bounds[name]).all()) for name in required):
             raise ValueError("primitive bounds contain NaN or Inf")
+
+        caps = capabilities if capabilities is not None else self.infer_capabilities(raw)
         p_hi = bounds["p"].clamp(min=0.0)
-        alpha_hi = bounds["alpha"].clamp(min=1.0)
-        p = torch.minimum(controls["p"].clamp(min=0.0), p_hi)
-        alpha = torch.minimum(controls["alpha"].clamp(min=1.0), alpha_hi)
-        p = torch.minimum(torch.round(p), torch.floor(p_hi))
-        p = torch.where(self.active_mask(raw, "p"), p, torch.zeros_like(p))
-        alpha = torch.where(self.active_mask(raw, "alpha"), alpha, torch.ones_like(alpha))
-        return {"p": p, "alpha": alpha}
+        delay_hi = bounds["delay"].clamp(min=0.0)
+        shape_hi = bounds["shape"].clamp(min=0.0, max=1.0)
+        p = torch.minimum(torch.round(controls["p"].clamp(min=0.0)), torch.floor(p_hi))
+        delay = torch.minimum(
+            torch.round(controls["delay"].clamp(min=0.0)),
+            torch.floor(delay_hi),
+        )
+        shape = torch.minimum(controls["shape"].clamp(0.0, 1.0), shape_hi)
+        p = torch.where(caps.pad_allowed, p, torch.zeros_like(p))
+        delay = torch.where(caps.timing_allowed, delay, torch.zeros_like(delay))
+        shape = torch.where((delay > 0.0) & caps.timing_allowed, shape, torch.zeros_like(shape))
+        return {"p": p, "delay": delay, "shape": shape}
 
     # -- generation ------------------------------------------------------------
-    def generate(self, raw: torch.Tensor, controls: Mapping[str, torch.Tensor], *, quantize: bool = False) -> torch.Tensor:
+    def generate(
+        self,
+        raw: torch.Tensor,
+        controls: Mapping[str, torch.Tensor],
+        *,
+        quantize: bool = False,
+        capabilities: PrimitiveCapabilities | None = None,
+    ) -> torch.Tensor:
         i = self.i
         x = raw.clone()
         col = lambda n: raw[:, i[n]]
-        p = controls["p"]; alpha = controls["alpha"]
+        required = ("p", "delay", "shape")
+        if any(name not in controls for name in required):
+            raise KeyError("controls must contain p, delay, and shape")
+        p, delay, shape = (controls[name] for name in required)
         if not bool(torch.isfinite(raw).all()):
             raise ValueError("source features contain NaN or Inf")
-        if not bool(torch.isfinite(p).all()) or not bool(torch.isfinite(alpha).all()):
+        if any(not bool(torch.isfinite(value).all()) for value in (p, delay, shape)):
             raise ValueError("primitive controls contain NaN or Inf")
-        # Active-mask primitives: unsupported controls are exact identity operations.
-        p = torch.where(self.active_mask(raw, "p"), p, torch.zeros_like(p)).clamp(min=0.0)
-        alpha = torch.where(self.active_mask(raw, "alpha"), alpha, torch.ones_like(alpha)).clamp(min=1.0)
+
+        caps = capabilities if capabilities is not None else self.infer_capabilities(raw)
+        p = torch.where(caps.pad_allowed, p, torch.zeros_like(p)).clamp(min=0.0)
+        delay = torch.where(caps.timing_allowed, delay, torch.zeros_like(delay)).clamp(min=0.0)
+        shape = torch.where(caps.timing_allowed, shape, torch.zeros_like(shape)).clamp(0.0, 1.0)
         if quantize:
             p = torch.round(p)
-        identity_rows = (p == 0.0) & (alpha == 1.0)
+            delay = torch.round(delay)
+        shape = torch.where(delay > 0.0, shape, torch.zeros_like(shape))
+        identity_rows = (p == 0.0) & (delay == 0.0)
         padding_rows = p != 0.0
-        timing_rows = alpha != 1.0
+        timing_rows = delay != 0.0
 
         def write_when(name: str, value: torch.Tensor, rows: torch.Tensor) -> None:
             x[:, i[name]] = torch.where(rows, value, col(name))
 
-        Nf_raw = col("Total Fwd Packet"); Nf = Nf_raw.clamp(min=1.0)
-        Nb = col("Total Bwd packets"); N = Nf_raw + Nb
+        Nf_raw = col("Total Fwd Packet")
+        Nf = Nf_raw.clamp(min=1.0)
+        gaps = (Nf_raw - 1.0).clamp(min=1.0)
+        Nb = col("Total Bwd packets")
+        N = Nf_raw + Nb
 
         # ---- forward packet-length augmentation ----
         tl_fwd = col("Total Length of Fwd Packet") + Nf_raw * p
         fmin = col("Fwd Packet Length Min") + p
         fmax = col("Fwd Packet Length Max") + p
         if quantize:
-            tl_fwd = torch.round(tl_fwd); fmin = torch.round(fmin); fmax = torch.round(fmax)
+            tl_fwd = torch.round(tl_fwd)
+            fmin = torch.round(fmin)
+            fmax = torch.round(fmax)
         fmean = tl_fwd / Nf
-        fstd = col("Fwd Packet Length Std")  # shift-invariant
+        fstd = col("Fwd Packet Length Std")
         write_when("Total Length of Fwd Packet", tl_fwd, padding_rows)
         write_when("Fwd Packet Length Min", fmin, padding_rows)
         write_when("Fwd Packet Length Max", fmax, padding_rows)
         write_when("Fwd Packet Length Mean", fmean, padding_rows)
         write_when("Fwd Segment Size Avg", fmean, padding_rows)
 
-        # ---- forward timing dilation ----
+        # ---- affine allocation of total forward delay ----
         fit0 = col("Fwd IAT Total")
-        fit = alpha * fit0
-        fimax = alpha * col("Fwd IAT Max"); fimin = alpha * col("Fwd IAT Min")
-        fistd = alpha * col("Fwd IAT Std")
+        proportional_scale = 1.0 + (1.0 - shape) * delay / fit0.clamp(min=1e-9)
+        uniform_offset = shape * delay / gaps
+        fit = fit0 + delay
+        fimax = proportional_scale * col("Fwd IAT Max") + uniform_offset
+        fimin = proportional_scale * col("Fwd IAT Min") + uniform_offset
+        fistd = proportional_scale * col("Fwd IAT Std")
         bwd_iat_total = col("Bwd IAT Total")
-        dur = col("Flow Duration") + (fit - fit0)
+        dur = col("Flow Duration") + delay
         dur = torch.maximum(dur, fit)
         dur = torch.maximum(dur, bwd_iat_total).clamp(min=self.dur_floor_us)
         d_dur = dur - col("Flow Duration")
-        flow_iat_max = col("Flow IAT Max") + d_dur.clamp(min=0.0)  # added delay lands in largest gap
+        flow_iat_max = col("Flow IAT Max") + d_dur.clamp(min=0.0)
         if quantize:
-            fit = torch.round(fit); fimax = torch.round(fimax); fimin = torch.round(fimin)
+            fit = torch.round(fit)
+            fimax = torch.round(fimax)
+            fimin = torch.round(fimin)
             dur = torch.round(dur).clamp(min=self.dur_floor_us)
             flow_iat_max = torch.round(flow_iat_max)
-        fimean = fit / (Nf - 1.0).clamp(min=1.0)
+        fimean = fit / gaps
         flow_iat_mean = dur / (N - 1.0).clamp(min=1.0)
         write_when("Fwd IAT Total", fit, timing_rows)
         write_when("Fwd IAT Mean", fimean, timing_rows)
@@ -584,10 +615,13 @@ class CICIDS2017PrimitiveModel:
         write_when("Flow IAT Mean", flow_iat_mean, timing_rows)
         write_when("Flow IAT Max", flow_iat_max, timing_rows)
 
-        # ---- combined (fwd+bwd) packet-length statistics ----
-        bmin = col("Bwd Packet Length Min"); bmax = col("Bwd Packet Length Max")
-        mb = col("Bwd Packet Length Mean"); sb = col("Bwd Packet Length Std")
-        has_b = Nb > 0; has_f = Nf_raw > 0
+        # ---- combined packet-length statistics ----
+        bmin = col("Bwd Packet Length Min")
+        bmax = col("Bwd Packet Length Max")
+        mb = col("Bwd Packet Length Mean")
+        sb = col("Bwd Packet Length Std")
+        has_b = Nb > 0
+        has_f = Nf_raw > 0
         cmax = torch.where(has_b, torch.maximum(fmax, bmax), fmax)
         cmax = torch.where(has_f, cmax, bmax)
         cmin = torch.where(has_b, torch.minimum(fmin, bmin), fmin)
@@ -599,8 +633,11 @@ class CICIDS2017PrimitiveModel:
         SSf = (Nf_raw - 1.0).clamp(min=0.0) * fstd ** 2
         SSb = (Nb - 1.0).clamp(min=0.0) * sb ** 2
         between = Nf_raw * (fmean - cm) ** 2 + Nb * (mb - cm) ** 2
-        pvar = torch.where(N >= 2.0, (SSf + SSb + between) / (N - 1.0).clamp(min=1.0),
-                           torch.zeros_like(N)).clamp(min=0.0)
+        pvar = torch.where(
+            N >= 2.0,
+            (SSf + SSb + between) / (N - 1.0).clamp(min=1.0),
+            torch.zeros_like(N),
+        ).clamp(min=0.0)
         pstd = torch.sqrt(pvar)
         write_when("Packet Length Max", cmax, padding_rows)
         write_when("Packet Length Min", cmin, padding_rows)
@@ -609,7 +646,7 @@ class CICIDS2017PrimitiveModel:
         write_when("Packet Length Variance", pvar, padding_rows)
         write_when("Packet Length Std", pstd, padding_rows)
 
-        # ---- rates (only dependencies of the active primitive are rewritten) ----
+        # ---- rates ----
         effective_duration = torch.where(timing_rows, dur, col("Flow Duration"))
         dur_s = (effective_duration / 1.0e6).clamp(min=1e-12)
         write_when("Fwd Packets/s", Nf_raw / dur_s, timing_rows)
@@ -620,5 +657,4 @@ class CICIDS2017PrimitiveModel:
             (tl_fwd + tl_bwd) / dur_s,
             padding_rows | timing_rows,
         )
-        # Preserve the formal no-op contract exactly, including zero-duration boundary rows.
         return torch.where(identity_rows[:, None], raw, x)

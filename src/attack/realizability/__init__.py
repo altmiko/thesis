@@ -11,7 +11,7 @@ Dataset-agnostic core:
   from the external mined/PAVE validators.
 * :mod:`attack.realizability.cicids2017` -- the concrete CICIDS2017-DistriNet realization
   of the primitive model (forward packet-length augmentation ``p`` + forward timing
-  dilation ``alpha``), with the empirically-mined dependency graph.
+  delay allocation ``(delay, shape)``), with the empirically-mined dependency graph.
 
 Only true attacker-controlled primitives are optimized; every aggregate/derived feature
 that a primitive affects is deterministically recomputed. See ``docs`` and the module

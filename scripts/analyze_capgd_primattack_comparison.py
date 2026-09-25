@@ -387,9 +387,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--primattack-dir", type=Path,
-        default=REPO_ROOT / "outputs/full_adv_eval",
+        default=REPO_ROOT / "outputs/full_adv_eval_primattack_v2",
     )
-    parser.add_argument("--primattack", default="prim_opt_joint_p75")
+    parser.add_argument("--primattack", default="prim_search_joint_p75")
     parser.add_argument("--victims", default=",".join(DEFAULT_VICTIMS))
     parser.add_argument("--classes", default=",".join(DEFAULT_CLASSES))
     parser.add_argument("--reference-seed", type=int, default=42)

@@ -449,7 +449,7 @@ data/processed/CICIDS_2017_Distrinet/preprocessing_manifest.json
 data/processed/CICIDS_2017_Distrinet/label_encoders.json
 ```
 
-`X_train.npy` has shape `(1,456,265, 79)` and dtype `float32`. It is the exact model-ready `RobustScaler` representation produced by `scripts/preprocess_cicids2017_distrinet.py`; the scaler was fitted on all 1,456,265 training rows only. The preprocessing pipeline performs a chronological 70/15/15 split independently within each retained source attack label before fitting the scaler. CFF does not open CICIDS validation/test matrices, labels, Parquet files, timestamps, or metadata.
+`X_train.npy` has shape `(1,456,265, 79)` and dtype `float32`. It is the exact model-ready `RobustScaler` representation produced by `src/preprocessing/preprocess_cicids2017_distrinet.py`; the scaler was fitted on all 1,456,265 training rows only. The preprocessing pipeline performs a chronological 70/15/15 split independently within each retained source attack label before fitting the scaler. CFF does not open CICIDS validation/test matrices, labels, Parquet files, timestamps, or metadata.
 
 The 79-feature order is loaded from `preprocessing_manifest.json::modelling_feature_names`, not copied into the CFF source. `label_encoders.json::category` supplies the configured class order:
 

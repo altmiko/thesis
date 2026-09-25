@@ -1,5 +1,11 @@
 # PrimAttack primitive audit
 
+> **Historical pre-v2 audit.** This file records the replaced `(p, alpha)` /
+> Adam-sigmoid implementation and its then-open corrections. It is retained for
+> provenance, not as the current specification. See
+> [`../full_thesis_methodology/02_primattack.md`](../full_thesis_methodology/02_primattack.md)
+> for the active `(p, delay, shape)` implementation and completed corrections.
+
 ## Scope and evidence
 
 This audit covers the active CICIDS2017-DistriNet primitive paths:

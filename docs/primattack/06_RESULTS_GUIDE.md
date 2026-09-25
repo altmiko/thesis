@@ -1,5 +1,10 @@
 # PrimAttack results guide
 
+> **Metric reference.** The metric definitions remain current. For the active
+> `(p, delay, shape)` search, paired v2 artifacts, and current result tables, use
+> [`../full_thesis_methodology/02_primattack.md`](../full_thesis_methodology/02_primattack.md).
+> The linked budget-sweep report at the end is the replaced `(p, alpha)` run.
+
 ## Primary metrics
 
 All ASRs use eligible clean-correct malicious source samples as the denominator.
@@ -57,7 +62,8 @@ Each NPZ contains:
 - original/adversarial duration, delta, and relative change;
 - original/adversarial represented bytes, added bytes, and relative change;
 - original/adversarial rate and retention;
-- requested/projected $p$ and $\alpha$, per-flow caps, and normalized magnitudes;
+- requested/projected `p`, `delay`, and `shape`, per-flow caps, and normalized magnitudes;
+- winning optimizer candidate source, realized target margin, and evaluation counts;
 - changed feature names and count;
 - source, code, preprocessing, scaler, victim, VAE/IDR, and calibration provenance.
 

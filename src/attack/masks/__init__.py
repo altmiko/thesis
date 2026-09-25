@@ -19,6 +19,8 @@ _ALIASES = {
     "cicids": "cicids2017_distrinet",
     "cicids2017": "cicids2017_distrinet",
     "cicids2017_distrinet": "cicids2017_distrinet",
+    "cicids2018": "cicids2018_distrinet",
+    "cicids2018_distrinet": "cicids2018_distrinet",
 }
 
 
@@ -28,10 +30,10 @@ def get_dataset_mask(name: str) -> DatasetMask:
         from attack.masks.ciciot2023 import build_mask
 
         return build_mask()
-    if key == "cicids2017_distrinet":
+    if key in ("cicids2017_distrinet", "cicids2018_distrinet"):
         from attack.masks.cicids2017_distrinet import build_mask
 
-        return build_mask()
+        return build_mask(key)
     raise KeyError(f"no perturbation mask registered for dataset {name!r}")
 
 

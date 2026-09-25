@@ -1,6 +1,6 @@
 """VAE latent decoder-movement attacks on CICIDS2017-DistriNet (masked / raw variants).
 
-Two genuine VAE latent attacks whose decoder movement is NOT compressed into (p, alpha):
+Two genuine VAE latent attacks whose decoder movement is NOT compressed into (p, delay, shape):
 
 * ``--variant masked`` -> ``VAE-Latent-Masked``: decoder movement applied to every PERTURBABLE
   feature of the CICIDS2017 perturbation mask; FROZEN copied from pristine input; DERIVED_EXACT

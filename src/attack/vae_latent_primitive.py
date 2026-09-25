@@ -14,14 +14,12 @@ The decoder output is never classified directly. It proposes movement that is co
 true controls, then the dataset realizability layer regenerates the final feature vector.
 Final success is re-evaluated after discrete primitive projection and dependency recomputation.
 
-Search strength (added for the bottleneck study, all backward compatible; the defaults below
-reproduce the original single-start / constant-LR / no-logging behaviour exactly):
+Search strength:
 
-* ``restarts``      -- multiple random latent starts per sample; the per-sample best FINAL
-  PROJECTED (realized) result is kept (targeted-Benign success first, then smallest CW margin).
-* ``lr_schedule``   -- "constant" (default) or "cosine" annealing of the Adam LR.
-* ``log_grad_norms``-- capture the mean per-sample L2 norms of the classifier-loss gradient at
-  the intermediate tensors (x_adv, p, alpha, decoder output, z_adv) for the diagnostics.
+* ``restarts`` keeps the per-sample best final projected result.
+* ``lr_schedule`` supports constant or cosine Adam learning rates.
+* ``log_grad_norms`` captures classifier-loss gradients at the generated flow,
+  primitive controls, decoder output, and latent code.
 """
 from __future__ import annotations
 
@@ -49,7 +47,7 @@ class LatentAttackConfig:
     init_noise: float = 0.3  # random latent start; escapes the relu(0) dead point (PGD-style)
     restarts: int = 1  # random restarts per sample; best final projected result is kept
     lr_schedule: str = "constant"  # "constant" | "cosine"
-    log_grad_norms: bool = False  # capture dL/d{x,p,alpha,decoder,z} norms for diagnostics
+    log_grad_norms: bool = False
 
     def __post_init__(self) -> None:
         if self.objective not in {"cw", "ce"}:
@@ -88,7 +86,7 @@ class LatentAttackResult:
 
 
 class LatentPrimitiveAttack:
-    """Optimize each source posterior mean in latent space; never optimize p/alpha directly."""
+    """Optimize each source posterior mean in latent space; never optimize controls directly."""
 
     def __init__(self, primitive_model: DatasetPrimitiveModel, config: LatentAttackConfig) -> None:
         self.primitive_model = primitive_model
@@ -126,8 +124,8 @@ class LatentPrimitiveAttack:
         delta = z - realism["mean"].unsqueeze(0)
         return torch.einsum("ni,ij,nj->n", delta, realism["precision"], delta)
 
-    def _grad_norms(self, vae, victim, raw0, center, scale, bounds, z0, decoded_base_raw,
-                    target) -> dict[str, float]:
+    def _grad_norms(self, vae, victim, raw0, center, scale, bounds, caps, z0,
+                    decoded_base_raw, target) -> dict[str, float]:
         """Mean per-sample L2 norm of the classifier-loss gradient at each stage.
 
         A separate autograd pass with ``retain_grad`` on the intermediate tensors; the
@@ -137,10 +135,12 @@ class LatentPrimitiveAttack:
         decoded_adv_raw = vae.decode(z_adv)["continuous_mu_raw"]
         decoded_adv_raw.retain_grad()
         controls = self.primitive_model.infer_primitives_from_decoded(
-            raw0, decoded_adv_raw, decoded_base_raw, bounds)
+            raw0, decoded_adv_raw, decoded_base_raw, bounds, capabilities=caps)
         for t in controls.values():
             t.retain_grad()
-        x_adv_raw = self.primitive_model.generate(raw0, controls, quantize=False)
+        x_adv_raw = self.primitive_model.generate(
+            raw0, controls, quantize=False, capabilities=caps
+        )
         x_adv_raw.retain_grad()
         logits = victim((x_adv_raw - center) / scale)
         cls_loss = self._targeted_loss(logits, target, cfg.objective, cfg.kappa)
@@ -154,14 +154,13 @@ class LatentPrimitiveAttack:
 
         return {
             "dL_dx_adv": norm(x_adv_raw),
-            "dL_dp": norm(controls.get("p")),
-            "dL_dalpha": norm(controls.get("alpha")),
+            **{f"dL_d{name}": norm(value) for name, value in controls.items()},
             "dL_ddecoder_output": norm(decoded_adv_raw),
             "dL_dz_adv": norm(z_adv),
         }
 
-    def _optimize_once(self, vae, victim, raw0, center, scale, bounds, z0, decoded_base_raw,
-                       clean_logits, target, realism):
+    def _optimize_once(self, vae, victim, raw0, center, scale, bounds, caps, z0,
+                       decoded_base_raw, clean_logits, target, realism):
         """One random-start latent optimization; returns final per-sample instrumentation."""
         cfg = self.config
         z_adv = (z0 + cfg.init_noise * torch.randn_like(z0)).detach().requires_grad_(True)
@@ -173,8 +172,10 @@ class LatentPrimitiveAttack:
             optimizer.zero_grad(set_to_none=True)
             decoded_adv_raw = vae.decode(z_adv)["continuous_mu_raw"]
             controls = self.primitive_model.infer_primitives_from_decoded(
-                raw0, decoded_adv_raw, decoded_base_raw, bounds)
-            x_adv_raw = self.primitive_model.generate(raw0, controls, quantize=False)
+                raw0, decoded_adv_raw, decoded_base_raw, bounds, capabilities=caps)
+            x_adv_raw = self.primitive_model.generate(
+                raw0, controls, quantize=False, capabilities=caps
+            )
             logits = victim((x_adv_raw - center) / scale)
 
             cls_loss = self._targeted_loss(logits, target, cfg.objective, cfg.kappa)
@@ -213,11 +214,17 @@ class LatentPrimitiveAttack:
         with torch.no_grad():
             decoded_adv_raw = vae.decode(z_adv)["continuous_mu_raw"]
             controls_cont = self.primitive_model.infer_primitives_from_decoded(
-                raw0, decoded_adv_raw, decoded_base_raw, bounds)
-            x_cont = self.primitive_model.generate(raw0, controls_cont, quantize=False)
+                raw0, decoded_adv_raw, decoded_base_raw, bounds, capabilities=caps)
+            x_cont = self.primitive_model.generate(
+                raw0, controls_cont, quantize=False, capabilities=caps
+            )
             logits_cont = victim((x_cont - center) / scale)
-            controls_real = self.primitive_model.project_controls(raw0, controls_cont, bounds)
-            x_real = self.primitive_model.generate(raw0, controls_real, quantize=True)
+            controls_real = self.primitive_model.project_controls(
+                raw0, controls_cont, bounds, capabilities=caps
+            )
+            x_real = self.primitive_model.generate(
+                raw0, controls_real, quantize=True, capabilities=caps
+            )
             logits_real = victim((x_real - center) / scale)
             dz = z_adv - z0
             latent_l2 = dz.norm(p=2, dim=1)
@@ -286,16 +293,21 @@ class LatentPrimitiveAttack:
             clean_logits = victim(x0_scaled).detach()
 
         target = torch.full((raw0.shape[0],), int(target_class), dtype=torch.long, device=raw0.device)
+        caps = self.primitive_model.infer_capabilities(raw0)
 
         grad_norms = None
         if cfg.log_grad_norms:
-            grad_norms = self._grad_norms(vae, victim, raw0, center, scale, bounds, z0,
-                                          decoded_base_raw, target)
+            grad_norms = self._grad_norms(
+                vae, victim, raw0, center, scale, bounds, caps, z0,
+                decoded_base_raw, target,
+            )
 
         best = None
         for _ in range(cfg.restarts):
-            cand = self._optimize_once(vae, victim, raw0, center, scale, bounds, z0,
-                                       decoded_base_raw, clean_logits, target, realism)
+            cand = self._optimize_once(
+                vae, victim, raw0, center, scale, bounds, caps, z0,
+                decoded_base_raw, clean_logits, target, realism,
+            )
             best = cand if best is None else self._select(best, cand)
 
         return LatentAttackResult(
@@ -308,6 +320,6 @@ class LatentPrimitiveAttack:
             latent_l2=best["latent_l2"], primitive_cost=best["primitive_cost"],
             reconstruction_error=best["recon_err"],
             latent_distance_sq=best["dist_sq"],
-            timing_active=self.primitive_model.active_mask(raw0, "alpha").detach(),
+            timing_active=caps.timing_allowed.detach(),
             grad_norms=grad_norms,
         )

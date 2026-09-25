@@ -15,17 +15,18 @@ import torch
 
 
 class FeatureRole(str, Enum):
-    """How a feature relates to the attacker-controlled primitives (p, alpha).
+    """How a feature relates to the attacker-controlled primitives (p, delay, shape).
 
     NOTE: the 79 CICFlowMeter features are NEVER optimized directly; only the primitives
-    ``p`` (forward packet-length augmentation) and ``alpha`` (forward timing dilation) are.
+    ``p`` (forward packet-length augmentation) and ``delay``/``shape`` (forward timing
+    delay allocation) are.
     These roles therefore describe how each feature is *derived from* / *reacts to* the
     primitives, not that any feature is itself an attack variable. ``tag`` is the short
     label used in the example tables.
     """
 
     DERIVED_P = "derived_p"          # Dp: exactly derived from the packet-length primitive p
-    DERIVED_T = "derived_t"          # Dt: exactly derived from the timing primitive alpha
+    DERIVED_T = "derived_t"          # Dt: exactly derived from the timing primitive (delay, shape)
     DERIVED = "derived"              # D : other exact algebraic derived feature
     CONDITIONAL = "conditional"      # C : conditionally / conservatively reconstructed feature
     RATE = "rate"                    # R : rate-derived feature (count/byte over projected duration)
@@ -113,10 +114,10 @@ class IdentityCheck:
 PAD_ALLOWED = "PAD_ALLOWED"
 NO_FORWARD_PAYLOAD = "NO_FORWARD_PAYLOAD"          # no forward bytes/mean to augment
 INSUFFICIENT_FWD_PACKETS = "INSUFFICIENT_FWD_PACKETS"  # too few forward packets for evidence
-# Timing (alpha) capability reason codes.
+# Timing (delay, shape) capability reason codes.
 TIMING_ALLOWED = "TIMING_ALLOWED"
 SINGLE_FWD_PACKET = "SINGLE_FWD_PACKET"            # < 2 forward packets: no fwd IAT sequence
-ZERO_TIMING_HEADROOM = "ZERO_TIMING_HEADROOM"      # forward IAT total is 0: nothing to dilate
+ZERO_TIMING_HEADROOM = "ZERO_TIMING_HEADROOM"      # forward IAT total is 0: nothing to delay
 
 
 @dataclass(frozen=True)
@@ -125,7 +126,7 @@ class PrimitiveCapabilities:
 
     ``pad_allowed`` / ``timing_allowed`` are boolean tensors (shape ``[n]``); a ``False`` entry
     means the source flow does not provide evidence that the primitive is realizable, so its
-    per-flow cap is forced to the identity (``p_hi = 0`` / ``alpha_hi = 1``). ``pad_reason`` /
+    per-flow cap is forced to the identity (``p_hi = 0`` / ``delay_hi = 0``). ``pad_reason`` /
     ``timing_reason`` carry one machine-readable reason code per flow (see the ``*_ALLOWED`` /
     disable constants above) for auditable artifacts.
     """
@@ -141,7 +142,7 @@ class DatasetPrimitiveModel(Protocol):
     """Contract implemented once per dataset.
 
     Controls are passed as a name->tensor mapping so a dataset may expose any number of
-    primitives (CICIDS2017 uses two: ``p``, ``alpha``).
+    primitives (CICIDS2017 uses padding plus total-delay and delay-shape controls).
     """
 
     dataset: str
@@ -191,12 +192,11 @@ class DatasetPrimitiveModel(Protocol):
         self, raw: torch.Tensor, config: "Mapping[str, float]",
         capabilities: "PrimitiveCapabilities | None" = None,
     ) -> dict[str, torch.Tensor]:
-        """primitive name -> per-flow upper bound (lower is the identity).
+        """Control name -> per-flow upper bound (lower is the identity).
 
-        Semantic capabilities gate the numeric (train-envelope) caps: an inadmissible
-        primitive gets its cap forced to the identity (``p_hi = 0`` / ``alpha_hi = 1``). The
-        returned dict also exposes ``p_numeric`` / ``alpha_numeric`` (the pre-gate caps) for
-        provenance.
+        Semantic capabilities gate the numeric train-envelope caps: an inadmissible
+        primitive gets its cap forced to the identity. Pre-gate numeric caps may be
+        returned separately for provenance.
         """
         ...
 
@@ -206,6 +206,7 @@ class DatasetPrimitiveModel(Protocol):
         decoded_adv_raw: torch.Tensor,
         decoded_base_raw: torch.Tensor,
         bounds: Mapping[str, torch.Tensor],
+        capabilities: "PrimitiveCapabilities | None" = None,
     ) -> dict[str, torch.Tensor]:
         """Differentiably collapse decoder movement into feasible primitive controls.
 
@@ -220,13 +221,13 @@ class DatasetPrimitiveModel(Protocol):
         controls: Mapping[str, torch.Tensor],
         *,
         quantize: bool = False,
+        capabilities: "PrimitiveCapabilities | None" = None,
     ) -> torch.Tensor:
         """Map raw rows + per-flow controls to adversarial raw rows.
 
         Differentiable in every control when ``quantize=False``. When ``quantize=True`` the
-        primitives are first projected to their realizable (discrete) values and every
-        dependent feature is recomputed from the projected primitives (no independent
-        per-feature clipping).
+        dependent integer-valued features are quantized after the controls have been projected.
+        ``capabilities`` avoids recomputation and device synchronization in attack loops.
         """
         ...
 
@@ -235,6 +236,8 @@ class DatasetPrimitiveModel(Protocol):
         raw: torch.Tensor,
         controls: Mapping[str, torch.Tensor],
         bounds: Mapping[str, torch.Tensor],
+        *,
+        capabilities: "PrimitiveCapabilities | None" = None,
     ) -> dict[str, torch.Tensor]:
         """Project controls to the declared per-flow budget and discrete feasible set."""
         ...

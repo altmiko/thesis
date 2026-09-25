@@ -46,20 +46,24 @@ def context():
 def test_primitive_spec_is_complete_and_directional(context):
     _, model, _, _, _, _, _ = context
     specs = {spec.name: spec for spec in model.primitives()}
-    assert set(specs) == {"p", "alpha"}
+    assert set(specs) == {"p", "delay", "shape"}
     assert specs["p"].dtype == "discrete_integer"
     assert specs["p"].units == "bytes_per_forward_packet"
-    assert specs["p"].direction == "increase_only"
-    assert specs["alpha"].dtype == "continuous"
-    assert specs["alpha"].units == "dimensionless_ratio"
-    assert specs["alpha"].direction == "increase_only"
-    assert specs["p"].dependencies and specs["alpha"].dependencies
+    assert specs["delay"].dtype == "discrete_integer"
+    assert specs["delay"].units == "microseconds_total_forward_delay"
+    assert specs["shape"].absolute_lower_bound == 0.0
+    assert specs["shape"].absolute_upper_bound == 1.0
+    assert all(spec.dependencies for spec in specs.values())
     assert "packet-level" in specs["p"].semantic_risk
 
 
 def test_zero_perturbation_identity_is_exact(context):
     _, model, raw, _, _, _, _ = context
-    controls = {"p": torch.zeros(len(raw)), "alpha": torch.ones(len(raw))}
+    controls = {
+        "p": torch.zeros(len(raw)),
+        "delay": torch.zeros(len(raw)),
+        "shape": torch.zeros(len(raw)),
+    }
     assert torch.equal(model.generate(raw, controls), raw)
     assert torch.equal(model.generate(raw, controls, quantize=True), raw)
 
@@ -69,68 +73,83 @@ def test_declared_dependency_completeness_per_primitive(context):
     specs = {spec.name: spec for spec in model.primitives()}
     roles = model.roles()
     pad_active = model.active_mask(raw, "p")
-    timing_active = model.active_mask(raw, "alpha")
+    timing_active = model.active_mask(raw, "delay")
     for primitive, requested in (
-        ("p", {"p": torch.where(pad_active, torch.full_like(bounds["p"], 2.0),
-                                torch.zeros_like(bounds["p"])),
-               "alpha": torch.ones_like(bounds["alpha"])}),
-        ("alpha", {"p": torch.zeros_like(bounds["p"]),
-                   "alpha": torch.where(timing_active, torch.full_like(bounds["alpha"], 1.01),
-                                        torch.ones_like(bounds["alpha"]))}),
+        ("p", {
+            "p": torch.where(pad_active, torch.full_like(bounds["p"], 2.0),
+                             torch.zeros_like(bounds["p"])),
+            "delay": torch.zeros_like(bounds["delay"]),
+            "shape": torch.zeros_like(bounds["shape"]),
+        }),
+        ("delay", {
+            "p": torch.zeros_like(bounds["p"]),
+            "delay": torch.where(timing_active, torch.full_like(bounds["delay"], 10.0),
+                                 torch.zeros_like(bounds["delay"])),
+            "shape": torch.full_like(bounds["shape"], 0.5),
+        }),
     ):
         adv = model.generate(raw, requested)
         delta = (adv - raw).abs()
-        active = requested[primitive] > (0.0 if primitive == "p" else 1.0)
+        active = requested[primitive] > 0.0
         assert bool(active.any())
         changed_columns = {
             model.feature_names[column]
-            for column in torch.nonzero(delta[active].gt(1e-6).any(0), as_tuple=False).flatten().tolist()
+            for column in torch.nonzero(
+                delta[active].gt(1e-6).any(0), as_tuple=False
+            ).flatten().tolist()
         }
         assert changed_columns <= set(specs[primitive].dependencies)
-        # Every transform-written column is declared by at least one primitive; no arbitrary
-        # feature is silently optimized or written.
-        assert all(
-            name in specs["p"].dependencies or name in specs["alpha"].dependencies
-            for name in changed_columns
-        )
+        declared = set().union(*(set(spec.dependencies) for spec in specs.values()))
+        assert changed_columns <= declared
         frozen = [model.i[name] for name, (role, _) in roles.items()
                   if role in {FeatureRole.FROZEN, FeatureRole.INVARIANT, FeatureRole.LEVEL_C}]
         assert torch.equal(adv[:, frozen], raw[:, frozen])
 
 
-def test_timing_equations_and_nonmonotone_claim_boundary(context):
+def test_timing_equations_and_shape_endpoints(context):
     _, model, raw, _, _, _, _ = context
     i = model.i
-    alpha = torch.where(
-        model.active_mask(raw, "alpha"),
-        torch.full((len(raw),), 1.02, dtype=raw.dtype),
-        torch.ones(len(raw), dtype=raw.dtype),
+    active = model.active_mask(raw, "delay")
+    delay = torch.where(
+        active,
+        torch.full((len(raw),), 100.0, dtype=raw.dtype),
+        torch.zeros(len(raw), dtype=raw.dtype),
     )
-    adv = model.generate(raw, {"p": torch.zeros_like(alpha), "alpha": alpha})
-    active = alpha > 1.0
+    p = torch.zeros_like(delay)
+    proportional = model.generate(
+        raw, {"p": p, "delay": delay, "shape": torch.zeros_like(delay)}
+    )
+    uniform = model.generate(
+        raw, {"p": p, "delay": delay, "shape": torch.ones_like(delay)}
+    )
     assert bool(active.any())
     assert torch.allclose(
-        adv[active, i["Fwd IAT Total"]],
-        alpha[active] * raw[active, i["Fwd IAT Total"]],
-        rtol=1e-5,
+        proportional[active, i["Fwd IAT Total"]],
+        raw[active, i["Fwd IAT Total"]] + delay[active],
         atol=1e-3,
     )
-    expected_mean = adv[active, i["Fwd IAT Total"]] / (
-        raw[active, i["Total Fwd Packet"]] - 1.0
-    ).clamp(min=1.0)
+    gaps = (raw[active, i["Total Fwd Packet"]] - 1.0).clamp(min=1.0)
     assert torch.allclose(
-        adv[active, i["Fwd IAT Mean"]], expected_mean, rtol=1e-5, atol=1e-3
+        uniform[active, i["Fwd IAT Min"]],
+        raw[active, i["Fwd IAT Min"]] + delay[active] / gaps,
+        atol=1e-3,
     )
-    assert bool((adv[:, i["Flow Duration"]] >= raw[:, i["Flow Duration"]]).all())
-    assert bool((adv[:, i["Fwd IAT Min"]] >= 0).all())
-    assert bool((adv[:, i["Flow IAT Mean"]] <= adv[:, i["Flow IAT Max"]] + 1e-3).all())
+    assert torch.allclose(
+        uniform[active, i["Fwd IAT Std"]],
+        raw[active, i["Fwd IAT Std"]],
+        atol=1e-3,
+    )
+    assert bool((uniform[:, i["Flow Duration"]] >= raw[:, i["Flow Duration"]]).all())
+    assert bool((uniform[:, i["Flow IAT Mean"]] <= uniform[:, i["Flow IAT Max"]] + 1e-3).all())
 
 
 def test_padding_size_and_derived_equations(context):
     _, model, raw, bounds, _, _, _ = context
     i = model.i
     p = torch.minimum(bounds["p"], torch.full_like(bounds["p"], 3.0))
-    adv = model.generate(raw, {"p": p, "alpha": torch.ones_like(p)})
+    adv = model.generate(
+        raw, {"p": p, "delay": torch.zeros_like(p), "shape": torch.zeros_like(p)}
+    )
     active = p > 0
     assert bool(active.any())
     nf = raw[:, i["Total Fwd Packet"]]
@@ -155,12 +174,15 @@ def test_projection_is_discrete_and_hard_budgeted(context):
     _, model, raw, bounds, _, _, _ = context
     requested = {
         "p": bounds["p"] + 1000.75,
-        "alpha": bounds["alpha"] + 1000.0,
+        "delay": bounds["delay"] + 1000.75,
+        "shape": bounds["shape"] + 10.0,
     }
     projected = model.project_controls(raw, requested, bounds)
     assert bool((projected["p"] <= torch.floor(bounds["p"])).all())
-    assert bool((projected["alpha"] <= bounds["alpha"] + 1e-7).all())
+    assert bool((projected["delay"] <= torch.floor(bounds["delay"]) + 1e-7).all())
+    assert bool((projected["shape"] <= bounds["shape"] + 1e-7).all())
     assert torch.equal(projected["p"], torch.round(projected["p"]))
+    assert torch.equal(projected["delay"], torch.round(projected["delay"]))
     adv = model.generate(raw, projected, quantize=True)
     assert bool(torch.isfinite(adv).all())
     for name in model.integer_features():
@@ -168,36 +190,39 @@ def test_projection_is_discrete_and_hard_budgeted(context):
         assert bool(torch.isclose(value, torch.round(value), atol=1e-3, rtol=0.0).all()), name
 
 
-def _victim_loss(model, victim, raw, center, scale, p, alpha):
-    adv = model.generate(raw, {"p": p, "alpha": alpha})
+def _victim_loss(model, victim, raw, center, scale, p, delay, shape):
+    adv = model.generate(raw, {"p": p, "delay": delay, "shape": shape})
     target = torch.zeros(len(raw), dtype=torch.long)
     return F.cross_entropy(victim((adv - center) / scale), target, reduction="sum")
 
 
 def test_autograd_matches_finite_difference_through_victim(context):
     _, model, raw_all, _, center, scale, victim = context
-    active = model.active_mask(raw_all, "p") & model.active_mask(raw_all, "alpha")
+    active = model.active_mask(raw_all, "p") & model.active_mask(raw_all, "delay")
     row = int(torch.nonzero(active, as_tuple=False)[0])
     raw = raw_all[row:row + 1]
     p = torch.tensor([2.25], dtype=torch.float32, requires_grad=True)
-    alpha = torch.tensor([1.01], dtype=torch.float32, requires_grad=True)
-    loss = _victim_loss(model, victim, raw, center, scale, p, alpha)
-    grad_p, grad_alpha = torch.autograd.grad(loss, (p, alpha))
+    delay = torch.tensor([100.0], dtype=torch.float32, requires_grad=True)
+    shape = torch.tensor([0.5], dtype=torch.float32, requires_grad=True)
+    loss = _victim_loss(model, victim, raw, center, scale, p, delay, shape)
+    grad_p, grad_delay, grad_shape = torch.autograd.grad(loss, (p, delay, shape))
 
     def finite_difference(name: str, step: float) -> float:
+        values = {"p": p, "delay": delay, "shape": shape}
         with torch.no_grad():
-            if name == "p":
-                plus = _victim_loss(model, victim, raw, center, scale, p + step, alpha)
-                minus = _victim_loss(model, victim, raw, center, scale, p - step, alpha)
-            else:
-                plus = _victim_loss(model, victim, raw, center, scale, p, alpha + step)
-                minus = _victim_loss(model, victim, raw, center, scale, p, alpha - step)
+            plus_args = {k: (v + step if k == name else v) for k, v in values.items()}
+            minus_args = {k: (v - step if k == name else v) for k, v in values.items()}
+            plus = _victim_loss(model, victim, raw, center, scale, **plus_args)
+            minus = _victim_loss(model, victim, raw, center, scale, **minus_args)
         return float((plus - minus) / (2.0 * step))
 
-    numerical_p = finite_difference("p", 1e-2)
-    numerical_alpha = finite_difference("alpha", 1e-4)
-    assert float(grad_p) == pytest.approx(numerical_p, rel=5e-2, abs=2e-4)
-    assert float(grad_alpha) == pytest.approx(numerical_alpha, rel=5e-2, abs=2e-3)
+    assert float(grad_p) == pytest.approx(finite_difference("p", 1e-2), rel=5e-2, abs=2e-4)
+    assert float(grad_delay) == pytest.approx(
+        finite_difference("delay", 1e-1), rel=5e-2, abs=2e-3
+    )
+    assert float(grad_shape) == pytest.approx(
+        finite_difference("shape", 1e-3), rel=5e-2, abs=2e-3
+    )
 
 
 def test_numerical_safety_tiny_duration_boundaries_and_nonfinite_rejection(context):
@@ -208,14 +233,18 @@ def test_numerical_safety_tiny_duration_boundaries_and_nonfinite_rejection(conte
     boundary[:, i["Fwd IAT Total"]] = 0.0
     identity = model.generate(
         boundary,
-        {"p": torch.zeros(4), "alpha": torch.ones(4)},
+        {"p": torch.zeros(4), "delay": torch.zeros(4), "shape": torch.zeros(4)},
     )
     assert torch.equal(identity, boundary)
     padded = model.generate(
         boundary,
-        {"p": torch.ones(4), "alpha": torch.ones(4)},
+        {"p": torch.ones(4), "delay": torch.zeros(4), "shape": torch.zeros(4)},
     )
     assert bool(torch.isfinite(padded).all())
-    bad = {"p": torch.full((4,), float("nan")), "alpha": torch.ones(4)}
+    bad = {
+        "p": torch.full((4,), float("nan")),
+        "delay": torch.zeros(4),
+        "shape": torch.zeros(4),
+    }
     with pytest.raises(ValueError, match="NaN or Inf"):
         model.generate(boundary, bad)

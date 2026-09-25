@@ -1,5 +1,10 @@
 # PrimAttack transformation verification
 
+> **Superseded by PrimAttack v2.** The equations below describe the former
+> proportional-only `alpha` timing map. The active transform uses integer total
+> `delay` plus allocation `shape`; see
+> [`../full_thesis_methodology/02_primattack.md`](../full_thesis_methodology/02_primattack.md).
+
 ## Canonical contract
 
 The canonical feature transform is
