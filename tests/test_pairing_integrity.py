@@ -43,7 +43,7 @@ def _fixture(tmp_path, sids_by_attack, cid=1, clean_pred_by_attack=None):
     for a, sids in sids_by_attack.items():
         cp = None if clean_pred_by_attack is None else clean_pred_by_attack.get(a)
         _write_cell(art, v, cl, a, seed, sids, cid, cp)
-    return out, [v], [cl], [seed], roster, selection
+    return out, {v: {"attack_seeds": [seed]}}, [cl], roster, selection
 
 
 def test_assert_pairing_passes_on_identical_rows(tmp_path):

@@ -6,11 +6,14 @@ success definition so optimizers cannot diverge on either:
 * a candidate is a requested ``(p, delay, shape)``; it is projected into the hard per-flow
   box (integer bytes / integer microseconds), realized through the canonical primitive map
   with quantization, and scored by the victim on that realized flow;
-* success = victim predicts ``target_class`` on the realized flow AND the injected validity
-  gate (validator_v2 ``hybrid_valid`` in every experiment runner) accepts it;
+* the victim-side objective is an :class:`AttackObjective`: targeted (reach ``class_id``,
+  Benign by default) or untargeted (leave the true source class ``class_id``);
+* success = the realized flow meets the objective AND the injected validity gate
+  (validator_v2 ``hybrid_valid`` in every experiment runner) accepts it;
 * each flow keeps one incumbent: a success beats a failure, successes are ranked by
-  normalized primitive cost (then margin), failures by the targeted margin
-  ``max(non-target logits) - target logit``;
+  normalized primitive cost (then margin), failures by the objective margin
+  (targeted: ``max(non-target logits) - target logit``; untargeted:
+  ``source logit - max(non-source logits)``; negative = objective met);
 * per-flow victim evaluations are counted (realized forward passes, surrogate forward passes
   of the continuous relaxation, backward passes) and optionally capped by a shared budget.
 
@@ -21,7 +24,7 @@ Optimizers:
   refinement of normalized controls with restarts, stall-triggered step halving and reset to
   the restart's best point.
 * :func:`optimize_primitive_pgd` (Prim-PGD): fixed-step projected sign-momentum descent on the
-  targeted margin over normalized controls, clean start + uniform random restarts.
+  objective margin over normalized controls, clean start + uniform random restarts.
 * :func:`optimize_primitive_cw` (Prim-C&W): projected Adam on
   ``cost(q) + c * max(margin + kappa, 0)`` with a per-flow binary search over ``c``.
 
@@ -70,12 +73,43 @@ ValidityGate = Callable[[torch.Tensor], torch.Tensor]
 
 
 @dataclass(frozen=True)
+class AttackObjective:
+    """Victim-side objective shared by the success predicate, the incumbent and every gradient.
+
+    ``targeted``: the realized flow must be classified as ``class_id``.
+    ``untargeted``: the realized flow must NOT be classified as ``class_id`` (the source class).
+    ``margin`` is minimized by every optimizer; it is negative when the objective is met.
+    """
+
+    kind: str
+    class_id: int
+
+    def __post_init__(self) -> None:
+        if self.kind not in ("targeted", "untargeted"):
+            raise ValueError(f"unknown attack objective {self.kind!r}")
+        if self.class_id < 0:
+            raise ValueError("objective class_id must be a non-negative class index")
+
+    def margin(self, logits: torch.Tensor) -> torch.Tensor:
+        if self.kind == "targeted":
+            return targeted_margin(logits, self.class_id)
+        return -targeted_margin(logits, self.class_id)
+
+    def hit(self, logits: torch.Tensor) -> torch.Tensor:
+        pred = logits.argmax(1)
+        return pred == self.class_id if self.kind == "targeted" else pred != self.class_id
+
+
+TARGET_BENIGN = AttackObjective("targeted", 0)
+
+
+@dataclass(frozen=True)
 class PrimitiveOptimizationResult:
     requested: dict[str, torch.Tensor]
     projected: dict[str, torch.Tensor]
     adversarial_raw: torch.Tensor
     logits: torch.Tensor
-    target_margin: torch.Tensor
+    objective_margin: torch.Tensor
     normalized_cost: torch.Tensor
     valid: torch.Tensor
     success: torch.Tensor
@@ -85,9 +119,9 @@ class PrimitiveOptimizationResult:
     surrogate_evaluations: torch.Tensor
     backward_evaluations: torch.Tensor
     # 1-based index (in realized + surrogate evaluations) of the first successful / first
-    # target-classified realized candidate; -1 if never reached.
+    # objective-meeting realized candidate (validity ignored); -1 if never reached.
     first_success_evaluation: torch.Tensor
-    first_targeted_evaluation: torch.Tensor
+    first_objective_hit_evaluation: torch.Tensor
     # Restart / binary-search stage index of the first success; -1 for the identity and
     # exact-padding phase, -2 if never reached.
     first_success_phase: torch.Tensor
@@ -100,6 +134,7 @@ class PrimitiveOptimizationResult:
 
 
 def targeted_margin(logits: torch.Tensor, target_class: int = 0) -> torch.Tensor:
+    """``max(non-target logits) - target logit``; negative iff ``target_class`` is the argmax."""
     target = logits[:, target_class]
     masked = logits.clone()
     masked[:, target_class] = -torch.inf
@@ -215,7 +250,7 @@ class RealizedSearch:
         caps: PrimitiveCapabilities,
         *,
         validity_fn: ValidityGate | None,
-        target_class: int = 0,
+        objective: AttackObjective = TARGET_BENIGN,
         eval_budget: int | None = None,
     ) -> None:
         if eval_budget is not None and eval_budget < 1:
@@ -224,7 +259,7 @@ class RealizedSearch:
         self.raw, self.center, self.scale = raw, center, scale
         self.bounds, self.caps = bounds, caps
         self.validity_fn = validity_fn
-        self.target_class = target_class
+        self.objective = objective
         self.eval_budget = eval_budget
         n = raw.shape[0]
         device = raw.device
@@ -233,7 +268,7 @@ class RealizedSearch:
         self.surrogate = torch.zeros(n, dtype=torch.int64, device=device)
         self.backward = torch.zeros(n, dtype=torch.int64, device=device)
         self.first_success = torch.full((n,), -1, dtype=torch.int64, device=device)
-        self.first_targeted = torch.full((n,), -1, dtype=torch.int64, device=device)
+        self.first_hit = torch.full((n,), -1, dtype=torch.int64, device=device)
         self.first_success_phase = torch.full((n,), -2, dtype=torch.int64, device=device)
         self.phase = -1
         self.iterations = 0
@@ -254,7 +289,7 @@ class RealizedSearch:
         self.best_success = s["success"].clone()
         self.best_source = torch.full((n,), CANDIDATE_IDENTITY, dtype=torch.int8, device=device)
         self.realized += 1
-        self.first_targeted[s["targeted"]] = 1
+        self.first_hit[s["hit"]] = 1
         self.first_success[s["success"]] = 1
         self.first_success_phase[s["success"]] = -1
 
@@ -280,16 +315,16 @@ class RealizedSearch:
             projected = self.model.project_controls(raw_s, req, bounds_s, capabilities=caps_s)
             adv = self.model.generate(raw_s, projected, quantize=True, capabilities=caps_s)
             logits = self.victim((adv - self.center) / self.scale)
-            targeted = logits.argmax(1) == self.target_class
+            hit = self.objective.hit(logits)
             valid = (
                 self.validity_fn(adv) if self.validity_fn is not None
-                else torch.ones_like(targeted)
+                else torch.ones_like(hit)
             )
             parts.append({
                 "projected": projected, "adv": adv, "logits": logits,
-                "margin": targeted_margin(logits, self.target_class),
+                "margin": self.objective.margin(logits),
                 "cost": _normalized_cost(projected, bounds_s),
-                "targeted": targeted, "valid": valid, "success": targeted & valid,
+                "hit": hit, "valid": valid, "success": hit & valid,
             })
         if len(parts) == 1:
             return parts[0]
@@ -316,7 +351,7 @@ class RealizedSearch:
         """
         s = self._score(rows, requested)
         position = _position_within_row(rows)
-        success, targeted = s["success"], s["targeted"]
+        success, hit = s["success"], s["hit"]
         if stop_at_first_success:
             first = torch.full((self.n,), _NO_EVAL, dtype=torch.int64, device=rows.device)
             first.scatter_reduce_(
@@ -327,15 +362,15 @@ class RealizedSearch:
             seen = torch.ones_like(success)
         eval_index = self.spent[rows] + position + 1
 
-        for flags, record in ((targeted, self.first_targeted), (success, self.first_success)):
-            hit = torch.full((self.n,), _NO_EVAL, dtype=torch.int64, device=rows.device)
-            hit.scatter_reduce_(
+        for flags, record in ((hit, self.first_hit), (success, self.first_success)):
+            first_eval = torch.full((self.n,), _NO_EVAL, dtype=torch.int64, device=rows.device)
+            first_eval.scatter_reduce_(
                 0, rows, torch.where(flags & seen, eval_index, _NO_EVAL), reduce="amin"
             )
-            new = (record < 0) & (hit < _NO_EVAL)
+            new = (record < 0) & (first_eval < _NO_EVAL)
             if record is self.first_success:
                 self.first_success_phase[new] = self.phase
-            record[new] = hit[new]
+            record[new] = first_eval[new]
         self.realized.index_add_(0, rows, seen.to(torch.int64))
 
         idx = torch.nonzero(seen, as_tuple=False).flatten()
@@ -375,12 +410,18 @@ class RealizedSearch:
         """Victim logits on the unquantized relaxation at normalized controls ``q``.
 
         The relaxation is evaluated at ``max(q, SURROGATE_FLOOR)`` on coordinates with
-        headroom (value floored, gradient passed straight through to ``q``). Charges one
-        surrogate forward and one backward per row (callers differentiate).
+        headroom (value floored, gradient passed straight through to ``q``). Coordinates
+        without integer headroom are pinned at 0 and are not optimization variables: their
+        autograd path is cut, so their gradient is exactly 0 (a non-finite partial derivative
+        of the map at a pinned control, e.g. padding on a flow without padding capability,
+        would otherwise turn the whole step into NaN). Charges one surrogate forward and one
+        backward per row (callers differentiate via :func:`objective_gradient`).
         """
         bounds_s = _subset_bounds(self.bounds, rows)
         floor = _mask_q(torch.full_like(q, SURROGATE_FLOOR), bounds_s)
         q_eval = q + (floor - q).clamp(min=0.0).detach()
+        free = _mask_q(torch.ones_like(q), bounds_s) > 0
+        q_eval = torch.where(free, q_eval, q_eval.detach())
         transformed = self.model.generate(
             self.raw[rows], _controls_from_q(q_eval, bounds_s), quantize=False,
             capabilities=_subset_capabilities(self.caps, rows),
@@ -399,7 +440,7 @@ class RealizedSearch:
             projected={name: v.detach() for name, v in self.best_projected.items()},
             adversarial_raw=self.best_adv.detach(),
             logits=self.best_logits.detach(),
-            target_margin=self.best_margin.detach(),
+            objective_margin=self.best_margin.detach(),
             normalized_cost=self.best_cost.detach(),
             valid=self.best_valid.detach(),
             success=self.best_success.detach(),
@@ -408,11 +449,20 @@ class RealizedSearch:
             surrogate_evaluations=self.surrogate.clone(),
             backward_evaluations=self.backward.clone(),
             first_success_evaluation=self.first_success.clone(),
-            first_targeted_evaluation=self.first_targeted.clone(),
+            first_objective_hit_evaluation=self.first_hit.clone(),
             first_success_phase=self.first_success_phase.clone(),
             iterations=self.iterations,
             restarts=self.restarts,
         )
+
+
+def objective_gradient(loss: torch.Tensor, q: torch.Tensor) -> torch.Tensor:
+    """``d loss / d q``; fails loudly instead of letting a non-finite step silently freeze or
+    corrupt a flow's controls."""
+    grad = torch.autograd.grad(loss, q)[0]
+    if not bool(torch.isfinite(grad).all()):
+        raise FloatingPointError("non-finite gradient of the PrimAttack surrogate objective")
+    return grad
 
 
 def _movable_rows(bounds: dict[str, torch.Tensor]) -> torch.Tensor:
@@ -442,7 +492,7 @@ def optimize_primitive_candidates(
     learning_rate: float,
     seed: int,
     validity_fn: ValidityGate | None,
-    target_class: int = 0,
+    objective: AttackObjective = TARGET_BENIGN,
     restarts: int | None = 2,
     eval_budget: int | None = None,
 ) -> PrimitiveOptimizationResult:
@@ -457,7 +507,7 @@ def optimize_primitive_candidates(
         raise ValueError("restarts=None (fill the budget) requires eval_budget")
     search = RealizedSearch(
         model, victim, raw, center, scale, bounds, caps,
-        validity_fn=validity_fn, target_class=target_class, eval_budget=eval_budget,
+        validity_fn=validity_fn, objective=objective, eval_budget=eval_budget,
     )
     n = raw.shape[0]
     zeros = torch.zeros(n, dtype=raw.dtype, device=raw.device)
@@ -530,7 +580,7 @@ def optimize_primitive_candidates(
                 bounds_s = _subset_bounds(bounds_a, alive)
                 q_alive = q[alive].requires_grad_(True)
                 logits = search.surrogate_logits(rows, q_alive)
-                grad = torch.autograd.grad(targeted_margin(logits, target_class).sum(), q_alive)[0]
+                grad = objective_gradient(objective.margin(logits).sum(), q_alive)
                 search.iterations += 1
                 with torch.no_grad():
                     grad_scale = grad.abs().mean(1, keepdim=True).clamp(min=1e-12)
@@ -576,10 +626,10 @@ def optimize_primitive_pgd(
     seed: int,
     validity_fn: ValidityGate | None,
     momentum: float = 0.75,
-    target_class: int = 0,
+    objective: AttackObjective = TARGET_BENIGN,
     eval_budget: int | None = None,
 ) -> PrimitiveOptimizationResult:
-    """Fixed-step projected sign-momentum descent on the targeted margin.
+    """Fixed-step projected sign-momentum descent on the objective margin.
 
     Restart 0 starts at the clean flow (q=0); later restarts start uniformly in the box.
     No padding enumeration, no step adaptation, no reset to a restart's best point.
@@ -588,7 +638,7 @@ def optimize_primitive_pgd(
         raise ValueError("invalid Prim-PGD configuration")
     search = RealizedSearch(
         model, victim, raw, center, scale, bounds, caps,
-        validity_fn=validity_fn, target_class=target_class, eval_budget=eval_budget,
+        validity_fn=validity_fn, objective=objective, eval_budget=eval_budget,
     )
     active = _movable_rows(bounds)
     if not active.numel():
@@ -615,7 +665,7 @@ def optimize_primitive_pgd(
             bounds_s = _subset_bounds(bounds_a, alive)
             q_alive = q[alive].requires_grad_(True)
             logits = search.surrogate_logits(rows, q_alive)
-            grad = torch.autograd.grad(targeted_margin(logits, target_class).sum(), q_alive)[0]
+            grad = objective_gradient(objective.margin(logits).sum(), q_alive)
             search.iterations += 1
             with torch.no_grad():
                 grad_scale = grad.abs().mean(1, keepdim=True).clamp(min=1e-12)
@@ -647,7 +697,7 @@ def optimize_primitive_cw(
     c_init: float = 1.0,
     kappa: float = 0.0,
     betas: tuple[float, float] = (0.9, 0.999),
-    target_class: int = 0,
+    objective: AttackObjective = TARGET_BENIGN,
     eval_budget: int | None = None,
 ) -> PrimitiveOptimizationResult:
     """Projected Adam on ``cost(q) + c * max(margin + kappa, 0)`` with binary search on ``c``.
@@ -661,7 +711,7 @@ def optimize_primitive_cw(
         raise ValueError("invalid Prim-C&W configuration")
     search = RealizedSearch(
         model, victim, raw, center, scale, bounds, caps,
-        validity_fn=validity_fn, target_class=target_class, eval_budget=eval_budget,
+        validity_fn=validity_fn, objective=objective, eval_budget=eval_budget,
     )
     active = _movable_rows(bounds)
     if not active.numel():
@@ -691,10 +741,10 @@ def optimize_primitive_cw(
             bounds_s = _subset_bounds(bounds_a, alive)
             q_alive = q[alive].requires_grad_(True)
             logits = search.surrogate_logits(rows, q_alive)
-            margin = targeted_margin(logits, target_class)
+            margin = objective.margin(logits)
             cost = q_alive[:, 0] * pad_on[alive] + q_alive[:, 1] * timing_on[alive]
             loss = (cost + c[alive] * (margin + kappa).clamp(min=0.0)).sum()
-            grad = torch.autograd.grad(loss, q_alive)[0]
+            grad = objective_gradient(loss, q_alive)
             search.iterations += 1
             with torch.no_grad():
                 t[alive] += 1.0

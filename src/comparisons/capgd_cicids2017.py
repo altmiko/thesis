@@ -5,9 +5,10 @@ The attack implementation is imported from the frozen repository at
 that upstream CAPGD requires: a train-fitted min-max attack space, feature types,
 mutability, exact relations, and a raw-space victim wrapper.
 
-The primary comparison mask is the repository's existing nine-feature CICIDS mask.
-Its seven exact derived features are repairable outputs, not additional independent
-attacker controls.  Validator v2 remains the independent final validity authority.
+The default comparison retains the repository's existing nine-feature mask plus
+seven repairable exact outputs. ``capgd_prim_support`` instead makes every coordinate
+written by PrimAttack directly mutable; it matches feature support, not PrimAttack's
+coupled primitive-feasible space. Validator v2 remains the independent final authority.
 """
 from __future__ import annotations
 
@@ -24,10 +25,13 @@ import torch.nn as nn
 import yaml
 
 from attack.masks import get_dataset_mask
+from attack.realizability.cicids2017 import primattack_joint_feature_mask
 from datasets.cicids2017 import CICIDS2017Adapter
+from datasets.feature_manifest import FeatureManifest
 from validation import load_validator
 
 CAPGD_METHOD_ID = "capgd_config_mask_l2_eps0.5"
+CAPGD_PRIM_SUPPORT = "capgd_prim_support"
 TABULARBENCH_COMMIT = "bfb75415a6a31a41ddfeef34478eea1da227d19c"
 
 
@@ -38,11 +42,13 @@ class CAPGDResources:
     api: SimpleNamespace
     scaler: Any
     constraints: Any
+    configuration: str
     resolved_mask: Any
     train_min: np.ndarray
     train_max: np.ndarray
     feature_types: np.ndarray
     mutable_features: np.ndarray
+    support_mask: np.ndarray
     validator: Any
     manifest_payload: dict[str, Any]
 
@@ -100,10 +106,13 @@ def load_tabularbench_api(repo_root: str | Path) -> SimpleNamespace:
         sys.path.insert(0, str(package_root))
 
     from tabularbench.attacks.capgd.capgd import CAPGD
-    from tabularbench.attacks.utils import compute_distance
+    from tabularbench.attacks.utils import compute_distance, fix_types
     from tabularbench.constraints.constraints import Constraints
+    from tabularbench.constraints.constraints_backend_executor import ConstraintsExecutor
     from tabularbench.constraints.constraints_checker import ConstraintChecker
+    from tabularbench.constraints.pytorch_backend import PytorchBackend
     from tabularbench.constraints.relation_constraint import (
+        AndConstraint,
         Constant,
         EqualConstraint,
         Feature,
@@ -114,9 +123,13 @@ def load_tabularbench_api(repo_root: str | Path) -> SimpleNamespace:
 
     return SimpleNamespace(
         CAPGD=CAPGD,
+        AndConstraint=AndConstraint,
         compute_distance=compute_distance,
         Constraints=Constraints,
+        ConstraintsExecutor=ConstraintsExecutor,
         ConstraintChecker=ConstraintChecker,
+        PytorchBackend=PytorchBackend,
+        fix_types=fix_types,
         Constant=Constant,
         EqualConstraint=EqualConstraint,
         Feature=Feature,
@@ -277,6 +290,7 @@ def build_capgd_resources(
         "dataset": dataset,
         "fit_split": "train",
         "fit_array": str(train_path),
+        "configuration": "capgd_native",
         "n_features": manifest.n_features,
         "feature_order": feature_names,
         "feature_types": feature_types.tolist(),
@@ -302,12 +316,65 @@ def build_capgd_resources(
         api=api,
         scaler=scaler,
         constraints=constraints,
+        configuration="capgd_native",
         resolved_mask=resolved,
         train_min=train_min,
         train_max=train_max,
         feature_types=feature_types,
         mutable_features=mutable,
+        support_mask=mutable.copy(),
         validator=load_validator(dataset),
+        manifest_payload=payload,
+    )
+
+
+def build_capgd_prim_support_resources(
+    base: CAPGDResources,
+    manifest: FeatureManifest,
+) -> CAPGDResources:
+    """Reuse CAPGD's fitted box/configuration with PrimAttack's downstream support.
+
+    CAPGD still directly optimizes ``x'_S = x_S + delta_S``. The shared mask does not
+    impose PrimAttack's primitive budgets, directions, quantization, or deterministic
+    coupling ``x' = g(x, z)``.
+    """
+
+    support = primattack_joint_feature_mask(manifest).cpu().numpy()
+    constraints = base.api.Constraints(
+        feature_types=base.feature_types,
+        mutable_features=support,
+        lower_bounds=base.train_min,
+        upper_bounds=base.train_max,
+        relation_constraints=_relations(base.api),
+        feature_names=np.asarray(manifest.names),
+    )
+    payload = {
+        **base.manifest_payload,
+        "configuration": CAPGD_PRIM_SUPPORT,
+        "direct_mutable_features": [
+            name for name, allowed in zip(manifest.names, support) if allowed
+        ],
+        "repairable_derived_features": [],
+        "frozen_features": [
+            name for name, allowed in zip(manifest.names, support) if not allowed
+        ],
+        "methodological_scope": (
+            "feature-support match only; CAPGD coordinates are independent and do not "
+            "reproduce PrimAttack primitive feasibility or recomputation coupling"
+        ),
+    }
+    return CAPGDResources(
+        api=base.api,
+        scaler=base.scaler,
+        constraints=constraints,
+        configuration=CAPGD_PRIM_SUPPORT,
+        resolved_mask=None,
+        train_min=base.train_min,
+        train_max=base.train_max,
+        feature_types=base.feature_types,
+        mutable_features=support,
+        support_mask=support,
+        validator=base.validator,
         manifest_payload=payload,
     )
 
@@ -380,9 +447,21 @@ def finalize_capgd_output(
     clean_raw: torch.Tensor,
     candidate_raw: torch.Tensor,
 ) -> torch.Tensor:
-    """Apply the repository-native immutable/derived contract after upstream repair."""
+    """Enforce the selected configuration's immutable-coordinate contract."""
 
-    return resources.resolved_mask.apply(candidate_raw, clean_raw)
+    if resources.configuration == "capgd_native":
+        return resources.resolved_mask.apply(candidate_raw, clean_raw)
+    if resources.configuration != CAPGD_PRIM_SUPPORT:
+        raise ValueError(f"unknown CAPGD resource configuration {resources.configuration!r}")
+
+    # Matched support permits direct optimization of every coordinate PrimAttack can
+    # write. It deliberately does not run PrimAttack's coupled recomputation map.
+    out = candidate_raw.clone()
+    frozen = torch.as_tensor(~resources.support_mask, device=out.device)
+    out[:, frozen] = clean_raw[:, frozen]
+    if not torch.equal(out[:, frozen], clean_raw[:, frozen]):
+        raise AssertionError("CAPGD prim-support changed a feature outside its mask")
+    return out
 
 
 def evaluate_capgd_output(

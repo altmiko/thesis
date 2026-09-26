@@ -422,7 +422,7 @@ def run(
                     delay_hi=bounds["delay"].cpu().numpy(),
                     shape_hi=bounds["shape"].cpu().numpy(),
                     optimizer_target_margin=(
-                        optimization.target_margin.cpu().numpy()
+                        optimization.objective_margin.cpu().numpy()
                         if optimization is not None else np.full(len(raw), np.nan)
                     ),
                     optimizer_candidate_source=(

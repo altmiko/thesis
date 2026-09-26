@@ -446,6 +446,20 @@ def mcnemar_test(b: int, c: int) -> dict[str, Any]:
     }
 
 
+def cochran_q(matrix: np.ndarray) -> dict[str, float | int]:
+    """Cochran's Q for k related binary samples; ``matrix`` is (n paired units, k conditions)."""
+    x = np.asarray(matrix).astype(np.int64)
+    if x.ndim != 2 or x.shape[1] < 3:
+        raise ValueError("Cochran's Q needs an (n, k>=3) binary matrix")
+    k = x.shape[1]
+    col, row = x.sum(0), x.sum(1)
+    denom = k * row.sum() - (row ** 2).sum()
+    if denom == 0:
+        return {"Q": 0.0, "df": k - 1, "p": 1.0}
+    q = (k - 1) * (k * (col ** 2).sum() - col.sum() ** 2) / denom
+    return {"Q": float(q), "df": k - 1, "p": float(chi2.sf(q, k - 1))}
+
+
 def holm_adjust(p_values: Sequence[float]) -> list[float]:
     """Holm step-down family-wise-error correction."""
     m = len(p_values)

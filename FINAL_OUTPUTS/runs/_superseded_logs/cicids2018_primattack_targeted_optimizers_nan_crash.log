@@ -1,0 +1,46 @@
+
+# 2026-09-26 13:25:56 C:\Users\user6\.local\share\mamba\envs\thesis\python.exe scripts/run_primattack_optimizer_ablation.py --dataset cicids2018 --device cuda --selection-from E:\Shameem\thesis\FINAL_OUTPUTS\runs\cicids2018_distrinet\baselines_untargeted\selection.json --split test --seeds 42,2024,2026 --objective targeted --victims mlp-s42,cnn-s42,ft_transformer-s42 --classes DoS,DDoS,Recon,BruteForce --budgets maximum-evaluated --methods hybrid,pgd,cw --eval-budget 256 --hybrid-steps 40 --hybrid-lr 0.1 --pgd-restarts 3 --pgd-step 0.05 --pgd-momentum 0.75 --cw-stages 3 --cw-lr 0.5 --cw-c 1.0 --cw-kappa 0.0 --output-dir E:\Shameem\thesis\FINAL_OUTPUTS\runs\cicids2018_distrinet\primattack_targeted_optimizers --resume
+[      3s] mlp-s42/DoS/p75/s42/hybrid: valid ASR 0.0000 raw 0.0000 evals 241.2 t 3.3s mismatch 0
+[      6s] mlp-s42/DoS/p75/s42/pgd: valid ASR 0.0000 raw 0.0000 evals 252.4 t 2.7s mismatch 0
+[      9s] mlp-s42/DoS/p75/s42/cw: valid ASR 0.0000 raw 0.0000 evals 252.4 t 2.9s mismatch 0
+[     12s] mlp-s42/DoS/p75/s2024/hybrid: valid ASR 0.0000 raw 0.0000 evals 241.2 t 2.7s mismatch 0
+[     14s] mlp-s42/DoS/p75/s2024/pgd: valid ASR 0.0000 raw 0.0000 evals 252.4 t 2.5s mismatch 0
+[     17s] mlp-s42/DoS/p75/s2024/cw: valid ASR 0.0000 raw 0.0000 evals 252.4 t 2.9s mismatch 0
+[     20s] mlp-s42/DoS/p75/s2026/hybrid: valid ASR 0.0000 raw 0.0000 evals 241.2 t 3.1s mismatch 0
+[     23s] mlp-s42/DoS/p75/s2026/pgd: valid ASR 0.0000 raw 0.0000 evals 252.4 t 2.7s mismatch 0
+[     26s] mlp-s42/DoS/p75/s2026/cw: valid ASR 0.0000 raw 0.0000 evals 252.4 t 2.8s mismatch 0
+[     29s] mlp-s42/DDoS/p75/s42/hybrid: valid ASR 0.0037 raw 0.0050 evals 245.5 t 2.7s mismatch 0
+[     32s] mlp-s42/DDoS/p75/s42/pgd: valid ASR 0.0050 raw 0.0050 evals 252.7 t 3.0s mismatch 0
+[     35s] mlp-s42/DDoS/p75/s42/cw: valid ASR 0.0050 raw 0.0050 evals 252.7 t 3.0s mismatch 0
+[     37s] mlp-s42/DDoS/p75/s2024/hybrid: valid ASR 0.0037 raw 0.0037 evals 245.5 t 2.6s mismatch 0
+[     41s] mlp-s42/DDoS/p75/s2024/pgd: valid ASR 0.0050 raw 0.0050 evals 252.7 t 3.1s mismatch 0
+[     44s] mlp-s42/DDoS/p75/s2024/cw: valid ASR 0.0050 raw 0.0050 evals 252.7 t 3.0s mismatch 0
+[     46s] mlp-s42/DDoS/p75/s2026/hybrid: valid ASR 0.0013 raw 0.0025 evals 245.5 t 2.1s mismatch 0
+[     48s] mlp-s42/DDoS/p75/s2026/pgd: valid ASR 0.0050 raw 0.0050 evals 252.7 t 2.4s mismatch 0
+[     52s] mlp-s42/DDoS/p75/s2026/cw: valid ASR 0.0050 raw 0.0050 evals 252.7 t 3.2s mismatch 0
+[     54s] mlp-s42/Recon/p75/s42/hybrid: valid ASR 0.0088 raw 0.0475 evals 29.3 t 2.3s mismatch 0
+[     56s] mlp-s42/Recon/p75/s42/pgd: valid ASR 0.0063 raw 0.0475 evals 31.6 t 2.3s mismatch 0
+Traceback (most recent call last):
+  File "E:\Shameem\thesis\scripts\run_primattack_optimizer_ablation.py", line 453, in <module>
+    main()
+  File "E:\Shameem\thesis\scripts\run_primattack_optimizer_ablation.py", line 321, in main
+    res = run_method(method, cfgs[method],
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Shameem\thesis\scripts\run_primattack_optimizer_ablation.py", line 101, in run_method
+    return optimize_primitive_cw(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Shameem\thesis\src\attack\primitive_optimizer.py", line 745, in optimize_primitive_cw
+    out = search.evaluate(rows, _controls_from_q(q_new, bounds_s), CANDIDATE_CW)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user6\.local\share\mamba\envs\thesis\Lib\site-packages\torch\utils\_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Shameem\thesis\src\attack\primitive_optimizer.py", line 352, in evaluate
+    s = self._score(rows, requested)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Shameem\thesis\src\attack\primitive_optimizer.py", line 315, in _score
+    projected = self.model.project_controls(raw_s, req, bounds_s, capabilities=caps_s)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Shameem\thesis\src\attack\realizability\cicids2017.py", line 581, in project_controls
+    raise ValueError("primitive controls contain NaN or Inf")
+ValueError: primitive controls contain NaN or Inf

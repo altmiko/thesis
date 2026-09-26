@@ -1,0 +1,6 @@
+dataset,split,rule_id,source_type,expression,rejected,rate
+cicids2017_distrinet,val,SCH_0085,SCHEMA,URG Flag Count == 0.0,94,0.0003012260541309628
+cicids2017_distrinet,val,SCH_0058,SCHEMA,Fwd URG Flags == 0.0,93,0.0002980215216402079
+cicids2017_distrinet,val,SCH_0060,SCHEMA,Bwd URG Flags == 0.0,1,3.204532490754924e-06
+cicids2018_distrinet,val,MINED_0001,MINED,Fwd Packet Length Min ~= Packet Length Min,84,0.0006718226388233506
+cicids2018_distrinet,test,MINED_0001,MINED,Fwd Packet Length Min ~= Packet Length Min,80,0.0006398362019323054

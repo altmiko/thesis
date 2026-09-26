@@ -24,11 +24,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
-from scipy.stats import chi2  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
-from evaluation.paired_validity_gap import holm_adjust, mcnemar_test, newcombe_paired_ci  # noqa: E402
+from evaluation.paired_validity_gap import (  # noqa: E402
+    cochran_q, holm_adjust, mcnemar_test, newcombe_paired_ci,
+)
 
 METHODS = ("hybrid", "pgd", "cw")
 LABEL = {"hybrid": "Hybrid", "pgd": "Prim-PGD", "cw": "Prim-C&W",
@@ -79,18 +80,6 @@ def paired(a: np.ndarray, b: np.ndarray) -> dict:
             "rate_A": float(a.mean()), "rate_B": float(b.mean()),
             "diff": float(a.mean() - b.mean()), "ci95": [lo, hi],
             "test": test["test_variant"], "p": float(test["p_value"])}
-
-
-def cochran_q(matrix: np.ndarray) -> dict:
-    """Cochran's Q for k related binary samples; matrix is (n, k)."""
-    x = matrix.astype(np.int64)
-    k = x.shape[1]
-    col, row = x.sum(0), x.sum(1)
-    denom = k * row.sum() - (row ** 2).sum()
-    if denom == 0:
-        return {"Q": 0.0, "df": k - 1, "p": 1.0}
-    q = (k - 1) * (k * (col ** 2).sum() - col.sum() ** 2) / denom
-    return {"Q": float(q), "df": k - 1, "p": float(chi2.sf(q, k - 1))}
 
 
 def pct(v) -> str:
@@ -368,7 +357,8 @@ def make_plots(out: Path, agg, per_class, tests, curves, victims):
         ax.bar(range(len(ov)), vals, bottom=bottom, color=col, label=reg)
         bottom += vals
     ax.set_xticks(range(len(ov)), [f"{r.victim}\n{r.budget}" for r in ov.itertuples()], fontsize=7)
-    ax.set_ylabel("% of flows with a valid success"); ax.legend(fontsize=7, ncol=4)
+    ax.set_ylabel("% of flows with a valid success"); ax.set_ylim(0, 100)
+    ax.legend(fontsize=7, ncol=4, loc="upper left")
     fig.tight_layout()
     paths["overlap"] = plots / "success_overlap.png"
     fig.savefig(paths["overlap"], dpi=130); plt.close(fig)

@@ -19,9 +19,11 @@ Attack families (all on the SAME eligible rows, per-row outcomes in artifacts/*.
   1. Unconstrained input-space PGD/C&W, untargeted and targeted->Benign.
   2. PrimAttack {search, random-feasible} x {joint, timing-only, padding-only} x budgets
      (targeted->Benign).
-  3. CAPGD (TabularBench, untargeted): native feature-space (config mask, L2 eps=0.5) and
-     restricted to PrimAttack's p75 primitive-control box.
-  4. FAB (AutoAttack ``FABAttack_PT``, untargeted, unconstrained minimum-norm) in the
+  3. CAPGD (TabularBench, untargeted): native feature-space, direct feature-space on
+     PrimAttack's 23-coordinate downstream support, and PrimAttack's p75 primitive box.
+  4. C-PGD (Simonetto et al., IJCAI 2022, untargeted): published differentiable
+     constraint-penalty objective on the same 23-coordinate PrimAttack support.
+  5. FAB (AutoAttack ``FABAttack_PT``, untargeted, unconstrained minimum-norm) in the
      train-fitted min-max box (default L2 eps=0.5, same attack space as CAPGD native).
 
 Every cell is gated by the SAME validator_v2 profile of the dataset (hybrid_valid) and the
@@ -54,7 +56,9 @@ for _p in (str(REPO_ROOT), str(SRC)):
         sys.path.insert(0, _p)
 
 from attack.input_baselines import input_cw_attack, input_pgd_attack  # noqa: E402
-from attack.realizability.cicids2017 import CICIDS2017PrimitiveModel  # noqa: E402
+from attack.realizability.cicids2017 import (  # noqa: E402
+    CICIDS2017PrimitiveModel, primattack_joint_feature_mask,
+)
 from attack.realizability.validator import RealizabilityValidator  # noqa: E402
 from attack.flow_semantics import FlowSemanticValidator, SemanticStatus  # noqa: E402
 from attack.primattack_budget import class_calibration, load_calibration, unbounded_calibration  # noqa: E402
@@ -66,8 +70,12 @@ from attack.primitive_optimizer import (  # noqa: E402
     CANDIDATE_NAMES, hybrid_valid_gate, optimize_primitive_candidates,
 )
 from comparisons.capgd_cicids2017 import (  # noqa: E402
-    RawCICIDSVictim, build_capgd_resources, evaluate_capgd_output, finalize_capgd_output,
-    fit_train_minmax, make_capgd,
+    RawCICIDSVictim, build_capgd_prim_support_resources, build_capgd_resources,
+    evaluate_capgd_output, finalize_capgd_output, fit_train_minmax, make_capgd,
+)
+from comparisons.cpgd_prim_support import (  # noqa: E402
+    CPGDConfig, CPGDPrimSupportAttack, CPGD_METHOD_ID, CPGD_PAPER,
+    CPGD_PUBLIC_IMPLEMENTATION,
 )
 from comparisons.primitive_capgd import run_primitive_capgd  # noqa: E402
 from comparisons.fab_autoattack import AUTOATTACK_COMMIT, FABBox, load_fab_class, run_fab  # noqa: E402
@@ -80,7 +88,8 @@ from vae.cicids2017_stage_a import ATTACK_CLASSES  # noqa: E402
 BUDGET_LABEL = {"intermediate": "p50", "maximum-evaluated": "p75", "restricted": "p25",
                 "unbounded": "unb"}
 BENIGN_ID = 0
-FAMILIES = ("input", "primattack", "capgd", "fab")
+FAMILIES = ("input", "primattack", "capgd", "cpgd", "fab")
+DEFAULT_FAMILIES = ("input", "primattack", "capgd", "fab")
 
 DATASET_DEFAULTS = {
     "cicids2017_distrinet": {
@@ -172,6 +181,28 @@ def _sha_ids(ids: np.ndarray) -> str:
     return h.hexdigest()
 
 
+def file_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with Path(path).open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+class ForwardRowCounter:
+    """Counts flows passed through a victim's forward (all attack-internal victim queries)."""
+
+    def __init__(self, module: torch.nn.Module) -> None:
+        self.rows = 0
+        self._handle = module.register_forward_hook(self._hook)
+
+    def _hook(self, _module, inputs, _output) -> None:
+        self.rows += int(inputs[0].shape[0])
+
+    def remove(self) -> None:
+        self._handle.remove()
+
+
 def build_attack_roster(families, budgets, modes, optimizers):
     roster = []
     if "input" in families:
@@ -196,9 +227,14 @@ def build_attack_roster(families, budgets, modes, optimizers):
     if "capgd" in families:
         roster += [
             {"name": "capgd_native", "family": "capgd", "kind": "capgd", "goal": "untargeted"},
+            {"name": "capgd_prim_support", "family": "capgd",
+             "kind": "capgd_prim_support", "goal": "untargeted"},
             {"name": "capgd_prim_p75", "family": "capgd", "kind": "prim_capgd",
              "goal": "untargeted", "budget": "maximum-evaluated", "mode": "joint"},
         ]
+    if "cpgd" in families:
+        roster.append({"name": CPGD_METHOD_ID, "family": "cpgd",
+                       "kind": "cpgd_prim_support", "goal": "untargeted"})
     if "fab" in families:
         roster.append({"name": "fab_untargeted", "family": "fab", "kind": "fab",
                        "goal": "untargeted"})
@@ -214,7 +250,7 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dataset", default="cicids2017", help="cicids2017 | cicids2018")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
-    ap.add_argument("--seeds", default="42,123,2024",
+    ap.add_argument("--seeds", default="42,2024,2026",
                     help="attack seeds (ignored for victims with a training seed when "
                          "--match-victim-seed is set)")
     ap.add_argument("--match-victim-seed", action="store_true",
@@ -226,7 +262,11 @@ def main() -> None:
     ap.add_argument("--selection-seed", type=int, default=42)
     ap.add_argument("--victims", default=None, help="default: every victim of the dataset")
     ap.add_argument("--classes", default=",".join(ATTACK_CLASSES))
-    ap.add_argument("--families", default=",".join(FAMILIES))
+    ap.add_argument("--families", default=",".join(DEFAULT_FAMILIES))
+    ap.add_argument(
+        "--attacks", default=None,
+        help="optional comma-separated attack names after family roster expansion",
+    )
     ap.add_argument("--budgets", default="intermediate,maximum-evaluated,unbounded")
     ap.add_argument("--modes", default="joint,timing-only,padding-only")
     ap.add_argument("--optimizers", default="search,random-feasible")
@@ -244,10 +284,19 @@ def main() -> None:
     ap.add_argument("--prim-lr", type=float, default=0.1)
     ap.add_argument("--prim-restarts", type=int, default=2)
     # capgd
+    ap.add_argument("--capgd-norm", choices=("L2", "Linf"), default="L2")
     ap.add_argument("--capgd-epsilon", type=float, default=0.5)
     ap.add_argument("--capgd-steps", type=int, default=10)
     ap.add_argument("--capgd-batch-size", type=int, default=64)
     ap.add_argument("--prim-capgd-steps", type=int, default=40)
+    # C-PGD (Simonetto et al., IJCAI 2022)
+    ap.add_argument("--cpgd-epsilon", type=float, default=0.5)
+    ap.add_argument("--cpgd-norm", choices=("L2", "Linf"), default="L2")
+    ap.add_argument("--cpgd-step-size", type=float, default=0.05)
+    ap.add_argument("--cpgd-iterations", type=int, default=40)
+    ap.add_argument("--cpgd-constraint-weight", type=float, default=1.0)
+    ap.add_argument("--cpgd-loss", choices=("ce",), default="ce")
+    ap.add_argument("--cpgd-batch-size", type=int, default=64)
     # fab (AutoAttack)
     ap.add_argument("--fab-norm", choices=("Linf", "L2", "L1"), default="L2")
     ap.add_argument("--fab-epsilon", type=float, default=0.5,
@@ -279,13 +328,20 @@ def main() -> None:
         raise ValueError(f"unknown families {unknown}")
     budgets, modes, optimizers = _csv(args.budgets), _csv(args.modes), _csv(args.optimizers)
     roster = build_attack_roster(families, budgets, modes, optimizers)
+    if args.attacks:
+        selected_attacks = set(_csv(args.attacks))
+        known_attacks = {attack["name"] for attack in roster}
+        unknown_attacks = sorted(selected_attacks - known_attacks)
+        if unknown_attacks:
+            raise ValueError(f"unknown attacks {unknown_attacks}; available={sorted(known_attacks)}")
+        roster = [attack for attack in roster if attack["name"] in selected_attacks]
 
     victim_info = {}
     for vname in victims:
         ckpt, arch, train_seed = victim_checkpoint(dataset, vname)
         seeds = [train_seed] if (args.match_victim_seed and train_seed is not None) else base_seeds
-        victim_info[vname] = {"checkpoint": ckpt, "arch": arch, "train_seed": train_seed,
-                              "attack_seeds": seeds}
+        victim_info[vname] = {"checkpoint": ckpt, "checkpoint_sha256": file_sha256(ckpt),
+                              "arch": arch, "train_seed": train_seed, "attack_seeds": seeds}
 
     art = out / "artifacts"
     art.mkdir(parents=True, exist_ok=True)
@@ -332,7 +388,11 @@ def main() -> None:
     raw_all_t = torch.tensor(np.ascontiguousarray(raw_all), dtype=torch.float32, device=device)
     scaled_all_t = (raw_all_t - center) / scale  # single source of truth for victim input
 
-    capgd_resources = build_capgd_resources(REPO_ROOT, adapter=adapter) if "capgd" in families else None
+    capgd_resources = prim_support_resources = None
+    if {"capgd", "cpgd"} & set(families):
+        capgd_resources = build_capgd_resources(REPO_ROOT, adapter=adapter)
+        prim_support_resources = build_capgd_prim_support_resources(capgd_resources, manifest)
+    prim_support_mask = primattack_joint_feature_mask(manifest).to(device)
     fab_cls = fab_box = None
     if "fab" in families:
         fab_cls = load_fab_class(REPO_ROOT)
@@ -341,7 +401,8 @@ def main() -> None:
 
     config = {
         "dataset": dataset,
-        "victims": {v: {"checkpoint": str(i["checkpoint"]), "arch": i["arch"],
+        "victims": {v: {"checkpoint": str(i["checkpoint"]),
+                        "checkpoint_sha256": i["checkpoint_sha256"], "arch": i["arch"],
                         "train_seed": i["train_seed"], "attack_seeds": i["attack_seeds"]}
                     for v, i in victim_info.items()},
         "classes": classes, "families": families,
@@ -357,10 +418,28 @@ def main() -> None:
         "primattack": {"steps": args.prim_steps, "learning_rate": args.prim_lr,
                        "restarts": args.prim_restarts, "calibration": str(calibration_path),
                        "calibration_fit_split": calibration["fit_split"]},
-        "capgd": {"native": {"norm": "L2", "epsilon": args.capgd_epsilon,
-                             "steps": args.capgd_steps, "batch_size": args.capgd_batch_size},
-                  "primitive": {"norm": "Linf", "epsilon": 1.0, "box": "PrimAttack p75 joint",
-                                "steps": args.prim_capgd_steps}},
+        "capgd": {
+            "native": {"norm": args.capgd_norm, "epsilon": args.capgd_epsilon,
+                       "steps": args.capgd_steps, "batch_size": args.capgd_batch_size},
+            "prim_support": {"norm": args.capgd_norm, "epsilon": args.capgd_epsilon,
+                             "steps": args.capgd_steps, "batch_size": args.capgd_batch_size,
+                             "mutable_feature_mask": torch.nonzero(
+                                 prim_support_mask, as_tuple=False
+                             ).flatten().cpu().tolist()},
+            "primitive": {"norm": "Linf", "epsilon": 1.0, "box": "PrimAttack p75 joint",
+                          "steps": args.prim_capgd_steps},
+        },
+        "cpgd": {
+            "method": CPGD_METHOD_ID, "paper": CPGD_PAPER,
+            "public_implementation": CPGD_PUBLIC_IMPLEMENTATION,
+            "epsilon": args.cpgd_epsilon, "norm": args.cpgd_norm,
+            "step_size": args.cpgd_step_size, "iterations": args.cpgd_iterations,
+            "constraint_penalty_weight": args.cpgd_constraint_weight,
+            "loss": args.cpgd_loss, "batch_size": args.cpgd_batch_size,
+            "mutable_feature_mask": torch.nonzero(
+                prim_support_mask, as_tuple=False
+            ).flatten().cpu().tolist(),
+        },
         "fab": {"implementation": "autoattack.fab_pt.FABAttack_PT (external/auto-attack)",
                 "autoattack_commit": AUTOATTACK_COMMIT, "goal": "untargeted",
                 "norm": args.fab_norm, "epsilon": args.fab_epsilon, "n_iter": args.fab_iter,
@@ -403,6 +482,8 @@ def main() -> None:
             sids = sample_ids_all[idx]
             raw_t = raw_all_t[torch.tensor(idx, device=device)]
             clean_valid = structural_masks(raw_t.cpu().numpy(), dataset=dataset)["hybrid_valid"]
+            clean_sha = hashlib.sha256(
+                np.ascontiguousarray(raw_t.cpu().numpy()).tobytes()).hexdigest()
             selection[vname][cname] = {
                 "class_id": cid,
                 "n_class_test": int((y == cid).sum()),
@@ -412,11 +493,14 @@ def main() -> None:
                 "source_label_counts": {str(k): int(v) for k, v in
                                         meta.iloc[idx]["source_label"].value_counts().items()},
                 "sha256_sample_ids": _sha_ids(sids),
+                "clean_raw_sha256": clean_sha,
                 "positional_idx": idx.tolist(),
                 "sample_ids": sids.tolist(),
             }
             eligibility[(vname, cname)] = {
                 "idx": idx, "sids": sids, "raw": raw_t, "x0": (raw_t - center) / scale,
+                "clean_raw_sha256": clean_sha,
+                "source_label": meta.iloc[idx]["source_label"].astype(str).to_numpy(),
                 "src": {"Src IP": meta.iloc[idx]["Src IP"].astype(str).to_numpy(),
                         "Dst IP": meta.iloc[idx]["Dst IP"].astype(str).to_numpy()},
             }
@@ -435,7 +519,7 @@ def main() -> None:
     if args.resume and (out / "cells.json").exists():
         prior_cells = {(c["victim"], c["class"], c["attack"], c["seed"]): c for c in
                        json.loads((out / "cells.json").read_text(encoding="utf-8"))}
-    cells, failures, n_resumed = [], [], 0
+    cells, n_resumed = [], 0
     t0 = time.time()
     for vname in victims:
         victim = victim_cache[vname]
@@ -458,8 +542,12 @@ def main() -> None:
                         n_resumed += 1
                         continue
                     deterministic_runtime(seed)
+                    counter = ForwardRowCounter(victim)
                     semantic = None
                     requested = projected = optimization = bounds = ccfg = None
+                    attack_iterations = np.full(n, -1, dtype=np.int64)
+                    model_evaluations = np.full(n, -1, dtype=np.int64)
+                    attack_parameters: dict[str, object] = {}
                     extra: dict[str, np.ndarray] = {}
                     attack_t0 = time.perf_counter()
                     kind = atk["kind"]
@@ -468,12 +556,36 @@ def main() -> None:
                             classifier=victim, x_original=x0, y_true=labels_t,
                             epsilon=args.pgd_epsilon, alpha=args.pgd_alpha,
                             num_steps=args.pgd_steps, random_start=True, device=device)
+                        attack_iterations.fill(args.pgd_steps)
+                        model_evaluations.fill(args.pgd_steps)
+                        attack_parameters = {
+                            "norm": "Linf", "epsilon": args.pgd_epsilon,
+                            "space": "victim RobustScaler space, all 79 features",
+                            "step_size": args.pgd_alpha, "iterations": args.pgd_steps,
+                            "restarts": 1, "random_start": True, "loss": "ce (untargeted)",
+                            "projection": "Linf ball only; no feature mask, no box, no types",
+                            "stopping_rule": "fixed iterations; final iterate returned",
+                        }
                     elif kind == "input_cw":
-                        x_adv, _ = input_cw_attack(
+                        x_adv, cw_meta = input_cw_attack(
                             classifier=victim, x_original=x0, y_true=labels_t,
                             lambda_conf=args.cw_lambda, kappa=args.cw_kappa,
                             num_iterations=args.cw_iters, learning_rate=args.cw_lr,
                             convergence_threshold=args.cw_conv, device=device)
+                        attack_iterations.fill(int(cw_meta["iterations_run"]))
+                        model_evaluations.fill(2 * int(cw_meta["iterations_run"]))
+                        attack_parameters = {
+                            "norm": "L2 (penalty, unbounded)", "lambda_conf": args.cw_lambda,
+                            "kappa": args.cw_kappa, "iterations": args.cw_iters,
+                            "iterations_run": int(cw_meta["iterations_run"]),
+                            "learning_rate": args.cw_lr, "optimizer": "Adam",
+                            "convergence_threshold": args.cw_conv, "restarts": 1,
+                            "space": "victim RobustScaler space, all 79 features",
+                            "loss": "lambda*max(z_true - max z_other + kappa, 0) + ||delta||_2^2",
+                            "projection": "none (no feature mask, no box, no types)",
+                            "stopping_rule": "max iterations or max per-row delta shift < "
+                                             "convergence_threshold; lowest-L2 success kept",
+                        }
                     elif kind == "tpgd":
                         x_adv = targeted_pgd_benign(
                             victim, x0, epsilon=args.pgd_epsilon, steps=args.pgd_steps,
@@ -482,22 +594,84 @@ def main() -> None:
                         x_adv = targeted_cw_benign(
                             victim, x0, lambda_conf=args.cw_lambda, kappa=args.cw_kappa,
                             iters=args.cw_iters, lr=args.cw_lr, device=device)
-                    elif kind == "capgd":
-                        attack = make_capgd(capgd_resources, raw_victim, device=device, seed=seed,
-                                            norm="L2", eps=args.capgd_epsilon,
-                                            steps=args.capgd_steps)
+                    elif kind in ("capgd", "capgd_prim_support"):
+                        resources = (
+                            prim_support_resources
+                            if kind == "capgd_prim_support"
+                            else capgd_resources
+                        )
+                        attack = make_capgd(
+                            resources, raw_victim, device=device, seed=seed,
+                            norm=args.capgd_norm, eps=args.capgd_epsilon,
+                            steps=args.capgd_steps,
+                        )
                         chunks = []
                         for s in range(0, n, args.capgd_batch_size):
                             batch = raw[s:s + args.capgd_batch_size]
                             with parallel_backend("threading"):
                                 cand = attack(batch, labels_t[s:s + args.capgd_batch_size])
-                            chunks.append(finalize_capgd_output(capgd_resources, batch, cand).detach())
+                            chunks.append(finalize_capgd_output(resources, batch, cand).detach())
                         adv_raw = torch.cat(chunks, dim=0).float()
                         checked = evaluate_capgd_output(
-                            capgd_resources, raw.cpu().numpy(), adv_raw.cpu().numpy(),
-                            norm="L2", eps=args.capgd_epsilon)
-                        extra["capgd_internal_valid"] = np.asarray(checked["internal_constraint_valid"], bool)
+                            resources, raw.cpu().numpy(), adv_raw.cpu().numpy(),
+                            norm=args.capgd_norm, eps=args.capgd_epsilon,
+                        )
+                        extra["capgd_internal_valid"] = np.asarray(
+                            checked["internal_constraint_valid"], bool
+                        )
                         extra["capgd_distance_ok"] = np.asarray(checked["distance_ok"], bool)
+                        attack_iterations.fill(args.capgd_steps)
+                        attack_parameters = {
+                            "norm": args.capgd_norm, "epsilon": args.capgd_epsilon,
+                            "iterations": args.capgd_steps, "loss": "ce", "restarts": 2,
+                            "rho": 0.75, "adaptive_eps": True, "eps_margin": 0.01,
+                            "configuration": resources.configuration,
+                            "mutable_feature_mask": np.flatnonzero(
+                                resources.support_mask
+                            ).tolist(),
+                        }
+                    elif kind == "cpgd_prim_support":
+                        cpgd_config = CPGDConfig(
+                            epsilon=args.cpgd_epsilon,
+                            norm=args.cpgd_norm,
+                            step_size=args.cpgd_step_size,
+                            iterations=args.cpgd_iterations,
+                            constraint_penalty_weight=args.cpgd_constraint_weight,
+                            loss=args.cpgd_loss,
+                        )
+                        chunks = []
+                        cpgd_iterations = []
+                        cpgd_evaluations = []
+                        cpgd_penalties = []
+                        for s in range(0, n, args.cpgd_batch_size):
+                            attack = CPGDPrimSupportAttack(
+                                prim_support_resources, raw_victim, config=cpgd_config,
+                                seed=seed, device=device,
+                            )
+                            result = attack.run(
+                                raw[s:s + args.cpgd_batch_size],
+                                labels_t[s:s + args.cpgd_batch_size],
+                            )
+                            chunks.append(result.adversarial_raw)
+                            cpgd_iterations.append(result.iterations)
+                            cpgd_evaluations.append(result.model_evaluations)
+                            cpgd_penalties.append(result.final_constraint_violation)
+                        adv_raw = torch.cat(chunks, dim=0).float()
+                        attack_iterations = torch.cat(cpgd_iterations).cpu().numpy()
+                        model_evaluations = torch.cat(cpgd_evaluations).cpu().numpy()
+                        extra["cpgd_constraint_violation"] = (
+                            torch.cat(cpgd_penalties).cpu().numpy().astype(np.float32)
+                        )
+                        attack_parameters = {
+                            "epsilon": args.cpgd_epsilon, "norm": args.cpgd_norm,
+                            "step_size": args.cpgd_step_size,
+                            "iterations": args.cpgd_iterations,
+                            "constraint_penalty_weight": args.cpgd_constraint_weight,
+                            "loss": args.cpgd_loss, "random_start": True,
+                            "mutable_feature_mask": np.flatnonzero(
+                                prim_support_resources.support_mask
+                            ).tolist(),
+                        }
                     elif kind == "fab":
                         adv_raw = run_fab(
                             fab_cls, victim, raw, labels_t, box=fab_box, center=center,
@@ -545,11 +719,13 @@ def main() -> None:
                         adv_raw = (x_adv * scale + center).detach()
                     x_adv = (adv_raw - center) / scale
                     elapsed_seconds = time.perf_counter() - attack_t0
+                    forward_rows = counter.rows
+                    counter.remove()
 
                     if not bool(torch.isfinite(adv_raw).all()):
-                        failures.append({"attack": atk["name"], "victim": vname,
-                                         "class": cname, "seed": seed, "reason": "nonfinite_adv"})
-                        continue
+                        raise FloatingPointError(
+                            f"non-finite adversarial flow for {vname}/{cname}/{atk['name']}/"
+                            f"seed{seed}; refusing to drop the cell")
 
                     masks, _cost_unused, clean_pred, adv_pred = evaluate_cell(
                         model, realizability, victim, raw, adv_raw,
@@ -558,9 +734,9 @@ def main() -> None:
 
                     cc = masks["clean_correct"]
                     if int(cc.sum().item()) != n:
-                        failures.append({"attack": atk["name"], "victim": vname, "class": cname,
-                                         "seed": seed, "reason": "eligible_not_all_clean_correct",
-                                         "n_clean_correct": int(cc.sum().item()), "n": n})
+                        raise AssertionError(
+                            f"{vname}/{cname}: only {int(cc.sum().item())}/{n} eligible rows "
+                            "are clean-correct at evaluation time")
 
                     evasion = adv_pred != cid
                     targeted = adv_pred == BENIGN_ID
@@ -576,15 +752,35 @@ def main() -> None:
                     np_ = lambda t: t.detach().cpu().numpy()  # noqa: E731
                     nan = np.full(n, np.nan, np.float32)
                     l2 = (x_adv - x0).reshape(n, -1).norm(dim=1)
+                    matched_support = kind in ("capgd_prim_support", "cpgd_prim_support")
+                    changed = adv_raw != raw
+                    outside_changed = changed[:, ~prim_support_mask].sum(dim=1)
+                    modified_count = changed.sum(dim=1)
+                    if matched_support:
+                        if bool((outside_changed != 0).any()):
+                            raise AssertionError(
+                                f"{atk['name']} changed a feature outside PrimAttack support"
+                            )
+                        allowed_count = np.full(
+                            n, int(prim_support_mask.sum().item()), dtype=np.int64
+                        )
+                    elif kind in ("input_pgd", "input_cw", "tpgd", "tcw"):
+                        allowed_count = np.full(n, int(manifest.n_features), dtype=np.int64)
+                    else:
+                        allowed_count = np.full(n, -1, dtype=np.int64)
 
                     npz = art / f"{vname}__{cname}__{atk['name']}__seed{seed}.npz"
                     np.savez_compressed(
                         npz,
                         sample_id=sids, positional_idx=E["idx"], true_class=labels,
+                        source_class=np.full(n, cname),
+                        source_label=E["source_label"],
                         clean_pred=np_(clean_pred).astype(np.int64),
                         adv_pred=np_(adv_pred).astype(np.int64),
                         clean_correct=np_(cc), evasion=np_(evasion), targeted_success=np_(targeted),
                         domain_valid=np_(domain_valid),
+                        raw_success=np_(evasion), validator_pass=np_(domain_valid),
+                        valid_success=np_(evasion & domain_valid),
                         hard_structural_valid=np_(masks["hard_structural_valid"]),
                         realizable=np_(realizable),
                         semantic_pass=(np_(sem_pass) if sem_pass is not None
@@ -595,21 +791,41 @@ def main() -> None:
                         cost_padding=np_(cost["padding"]).astype(np.float32),
                         cost_timing=np_(cost["timing"]).astype(np.float32),
                         l2_scaled=np_(l2).astype(np.float32),
+                        perturbation_norm=np_(l2).astype(np.float32),
+                        iterations=attack_iterations,
+                        model_evaluations=model_evaluations,
+                        n_allowed_primattack_support_features=allowed_count,
+                        n_features_modified=np_(modified_count).astype(np.int64),
+                        n_modified_outside_primattack_mask=np_(outside_changed).astype(np.int64),
+                        mutable_feature_mask=(
+                            np.asarray(prim_support_mask.cpu(), dtype=bool)
+                            if matched_support else np.zeros(manifest.n_features, dtype=bool)
+                        ),
                         primitive_p=(np_(projected["p"]).astype(np.float32) if projected is not None else nan),
                         primitive_delay=(np_(projected["delay"]).astype(np.float32) if projected is not None else nan),
                         primitive_shape=(np_(projected["shape"]).astype(np.float32) if projected is not None else nan),
                         primitive_p_hi=(np_(bounds["p"]).astype(np.float32) if bounds is not None else nan),
                         primitive_delay_hi=(np_(bounds["delay"]).astype(np.float32) if bounds is not None else nan),
-                        optimizer_target_margin=(
-                            np_(optimization.target_margin).astype(np.float32)
+                        optimizer_objective_margin=(
+                            np_(optimization.objective_margin).astype(np.float32)
                             if optimization is not None else nan),
                         optimizer_candidate_source=(
                             np.asarray([CANDIDATE_NAMES[int(v)] for v in np_(optimization.candidate_source)])
                             if optimization is not None else np.full(n, "not-applicable")),
                         **extra,
+                        adv_raw=np_(adv_raw).astype(np.float32),
+                        clean_raw_sha256=E["clean_raw_sha256"],
+                        checkpoint_sha256=victim_info[vname]["checkpoint_sha256"],
+                        victim_forward_rows=np.int64(forward_rows),
                         elapsed_seconds=np.asarray(elapsed_seconds, np.float64),
-                        attack=atk["name"], family=atk["family"], victim=vname,
-                        victim_arch=victim_info[vname]["arch"], attack_class=cname, seed=seed,
+                        runtime_seconds=np.asarray(elapsed_seconds, np.float64),
+                        failure_status=np.full(n, "", dtype="U1"),
+                        attack_parameters=np.asarray(
+                            json.dumps(attack_parameters, sort_keys=True)
+                        ),
+                        attack=atk["name"], method=atk["name"], family=atk["family"],
+                        victim=vname, victim_arch=victim_info[vname]["arch"],
+                        attack_class=cname, seed=seed, objective=atk["goal"],
                         goal=atk["goal"], dataset=dataset,
                     )
 
@@ -629,6 +845,9 @@ def main() -> None:
                         "mean_cost_total": float(cost["total"].mean().item()),
                         "mean_l2_scaled": float(l2.mean().item()),
                         "elapsed_seconds": elapsed_seconds,
+                        "mean_victim_forwards_per_flow": forward_rows / n,
+                        "mean_features_modified": float(modified_count.float().mean().item()),
+                        "max_modified_outside_primattack_mask": int(outside_changed.max().item()),
                     }
                     if sem_pass is not None:
                         cell["semantic_pass_rate"] = rate(sem_pass)
@@ -640,10 +859,9 @@ def main() -> None:
             (out / "cells.json").write_text(json.dumps(cells, indent=2), encoding="utf-8")
 
     (out / "cells.json").write_text(json.dumps(cells, indent=2), encoding="utf-8")
-    (out / "failures.json").write_text(json.dumps(failures, indent=2), encoding="utf-8")
 
     assert_pairing(out, victim_info, classes, roster, selection)
-    print(f"[done] {len(cells)} cells ({n_resumed} resumed), {len(failures)} failures; "
+    print(f"[done] {len(cells)} cells ({n_resumed} resumed); "
           f"pairing assertions PASSED; artifacts in {art}", flush=True)
 
 

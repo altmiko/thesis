@@ -367,6 +367,20 @@ validator-invalid padding "success" could stop the padding sweep and block timin
 refinement (material on CICIDS2018, where padding breaks the mined
 `Fwd Packet Length Min == Packet Length Min` rule).
 
+### Untargeted objective
+
+`AttackObjective("untargeted", y)` (source class `y`) replaces the margin with
+
+$$
+m(x)=z_y(x)-\max_{k\ne y} z_k(x)
+$$
+
+and the realized-flow success test with `argmax(logits) != y` **and** the same validity gate.
+Everything else (projection, quantized realization, incumbent ordering, evaluation budget) is
+unchanged; all three optimizers accept `objective=`. The default objective is
+`AttackObjective("targeted", 0)` (Benign). `scripts/run_primattack_optimizer_ablation.py
+--objective untargeted` runs it (final suite Exp A/D).
+
 There is no cost term in the gradient objective. Hard bounds define feasibility.
 Per-row candidate selection is lexicographic:
 

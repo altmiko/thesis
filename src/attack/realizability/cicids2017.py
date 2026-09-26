@@ -37,6 +37,7 @@ projections. Subflow bytes, bulk stats, Flow IAT Std/Min, and active/idle featur
 not reconstructable from aggregate flows and remain explicit Level-C limitations.
 """
 from __future__ import annotations
+from dataclasses import dataclass
 
 from typing import Mapping
 
@@ -93,6 +94,106 @@ _QUANTIZE_LENGTH = ("Total Length of Fwd Packet", "Fwd Packet Length Max",
 _QUANTIZE_TIMING = ("Fwd IAT Total", "Fwd IAT Max", "Fwd IAT Min", "Flow Duration",
                     "Flow IAT Max")
 
+@dataclass(frozen=True)
+class PrimAttackFeatureSupport:
+    """One classifier coordinate written by the canonical primitive transform."""
+
+    name: str
+    index: int
+    padding: bool
+    timing: bool
+    recomputation: tuple[str, ...]
+
+
+# Canonical support is defined by actual write sites in ``generate``. These maps are
+# also consumed by ``primitives()`` and the matched-support feature-space baselines,
+# preventing a second hand-maintained feature list.
+_PADDING_RECOMPUTATION = {
+    "Total Length of Fwd Packet": "generate:forward packet-length augmentation",
+    "Fwd Packet Length Min": "generate:forward packet-length augmentation",
+    "Fwd Packet Length Max": "generate:forward packet-length augmentation",
+    "Fwd Packet Length Mean": "generate:forward packet-length augmentation",
+    "Fwd Segment Size Avg": "generate:forward packet-length augmentation",
+    "Packet Length Min": "generate:combined packet-length statistics",
+    "Packet Length Max": "generate:combined packet-length statistics",
+    "Packet Length Mean": "generate:combined packet-length statistics",
+    "Average Packet Size": "generate:combined packet-length statistics",
+    "Packet Length Variance": "generate:combined packet-length statistics",
+    "Packet Length Std": "generate:combined packet-length statistics",
+    "Flow Bytes/s": "generate:rates",
+}
+_TIMING_RECOMPUTATION = {
+    "Fwd IAT Total": "generate:affine allocation of total forward delay",
+    "Fwd IAT Mean": "generate:affine allocation of total forward delay",
+    "Fwd IAT Std": "generate:affine allocation of total forward delay",
+    "Fwd IAT Max": "generate:affine allocation of total forward delay",
+    "Fwd IAT Min": "generate:affine allocation of total forward delay",
+    "Flow Duration": "generate:affine allocation of total forward delay",
+    "Flow IAT Mean": "generate:affine allocation of total forward delay",
+    "Flow IAT Max": "generate:affine allocation of total forward delay",
+    "Flow Bytes/s": "generate:rates",
+    "Flow Packets/s": "generate:rates",
+    "Fwd Packets/s": "generate:rates",
+    "Bwd Packets/s": "generate:rates",
+}
+
+
+def primattack_feature_support(
+    manifest: FeatureManifest,
+) -> tuple[PrimAttackFeatureSupport, ...]:
+    """Resolve PrimAttack's downstream write support against the frozen feature order."""
+
+    padding = set(_PADDING_RECOMPUTATION)
+    timing = set(_TIMING_RECOMPUTATION)
+    declared = padding | timing
+    unknown = declared - set(manifest.names)
+    if unknown:
+        raise KeyError(f"PrimAttack support features missing from manifest: {sorted(unknown)}")
+    return tuple(
+        PrimAttackFeatureSupport(
+            name=name,
+            index=index,
+            padding=name in padding,
+            timing=name in timing,
+            recomputation=tuple(
+                source
+                for source in (
+                    _PADDING_RECOMPUTATION.get(name),
+                    _TIMING_RECOMPUTATION.get(name),
+                )
+                if source is not None
+            ),
+        )
+        for index, name in enumerate(manifest.names)
+        if name in declared
+    )
+
+
+def _primattack_feature_mask(
+    manifest: FeatureManifest, *, padding: bool, timing: bool
+) -> torch.Tensor:
+    mask = torch.zeros(manifest.n_features, dtype=torch.bool)
+    for feature in primattack_feature_support(manifest):
+        if (padding and feature.padding) or (timing and feature.timing):
+            mask[feature.index] = True
+    return mask
+
+
+def primattack_padding_feature_mask(manifest: FeatureManifest) -> torch.Tensor:
+    return _primattack_feature_mask(manifest, padding=True, timing=False)
+
+
+def primattack_timing_feature_mask(manifest: FeatureManifest) -> torch.Tensor:
+    return _primattack_feature_mask(manifest, padding=False, timing=True)
+
+
+def primattack_joint_feature_mask(manifest: FeatureManifest) -> torch.Tensor:
+    """Boolean mask of classifier coordinates that PrimAttack can write."""
+
+    return _primattack_feature_mask(manifest, padding=True, timing=True)
+
+
+
 
 class CICIDS2017PrimitiveModel:
     """Differentiable ``(p, delay, shape) -> 79-feature`` canonical map.
@@ -108,15 +209,11 @@ class CICIDS2017PrimitiveModel:
         self.dur_floor_us = float(dur_floor_us)
         self._names = tuple(manifest.names)
         self.i = {n: manifest.index_by_name(n) for n in self._names}
-        roles = self.roles()
-        self.controlled_idx = sorted(
-            self.i[n] for n, (r, _) in roles.items()
-            if r in (FeatureRole.DERIVED_P, FeatureRole.DERIVED_T, FeatureRole.DERIVED,
-                     FeatureRole.CONDITIONAL, FeatureRole.RATE)
-        )
+        support_mask = primattack_joint_feature_mask(manifest)
+        self.controlled_idx = torch.nonzero(support_mask, as_tuple=False).flatten().tolist()
         # Preserved exactly = everything the transform does not write: genuinely frozen (F),
         # proven-invariant (I), and Level-C held-constant (Fᶜ).
-        self.frozen_idx = [j for j in range(manifest.n_features) if j not in set(self.controlled_idx)]
+        self.frozen_idx = [j for j in range(manifest.n_features) if not bool(support_mask[j])]
 
     # -- interface -------------------------------------------------------------
     @property
@@ -124,34 +221,8 @@ class CICIDS2017PrimitiveModel:
         return self._names
 
     def primitives(self) -> tuple[PrimitiveSpec, ...]:
-        padding_dependencies = (
-            "Total Length of Fwd Packet",
-            "Fwd Packet Length Min",
-            "Fwd Packet Length Max",
-            "Fwd Packet Length Mean",
-            "Fwd Segment Size Avg",
-            "Packet Length Min",
-            "Packet Length Max",
-            "Packet Length Mean",
-            "Average Packet Size",
-            "Packet Length Variance",
-            "Packet Length Std",
-            "Flow Bytes/s",
-        )
-        timing_dependencies = (
-            "Fwd IAT Total",
-            "Fwd IAT Mean",
-            "Fwd IAT Std",
-            "Fwd IAT Max",
-            "Fwd IAT Min",
-            "Flow Duration",
-            "Flow IAT Mean",
-            "Flow IAT Max",
-            "Flow Bytes/s",
-            "Flow Packets/s",
-            "Fwd Packets/s",
-            "Bwd Packets/s",
-        )
+        padding_dependencies = tuple(_PADDING_RECOMPUTATION)
+        timing_dependencies = tuple(_TIMING_RECOMPUTATION)
         return (
             PrimitiveSpec(
                 name="p",

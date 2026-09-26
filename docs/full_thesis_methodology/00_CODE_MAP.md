@@ -31,7 +31,9 @@ retired snapshot.
 | `outputs/full_adv_eval_primattack_v2/` | Completed CICIDS2017 paired PrimAttack-v2 campaign: 3 victims × 4 classes × p50/p75/envelope-only × 3 modes × search/random × 3 attack seeds | LIVE artifacts |
 | `outputs/full_adv_eval/` | Paired evaluation with the replaced Adam/sigmoid `(p, α)` optimizer (`prim_opt_*`); frozen selection source and "before" condition | LIVE (historical) |
 | `scripts/budget_sweep_primitive.py` | Drives the 3-budget × 3-mode sweep | LIVE |
-| `scripts/run_primattack_optimizer_ablation.py` | Controlled optimizer ablation (Hybrid / Prim-PGD / Prim-C&W) on the frozen `adv_campaign_noidr` selection at a matched per-flow evaluation budget; `--split val` for tuning → `outputs/primattack_optimizer_ablation/<dataset>/` | LIVE |
+| `scripts/run_primattack_optimizer_ablation.py` | Controlled PrimAttack runs (Hybrid / Prim-PGD / Prim-C&W) on a frozen `selection.json` at a matched per-flow evaluation budget; `--objective targeted` or `untargeted`; per-row npz incl. final adversarial flow; `--split val` for tuning → `outputs/primattack_optimizer_ablation/<dataset>/` by default | LIVE |
+| `scripts/run_final_suite.py` | FINAL thesis suite driver (`master_experiments.md`, protocol `FINAL_OUTPUTS/00_PROTOCOL.md`): baselines (PGD, C&W, CAPGD/C-PGD-PrimSupport), PrimAttack optimizer selection, budgets, untargeted; seeds 42/2024/2026, both datasets → `FINAL_OUTPUTS/runs/` | LIVE |
+| `scripts/analyze_final_suite.py` | FINAL suite audit (pairing, validator/prediction recheck) + tables, Cochran's Q / McNemar / Holm, plots, reports for Exp A–F → `FINAL_OUTPUTS/` | LIVE |
 | `scripts/tune_primattack_ablation_baselines.py` | Validation-split grid for Prim-PGD step / Prim-C&W `c`, lr → `outputs/primattack_optimizer_ablation/val_tuning/` | LIVE |
 | `scripts/analyze_primattack_optimizer_ablation.py` | Ablation tables, paired McNemar/Newcombe/Holm, Cochran's Q, overlap, ASR-vs-evaluations, plots → `<root>/analysis/` | LIVE |
 | `artifacts/primattack/budget_calibration.json` | Frozen train-fit calibration | LIVE |
