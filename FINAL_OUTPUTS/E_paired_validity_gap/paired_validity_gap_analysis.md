@@ -106,6 +106,14 @@ rejects depends almost entirely on the attack's threat model:
 - Capability-aware PrimAttack (Exp A untargeted and all three Exp B optimizers, targeted): gap
   0.00 pp in all 24 cells; every raw success is valid (McNemar p = 1, no discordant flow).
 
+**Optimizer duplication is deliberate, not independent replication.** In Exp B, Hybrid and
+Prim-PGD have identical targeted success masks: 1,752 valid successes each and no discordant
+flow. Nearly all rows are timing-only, so Hybrid skips exact padding enumeration and both reduce
+to closely related sign-momentum timing searches. Their two zero-gap rows are retained because
+the optimizer comparison was pre-registered; they must not be treated as two independent pieces
+of evidence for validator performance. Prim-C&W follows the same validity gate but finds fewer
+CICIDS2017 CNN successes because its cost-penalized trajectory differs.
+
 **Why raw successes are rejected.** PGD and C&W examples fail every validator category (SCHEMA,
 EXTRACTOR and PROTOCOL for 100% of them; MINED for ≥ 98.5%). The matched-support attacks never
 fail SCHEMA (their type repair works) but mostly break CICFlowMeter identities (EXTRACTOR:

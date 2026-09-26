@@ -277,6 +277,16 @@ Hybrid is identical except where noted) grows monotonically with the budget:
 - CICIDS2018 MLP 0.69% → 0.78% → 24.76% (Hybrid 24.80%); CNN 0.00% → 0.00% → 26.09%;
   FT-Transformer 0.00% → 0.00% → 0.12%.
 
+**Why the two optimizer curves overlap.** Hybrid's unique exact integer-padding enumeration is
+inactive on almost every attacked flow, because `p` is pinned to zero. The remaining problem is
+the same low-dimensional timing search used by Prim-PGD, and both use projected sign-momentum
+updates with momentum 0.75, clean/random starts, the same realized-flow incumbent and the same
+evaluation cap. Consequently they have identical p50 and p75 success sets and nearly identical
+unbounded results. The only visible differences are CICIDS2017 FT-Transformer unbounded
+(Prim-PGD 0.59%, Hybrid 0.55%) and CICIDS2018 MLP unbounded (24.76% vs 24.80%). These tiny
+differences come from their fixed versus adaptive step/restart schedules, not from different
+threat models.
+
 **Inference (seed 42, Holm over the two adjacent comparisons, per optimizer).** Cochran's Q is
 significant on every victim for both optimizers. p75 beats p50 only on the CICIDS2017 MLP and CNN
 (57 and 130 flows gained, none lost; Holm p = 1.2e-13 and 1.1e-29); elsewhere the p50→p75 step

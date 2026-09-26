@@ -9,6 +9,14 @@ successes are DDoS flows pushed into DoS, i.e. into another attack class, not in
 targeted successes on the MLP (4 DDoS, 21 Recon) reach Benign under both objectives.
 FT-Transformer has no valid success under either objective on CICIDS2018.
 
+**Optimizer scope.** Prim-PGD was selected only after it tied Hybrid exactly on Exp B's targeted
+success outcome and won the evaluation-count tie-break. That tie is expected because almost all
+rows are timing-only: Hybrid's exact-padding phase is skipped and both optimizers use closely
+related sign-momentum timing updates. Exp D's targeted arm would therefore have the same
+flow-level outcome under Hybrid in the observed Exp B artifacts. The untargeted arm was rerun
+only with the selected Prim-PGD, so the targeted/untargeted conclusion is formally a Prim-PGD
+result rather than an optimizer-general claim.
+
 **Direction of the effect.** No flow is valid-targeted-only on any victim (targeted-only = 0
 everywhere), consistent with Benign being one of the classes an untargeted success may reach.
 

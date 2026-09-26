@@ -175,6 +175,12 @@ sets: on every victim their Valid Targeted ASR is equal (4.09% / 13.25% / 0.12% 
 0.78% / 0.00% / 0.00% on CICIDS2018), and on the CICIDS2017 CNN, where the planned McNemar tests
 run, Hybrid vs Prim-PGD has 0 discordant flows (Holm p = 1).
 
+The tie is in the binary success outcome, not in the optimization path. Hybrid and Prim-PGD can
+return different delay/shape values and different costs on the same successful flow. For example,
+their median normalized valid-success costs are 0.635 vs 0.617 on the CICIDS2017 MLP and
+0.596 vs 0.646 on the CNN. The result therefore supports equivalence of the observed success
+sets under this protocol, not algorithmic identity.
+
 **Prim-C&W.** Its cost-penalized objective (normalized primitive cost + c · margin) finds fewer
 successes where the needed delay is large: on the CICIDS2017 CNN it reaches 4.00% vs 13.25% for
 the other two (296 vs 0 discordant flows; Holm p = 2e-65 for both comparisons). Elsewhere it ties

@@ -24,6 +24,15 @@ padding was already rejected by `MINED_0001`, the same reallocation raises Valid
 0.03% / 0.00% to 2.53% / 1.16% / 0.00%. Like-for-like targeted runs with the same optimizer show
 the same recovery, so it is not merely the Hybrid→Prim-PGD selection change.
 
+**Why optimizer sophistication matters little here.** Hybrid and Prim-PGD tie exactly on Exp B:
+1,752 valid targeted successes each, with identical success masks. Capability-aware padding
+removes Hybrid's exact integer-padding phase from almost every row; both then optimize only
+`(delay, shape)` through projected sign-momentum steps, momentum 0.75, clean/random starts and
+the same realized-flow incumbent. Their delay/shape values and primitive costs can differ, so
+this is an observed outcome equivalence under the current timing-dominated protocol—not an
+algorithmic equivalence. Prim-PGD becomes canonical only through the pre-registered evaluation
+tie-break (188.5 vs 189.6 mean victim evaluations).
+
 **Constrained feature-space reachability vs primitive-domain reachability.** CAPGD-PrimSupport and
 PrimAttack are paired on the same flows, victims, seeds, validator, metrics and *potential*
 23-feature downstream support. They do not share a feasible set. CAPGD directly moves allowed

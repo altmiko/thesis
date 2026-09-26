@@ -26,6 +26,12 @@ invalid PGD/C&W examples (which fail every category). After the capability fix n
 PrimAttack output is rejected by any rule (the small number of invalid best-margin failures are
 not successes), so `MINED_0001`'s false-rejection rate no longer drives a PrimAttack validity gap.
 
+**Optimizer scope.** Experiment F evaluates validator acceptance, not attack optimization.
+Hybrid and Prim-PGD's matching attack outcomes therefore do not provide two validator estimates:
+they use the same rules and, on almost entirely timing-only rows, reach the same targeted success
+set through closely related sign-momentum searches. Their equality belongs to Exp B's attack-space
+analysis; genuine-flow acceptance here is independent of either optimizer.
+
 **Reading (Contribution 4).** The validator combines general flow-consistency constraints
 (133 SCHEMA, 7 EXTRACTOR and 78–80 PROTOCOL rules, one of them source-conditioned) with
 automatically mined, train-only dataset-specific invariants (16 rules on CICIDS2017, 10 on

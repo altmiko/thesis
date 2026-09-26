@@ -30,6 +30,17 @@ reaches a Valid ASR of 4.09% / 13.47% / 0.12% on CICIDS2017 and 2.53% / 1.16% / 
 CICIDS2018, with a Validity Gap of 0.00 pp everywhere. Its successes come from DoS and DDoS (and
 21 CICIDS2018 Recon flows on MLP); BruteForce and Recon barely move.
 
+**Why Prim-PGD and Hybrid are similar.** Exp B shows an exact tie: each finds 1,752 valid
+targeted successes in 57,600 attempts, with identical per-victim success sets. The capability
+rule removes Hybrid's distinctive exact-padding phase from almost every row; on timing-only rows
+both methods reduce to projected sign-momentum updates over `(delay, shape)`, with momentum 0.75,
+a clean start, random restarts, the same realized-flow scoring and the same validator-aware
+incumbent. Their trajectories and final primitive costs need not be identical, but this
+low-dimensional timing boundary is crossed by the same flows. Prim-PGD is used here because the
+pre-registered tie-break favors its lower mean evaluation count (188.5 vs 189.6). Only Prim-PGD
+was rerun for the untargeted Exp A arm, so the exact targeted tie should not be misreported as a
+direct untargeted Hybrid comparison.
+
 **4. Inference.** Cochran's Q is significant on five victims (not on CICIDS2018 FT-Transformer,
 where none of the five attacks has a valid success). PrimAttack has a higher Valid ASR than PGD, C&W and C-PGD on
 CICIDS2017 MLP / CNN and CICIDS2018 MLP / CNN (Holm p ≤ 1.3e-8) and than CAPGD-PrimSupport on the

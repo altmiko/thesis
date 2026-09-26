@@ -7,8 +7,11 @@
    (CICIDS2017 MLP / CNN / FT-Transformer) and 2.53% / 1.16% / 0.00% (CICIDS2018). It exceeds
    CAPGD-PrimSupport significantly on the MLP/CNN of both datasets, is statistically
    indistinguishable on CICIDS2017 FT and ties at zero on CICIDS2018 FT. Hybrid and Prim-PGD tie
-   exactly on the selection outcome (1,752 / 57,600 valid targeted successes); fewer mean victim
-   evaluations selects Prim-PGD.
+   exactly on the selection outcome (1,752 / 57,600 valid targeted successes) because the
+   capability rule leaves almost every row timing-only: Hybrid's exact-padding stage is skipped,
+   and both reduce to closely related sign-momentum searches over delay/shape. Their trajectories
+   and costs can differ, but their observed success masks do not. Fewer mean victim evaluations
+   selects Prim-PGD (188.5 vs 189.6).
 2. **Evaluation methodology (Contribution 2).** Threat-model restrictions reverse the raw-success
    ranking. PGD/C&W reach 53.59–100% Raw ASR but 0% Valid ASR. CAPGD/C-PGD restricted to
    PrimAttack's 23-feature support retain high raw success but little or no valid success.
