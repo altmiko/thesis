@@ -1,10 +1,10 @@
 group,dataset,victim,condition,raw_success_but_invalid,share_failing_schema,share_failing_extractor,share_failing_protocol,share_failing_mined
-A (untargeted),cicids2017_distrinet,mlp,"PrimAttack (Hybrid Search, p75)",0,,,,
-A (untargeted),cicids2017_distrinet,cnn,"PrimAttack (Hybrid Search, p75)",0,,,,
-A (untargeted),cicids2017_distrinet,ft_transformer,"PrimAttack (Hybrid Search, p75)",0,,,,
-A (untargeted),cicids2018_distrinet,mlp-s42,"PrimAttack (Hybrid Search, p75)",379,0.0,0.0,0.0,1.0
-A (untargeted),cicids2018_distrinet,cnn-s42,"PrimAttack (Hybrid Search, p75)",489,0.0,0.0,0.0,1.0
-A (untargeted),cicids2018_distrinet,ft_transformer-s42,"PrimAttack (Hybrid Search, p75)",11,0.0,0.0,0.0,1.0
+A (untargeted),cicids2017_distrinet,mlp,"PrimAttack (Prim-PGD, p75)",0,,,,
+A (untargeted),cicids2017_distrinet,cnn,"PrimAttack (Prim-PGD, p75)",0,,,,
+A (untargeted),cicids2017_distrinet,ft_transformer,"PrimAttack (Prim-PGD, p75)",0,,,,
+A (untargeted),cicids2018_distrinet,mlp-s42,"PrimAttack (Prim-PGD, p75)",0,,,,
+A (untargeted),cicids2018_distrinet,cnn-s42,"PrimAttack (Prim-PGD, p75)",0,,,,
+A (untargeted),cicids2018_distrinet,ft_transformer-s42,"PrimAttack (Prim-PGD, p75)",0,,,,
 A (untargeted),cicids2017_distrinet,mlp,PGD,3200,1.0,1.0,1.0,0.9996875
 A (untargeted),cicids2017_distrinet,cnn,PGD,3079,1.0,1.0,1.0,0.9990256576810653
 A (untargeted),cicids2017_distrinet,ft_transformer,PGD,3115,1.0,1.0,1.0,0.9967897271268058
@@ -17,33 +17,33 @@ A (untargeted),cicids2017_distrinet,ft_transformer,C&W,2469,1.0,1.0,1.0,1.0
 A (untargeted),cicids2018_distrinet,mlp-s42,C&W,2804,1.0,1.0,1.0,1.0
 A (untargeted),cicids2018_distrinet,cnn-s42,C&W,3173,1.0,1.0,1.0,1.0
 A (untargeted),cicids2018_distrinet,ft_transformer-s42,C&W,1715,1.0,1.0,1.0,1.0
-A (untargeted),cicids2017_distrinet,mlp,CAPGD-PrimSupport,2957,0.0,0.6743320933378424,0.0,0.928982076428813
-A (untargeted),cicids2017_distrinet,cnn,CAPGD-PrimSupport,2953,0.0,0.8469353200135455,0.0,0.8628513376227566
-A (untargeted),cicids2017_distrinet,ft_transformer,CAPGD-PrimSupport,1653,0.0,0.8318209316394435,0.0,0.9618874773139746
-A (untargeted),cicids2018_distrinet,mlp-s42,CAPGD-PrimSupport,2957,0.0,0.8271897193101116,0.0,0.9252620899560365
-A (untargeted),cicids2018_distrinet,cnn-s42,CAPGD-PrimSupport,2448,0.0,0.9583333333333334,0.0,0.923202614379085
-A (untargeted),cicids2018_distrinet,ft_transformer-s42,CAPGD-PrimSupport,335,0.0,1.0,0.0,0.991044776119403
-A (untargeted),cicids2017_distrinet,mlp,C-PGD-PrimSupport,1645,0.0,1.0,0.0,0.8948328267477204
-A (untargeted),cicids2017_distrinet,cnn,C-PGD-PrimSupport,2032,0.0,1.0,0.0,0.843503937007874
-A (untargeted),cicids2017_distrinet,ft_transformer,C-PGD-PrimSupport,686,0.0,1.0,0.0,0.9518950437317785
-A (untargeted),cicids2018_distrinet,mlp-s42,C-PGD-PrimSupport,885,0.0,1.0,0.0,0.9570621468926553
-A (untargeted),cicids2018_distrinet,cnn-s42,C-PGD-PrimSupport,1531,0.0,1.0,0.0,0.9523187459177008
-A (untargeted),cicids2018_distrinet,ft_transformer-s42,C-PGD-PrimSupport,39,0.0,1.0,0.0,1.0
+A (untargeted),cicids2017_distrinet,mlp,CAPGD-PrimSupport,2962,0.0,0.6731937879810939,0.16340310600945307,0.9274139095205942
+A (untargeted),cicids2017_distrinet,cnn,CAPGD-PrimSupport,2955,0.0,0.8463620981387479,0.11404399323181048,0.8622673434856176
+A (untargeted),cicids2017_distrinet,ft_transformer,CAPGD-PrimSupport,1653,0.0,0.8318209316394435,0.16636418632788869,0.9618874773139746
+A (untargeted),cicids2018_distrinet,mlp-s42,CAPGD-PrimSupport,2957,0.0,0.8271897193101116,0.15522489009130877,0.9252620899560365
+A (untargeted),cicids2018_distrinet,cnn-s42,CAPGD-PrimSupport,2448,0.0,0.9583333333333334,0.2222222222222222,0.923202614379085
+A (untargeted),cicids2018_distrinet,ft_transformer-s42,CAPGD-PrimSupport,335,0.0,1.0,0.6179104477611941,0.991044776119403
+A (untargeted),cicids2017_distrinet,mlp,C-PGD-PrimSupport,1645,0.0,1.0,0.5331306990881459,0.8948328267477204
+A (untargeted),cicids2017_distrinet,cnn,C-PGD-PrimSupport,2032,0.0,1.0,0.5492125984251969,0.843503937007874
+A (untargeted),cicids2017_distrinet,ft_transformer,C-PGD-PrimSupport,686,0.0,1.0,0.5160349854227405,0.9518950437317785
+A (untargeted),cicids2018_distrinet,mlp-s42,C-PGD-PrimSupport,885,0.0,1.0,0.47909604519774013,0.9570621468926553
+A (untargeted),cicids2018_distrinet,cnn-s42,C-PGD-PrimSupport,1531,0.0,1.0,0.5728282168517309,0.9523187459177008
+A (untargeted),cicids2018_distrinet,ft_transformer-s42,C-PGD-PrimSupport,39,0.0,1.0,0.8205128205128205,1.0
 B (targeted→Benign),cicids2017_distrinet,mlp,"Hybrid Search (targeted, p75)",0,,,,
 B (targeted→Benign),cicids2017_distrinet,cnn,"Hybrid Search (targeted, p75)",0,,,,
 B (targeted→Benign),cicids2017_distrinet,ft_transformer,"Hybrid Search (targeted, p75)",0,,,,
-B (targeted→Benign),cicids2018_distrinet,mlp-s42,"Hybrid Search (targeted, p75)",32,0.0,0.0,0.0,1.0
-B (targeted→Benign),cicids2018_distrinet,cnn-s42,"Hybrid Search (targeted, p75)",480,0.0,0.0,0.0,1.0
-B (targeted→Benign),cicids2018_distrinet,ft_transformer-s42,"Hybrid Search (targeted, p75)",11,0.0,0.0,0.0,1.0
+B (targeted→Benign),cicids2018_distrinet,mlp-s42,"Hybrid Search (targeted, p75)",0,,,,
+B (targeted→Benign),cicids2018_distrinet,cnn-s42,"Hybrid Search (targeted, p75)",0,,,,
+B (targeted→Benign),cicids2018_distrinet,ft_transformer-s42,"Hybrid Search (targeted, p75)",0,,,,
 B (targeted→Benign),cicids2017_distrinet,mlp,"Prim-PGD (targeted, p75)",0,,,,
 B (targeted→Benign),cicids2017_distrinet,cnn,"Prim-PGD (targeted, p75)",0,,,,
 B (targeted→Benign),cicids2017_distrinet,ft_transformer,"Prim-PGD (targeted, p75)",0,,,,
-B (targeted→Benign),cicids2018_distrinet,mlp-s42,"Prim-PGD (targeted, p75)",33,0.0,0.0,0.0,1.0
-B (targeted→Benign),cicids2018_distrinet,cnn-s42,"Prim-PGD (targeted, p75)",480,0.0,0.0,0.0,1.0
-B (targeted→Benign),cicids2018_distrinet,ft_transformer-s42,"Prim-PGD (targeted, p75)",10,0.0,0.0,0.0,1.0
+B (targeted→Benign),cicids2018_distrinet,mlp-s42,"Prim-PGD (targeted, p75)",0,,,,
+B (targeted→Benign),cicids2018_distrinet,cnn-s42,"Prim-PGD (targeted, p75)",0,,,,
+B (targeted→Benign),cicids2018_distrinet,ft_transformer-s42,"Prim-PGD (targeted, p75)",0,,,,
 B (targeted→Benign),cicids2017_distrinet,mlp,"Prim-C&W (targeted, p75)",0,,,,
 B (targeted→Benign),cicids2017_distrinet,cnn,"Prim-C&W (targeted, p75)",0,,,,
 B (targeted→Benign),cicids2017_distrinet,ft_transformer,"Prim-C&W (targeted, p75)",0,,,,
-B (targeted→Benign),cicids2018_distrinet,mlp-s42,"Prim-C&W (targeted, p75)",18,0.0,0.0,0.0,1.0
-B (targeted→Benign),cicids2018_distrinet,cnn-s42,"Prim-C&W (targeted, p75)",442,0.0,0.0,0.0,1.0
-B (targeted→Benign),cicids2018_distrinet,ft_transformer-s42,"Prim-C&W (targeted, p75)",6,0.0,0.0,0.0,1.0
+B (targeted→Benign),cicids2018_distrinet,mlp-s42,"Prim-C&W (targeted, p75)",0,,,,
+B (targeted→Benign),cicids2018_distrinet,cnn-s42,"Prim-C&W (targeted, p75)",0,,,,
+B (targeted→Benign),cicids2018_distrinet,ft_transformer-s42,"Prim-C&W (targeted, p75)",0,,,,

@@ -191,6 +191,12 @@
       "goal": "untargeted"
     },
     {
+      "name": "capgd_native",
+      "family": "capgd",
+      "kind": "capgd",
+      "goal": "untargeted"
+    },
+    {
       "name": "capgd_prim_support",
       "family": "capgd",
       "kind": "capgd_prim_support",

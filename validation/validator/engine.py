@@ -146,11 +146,17 @@ class Validator:
             raise ValueError(f"expected {len(self.feature_order)} features, got {X.shape[1]}")
         return X
 
-    def validate_batch(self, X) -> BatchResult:
+    def validate_batch(self, X, source=None) -> BatchResult:
+        """Validate raw flows. ``source`` = the unperturbed source flow of each row (required
+        for perturbed flows: transition rules compare the two); ``None`` means the rows ARE
+        unperturbed flows, so transition rules are ineligible."""
         X = self._as_matrix(X)
+        S = None if source is None else self._as_matrix(source)
+        if S is not None and S.shape != X.shape:
+            raise ValueError(f"source shape {S.shape} != flow shape {X.shape}")
         satisfied, eligible = {}, {}
         for r in self.rules:
-            s, e = r.evaluate(X, self.idx)
+            s, e = r.evaluate(X, self.idx, S)
             satisfied[r.id] = s
             eligible[r.id] = e
         plaus = self.plausibility.evaluate(X) if self.plausibility else None
@@ -158,8 +164,8 @@ class Validator:
                            n=X.shape[0], include_mined_in_structural=self.include_mined_in_structural,
                            plausibility=plaus)
 
-    def validate(self, x):
-        b = self.validate_batch(x)
+    def validate(self, x, source=None):
+        b = self.validate_batch(x, source)
         return b.result(0, self._as_matrix(x), self.idx)
 
     # ---- introspection ----------------------------------------------------

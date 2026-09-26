@@ -105,15 +105,18 @@ class IdentityCheck:
 # Semantic primitive capabilities -- section: "infer semantic capabilities before bounds".
 # A primitive can be *numerically* feasible (inside the train envelope) yet *semantically*
 # unsupported by the source flow: e.g. forward-length augmentation on a flow whose forward
-# direction carries no payload (Total Length of Fwd Packet == 0). Capability inference is a
-# conservative, per-flow gate applied to the bounds BEFORE the optimizer ever sees them, so
-# admissibility means "numerically feasible AND the operation is semantically supported by
-# the source flow", not merely "inside the envelope".
+# direction carries no payload (Total Length of Fwd Packet == 0), or on a flow that contains a
+# zero-length forward packet (Fwd Packet Length Min == 0; padding adds p bytes to EVERY forward
+# packet, so it would put bytes into an empty packet). Capability inference is a conservative,
+# per-flow gate applied to the bounds BEFORE the optimizer ever sees them, so admissibility
+# means "numerically feasible AND the operation is semantically supported by the source flow",
+# not merely "inside the envelope".
 # --------------------------------------------------------------------------------------
 # Padding (p) capability reason codes.
 PAD_ALLOWED = "PAD_ALLOWED"
 NO_FORWARD_PAYLOAD = "NO_FORWARD_PAYLOAD"          # no forward bytes/mean to augment
 INSUFFICIENT_FWD_PACKETS = "INSUFFICIENT_FWD_PACKETS"  # too few forward packets for evidence
+EMPTY_FWD_PACKET = "EMPTY_FWD_PACKET"              # >= 1 zero-length fwd packet (fwd min == 0)
 # Timing (delay, shape) capability reason codes.
 TIMING_ALLOWED = "TIMING_ALLOWED"
 SINGLE_FWD_PACKET = "SINGLE_FWD_PACKET"            # < 2 forward packets: no fwd IAT sequence
@@ -171,7 +174,8 @@ class DatasetPrimitiveModel(Protocol):
 
         Conservative gate applied to the bounds BEFORE optimization: a primitive is admissible
         only if the source flow provides evidence the operation is realizable (e.g. forward
-        payload present for padding, a forward IAT sequence for timing dilation).
+        payload present and no zero-length forward packet for padding, a forward IAT sequence
+        for timing dilation).
         """
         ...
 
@@ -183,7 +187,8 @@ class DatasetPrimitiveModel(Protocol):
 
         E.g. forward timing dilation is undefined for single-packet flows (``Total Fwd
         Packet < 2``); forward-length augmentation is unsupported when the source carries no
-        forward payload. ``capabilities`` (from :meth:`infer_capabilities`) may be passed to
+        forward payload or contains a zero-length forward packet. ``capabilities`` (from
+        :meth:`infer_capabilities`) may be passed to
         avoid recomputation; when omitted it is inferred from ``raw``.
         """
         ...

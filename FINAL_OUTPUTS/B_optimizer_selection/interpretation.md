@@ -1,40 +1,30 @@
-**Selection (locked criterion).** Hybrid Search has the highest aggregate Valid Targeted ASR
-at p75 over both datasets, all victims, classes and seeds: 4,602 / 57,600 = 7.990%. Prim-PGD
-follows with 4,595 = 7.977% and Prim-C&W with 2,541 = 4.411%. Hybrid Search is therefore the
-PrimAttack optimizer for Exp A and D, and Hybrid and Prim-PGD are the Exp C optimizers. The
-margin between Hybrid and Prim-PGD is 7 flow-instances (0.012 pp) across 57,600 attacked
-instances. The selection follows the pre-registered rule. It is not evidence that Hybrid is
-the more effective search.
+**Selection.** Under the pre-registered rule, Hybrid Search and Prim-PGD tie exactly: 1,752 valid
+targeted successes each out of 57,600 attempts (3.042%). The tie-break (fewer mean victim
+evaluations per flow) selects **Prim-PGD** (188.5 vs 189.6). Prim-C&W is third with 861 (1.495%).
+Budget sensitivity (Exp C) therefore uses Prim-PGD and Hybrid Search. Before amendment A2 the
+same rule had selected Hybrid (7.990% vs 7.977%); the capability fix, not the rule, changed the
+outcome.
 
-**Supporting paired evidence (seed 42, per dataset × victim).** Cochran's Q is significant for
-CICIDS2017 CNN (Q = 1380.2) and CICIDS2018 MLP (Q = 24.4). It is not significant for the other
-four victims. On CICIDS2017 FT and CICIDS2018 CNN/FT all three optimizers solve identical flow
-sets (Q = 0). On CICIDS2017 MLP they differ by 2 flows (Q = 4.0, p = 0.135).
-- CICIDS2017 CNN: Hybrid vs Prim-PGD is not significant (8 vs 4 discordant flows, +0.13 pp,
-  Holm p = 0.39). Both beat Prim-C&W by about 22 pp (Hybrid +21.84 pp, 699 vs 0; Prim-PGD
-  +21.72 pp, 696 vs 1; Holm p < 1e-150).
-- CICIDS2018 MLP: Prim-C&W is higher than Hybrid (+0.41 pp, 13 vs 0, Holm p = 0.0005) and
-  than Prim-PGD (+0.44 pp, 14 vs 0, Holm p = 0.0004). The effect is statistically clear but
-  practically small (under 0.5 pp of 3,200 flows).
+**Why Hybrid and Prim-PGD coincide.** With the capability-aware padding rule, only 1 (CICIDS2017)
+or 12 (CICIDS2018) of 3,200 attacked flows per victim may be padded, so Hybrid's distinguishing
+component, the exhaustive integer padding enumeration, has almost nothing to enumerate. What
+remains for both is projected sign-momentum descent on the timing controls (delay, shape) from
+the clean flow plus restarts, with the same 256-evaluation cap. The two reach identical success
+sets: on every victim their Valid Targeted ASR is equal (4.09% / 13.25% / 0.12% on CICIDS2017,
+0.78% / 0.00% / 0.00% on CICIDS2018), and on the CICIDS2017 CNN, where the planned McNemar tests
+run, Hybrid vs Prim-PGD has 0 discordant flows (Holm p = 1).
 
-**Why.** Hybrid and Prim-PGD share the same projected sign-momentum update and differ mainly in
-Hybrid's exact padding enumeration and step adaptation. They find essentially the same flows.
-Prim-C&W restarts every binary-search stage from the clean flow and minimizes primitive cost
-jointly with the margin. It is markedly weaker on CICIDS2017 CNN (−21.8 pp). On CICIDS2018 MLP
-every valid success of every optimizer is timing-only (p = 0) and mostly Recon, while every
-invalid raw success uses padding and fails a MINED rule (`MINED_0001` in every Hybrid case
-checked). Prim-C&W's cost term penalizes padding. At seed 42 it finds 23 timing-only valid
-successes, against 10 for Hybrid and 9 for Prim-PGD. Validity gaps are similar across
-optimizers: there is none on CICIDS2017, and on CICIDS2018 gaps reach 15.01 pp on CNN. Every
-invalid example there fails only the MINED category (Exp E).
+**Prim-C&W.** Its cost-penalized objective (normalized primitive cost + c · margin) finds fewer
+successes where the needed delay is large: on the CICIDS2017 CNN it reaches 4.00% vs 13.25% for
+the other two (296 vs 0 discordant flows; Holm p = 2e-65 for both comparisons). Elsewhere it ties
+within 0.03 pp (CICIDS2018 MLP 0.75% vs 0.78%; Cochran's Q p = 0.368). Cochran's Q is not
+significant, or not computable because all three are identical, on the other five victims.
 
-**Cost.** Under the matched cap of 256 victim evaluations per flow, Hybrid uses the fewest
-evaluations (188.2–188.4 on CICIDS2017, 192.8–192.9 on CICIDS2018, vs 190.6 / 197.4 for Prim-PGD
-and Prim-C&W). It is also the fastest on the FT-Transformer (12.2–12.8 vs 13.7–14.0 ms/flow);
-on MLP/CNN all three take about 3 ms/flow. Seed variability is negligible (SD ≤ 0.13 pp in Valid
-Targeted ASR). Prim-C&W is deterministic (SD 0).
+**Validity.** Every targeted raw success of every optimizer is valid (Validity Gap 0.00 pp in all
+18 cells): the realized-flow search keeps only validator-accepted incumbents, and the timing-only
+flows cannot trigger the empty-packet rule. The optimizers spend a similar per-flow budget
+(187–191 victim evaluations) because flows without primitive headroom stop at the identity.
 
-**Thesis reading (Contribution 1).** Given this primitive parameterization, the valid-success
-ceiling is set mainly by the attack space (budget, capabilities, validator) and by the victim,
-not by the optimizer. Two of the three gradient searches reach the same flows. The selected
-Hybrid Search is at least as effective as the strongest alternative, at the lowest query cost.
+**Reading.** After the fix, the optimizer choice matters little: timing is a low-dimensional
+search that simple projected descent already saturates within the budget. The victim and the
+timing budget determine success (Exp C), not the optimizer.

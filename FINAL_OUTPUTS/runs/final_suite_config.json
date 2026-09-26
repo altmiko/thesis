@@ -17,7 +17,7 @@
       "victims": "mlp-s42,cnn-s42,ft_transformer-s42"
     }
   },
-  "baseline_attacks": "pgd_untargeted,cw_untargeted,capgd_prim_support,cpgd_prim_support",
+  "baseline_attacks": "pgd_untargeted,cw_untargeted,capgd_prim_support,cpgd_prim_support,capgd_native",
   "baseline_args": [
     "--pgd-epsilon",
     "0.5",
@@ -78,6 +78,7 @@
     "--cw-kappa",
     "0.0"
   ],
-  "primattack_mode": "joint",
+  "primattack_mode": "joint (Exp A-E); timing-only / padding-only ablation stage",
+  "padding_capability": "Nf >= 1 AND Total Length of Fwd Packet > 0 AND Fwd Packet Length Mean > 0 AND Fwd Packet Length Min > 0",
   "python": "3.11.15"
 }

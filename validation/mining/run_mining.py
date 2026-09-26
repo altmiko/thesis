@@ -356,14 +356,47 @@ def _build_protocol_rules(dataset, names, category_of, Xtr, Xva, idx) -> dict:
                         "automatically_mined": False}
         r.evidence = {"train_support_full": ts, "validation_support_full": vs}
         rules.append(r.to_dict())
+    rules += transition_protocol_rules(names, Xtr, Xva, idx, first_id=len(names) + 1)
     doc = {"dataset": dataset,
            "note": "Minimal, domain-justified PROTOCOL layer: a single principled "
-                   "template (non-negativity) instantiated per feature. Not hand-invented "
-                   "per feature; verified to hold on train and validation.",
+                   "template (non-negativity) instantiated per feature, verified to hold on "
+                   "train and validation, plus source-conditioned transition rules (an empty "
+                   "forward packet stays empty) that constrain perturbed flows only.",
            "rules": rules}
     if excluded:
         doc["excluded"] = excluded
     return doc
+
+
+def transition_protocol_rules(names, Xtr, Xva, idx, *, first_id: int) -> list[dict]:
+    """Source-conditioned PROTOCOL rules for perturbed flows (validator ``TRANSITION_TYPES``).
+
+    ``Fwd Packet Length Min == 0`` in a source flow means >= 1 forward packet carries no
+    payload (e.g. a pure ACK). A perturbation may not give that packet bytes: an adversarial
+    flow derived from such a source must keep ``Fwd Packet Length Min == 0``. The aggregate
+    flow does not reveal which packet is empty, so any positive minimum is a filled packet.
+    Unperturbed flows are their own source and can never violate the rule; the evidence
+    records how often the antecedent holds on train / validation.
+    """
+    f = "Fwd Packet Length Min"
+    col = idx[f]
+    r = Rule(id=f"PROTO_{first_id:04d}", name=f"zero_preserved::{f}", source_type="PROTOCOL",
+             rule_type="zero_preserved", params={"feature": f}, features=[f],
+             hardness="PROTOCOL", tolerance=Tolerance(1e-6, 0.0),
+             description=(
+                 "An empty forward packet stays empty: if the SOURCE flow has Fwd Packet "
+                 "Length Min == 0 (at least one zero-length forward packet, e.g. a pure ACK), "
+                 "the perturbed flow must keep Fwd Packet Length Min == 0. Length augmentation "
+                 "of existing packets cannot put bytes into an empty packet; which packet is "
+                 "empty is not identifiable from aggregate flow features."))
+    r.provenance = {"origin": "networking / packet-semantics domain knowledge",
+                    "external_reference": "zero-length TCP control packets carry no payload",
+                    "automatically_mined": False,
+                    "applies_to": "(perturbed flow, unperturbed source flow) pairs only"}
+    r.evidence = {"train_antecedent_rate": float(np.mean(Xtr[:, col] == 0.0)),
+                  "validation_antecedent_rate": float(np.mean(Xva[:, col] == 0.0)),
+                  "unperturbed_flow_violations": 0}
+    return [r.to_dict()]
 
 
 def _write_mining_report(dataset, names, profile, families, fam_counts, n_candidates,

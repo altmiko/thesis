@@ -11,7 +11,8 @@ Locked design (see ``FINAL_OUTPUTS/00_PROTOCOL.md``):
 
 Stages (each resumable; a finished cell is never recomputed):
 
-1. ``baselines_untargeted``  (Exp A): PGD, C&W, CAPGD-PrimSupport, C-PGD-PrimSupport.
+1. ``baselines_untargeted``  (Exp A): PGD, C&W, CAPGD-PrimSupport, C-PGD-PrimSupport, plus the
+   descriptive native CAPGD row (amendment A3).
 2. ``primattack_targeted_optimizers`` (Exp B): Hybrid / Prim-PGD / Prim-C&W, targeted->Benign,
    p75 budget.
 3. optimizer selection (pre-registered rule, both datasets pooled) -> ``optimizer_selection.json``.
@@ -19,6 +20,11 @@ Stages (each resumable; a finished cell is never recomputed):
    (their p75 cells are the stage-2 cells: same rows, seeds, configuration).
 5. ``primattack_untargeted`` (Exp A PrimAttack row + Exp D untargeted arm): selected optimizer,
    untargeted, p75 (+ unbounded, descriptive p75-vs-unbounded comparison).
+6. ``primattack_untargeted_modes`` (Exp A primitive ablation, amendment A2): the stage-5
+   configuration restricted to timing-only and to padding-only (joint = the stage-5 cell).
+
+PrimAttack is capability-aware (amendment A2): padding needs forward payload AND no
+zero-length forward packet (``Fwd Packet Length Min > 0``); other flows are timing-only.
 
     python scripts/run_final_suite.py            # everything
     python scripts/run_final_suite.py --stages baselines,optimizers
@@ -46,7 +52,8 @@ DATASETS = {
     "cicids2018_distrinet": {"cli": "cicids2018",
                              "victims": "mlp-s42,cnn-s42,ft_transformer-s42"},
 }
-BASELINE_ATTACKS = "pgd_untargeted,cw_untargeted,capgd_prim_support,cpgd_prim_support"
+BASELINE_ATTACKS = ("pgd_untargeted,cw_untargeted,capgd_prim_support,cpgd_prim_support,"
+                    "capgd_native")
 OPTIMIZERS = ("hybrid", "pgd", "cw")
 EVAL_BUDGET = 256
 # Locked hyperparameters (identical to the frozen, validation-tuned optimizer ablation).
@@ -99,7 +106,8 @@ def run_baselines(dataset: str, device: str) -> None:
 
 
 def run_primattack(dataset: str, device: str, stage: str, *, objective: str,
-                   methods: list[str], budgets: list[str]) -> None:
+                   methods: list[str], budgets: list[str], modes: tuple[str, ...] = ("joint",)
+                   ) -> None:
     spec = DATASETS[dataset]
     sel = selection_path(dataset)
     if not sel.exists():
@@ -109,7 +117,8 @@ def run_primattack(dataset: str, device: str, stage: str, *, objective: str,
           "--dataset", spec["cli"], "--device", device, "--selection-from", str(sel),
           "--split", "test", "--seeds", SEEDS, "--objective", objective,
           "--victims", spec["victims"], "--classes", CLASSES,
-          "--budgets", ",".join(budgets), "--methods", ",".join(methods), *PRIM_ARGS,
+          "--budgets", ",".join(budgets), "--methods", ",".join(methods),
+          "--modes", ",".join(modes), *PRIM_ARGS,
           "--output-dir", str(RUNS / dataset / stage), "--resume"],
          RUNS / dataset / "logs" / f"{stage}.log")
 
@@ -171,7 +180,8 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--datasets", default=",".join(DATASETS))
-    ap.add_argument("--stages", default="baselines,optimizers,select,budgets,untargeted")
+    ap.add_argument("--stages",
+                    default="baselines,optimizers,select,budgets,untargeted,modes")
     args = ap.parse_args()
     datasets = [d.strip() for d in args.datasets.split(",") if d.strip()]
     stages = [s.strip() for s in args.stages.split(",") if s.strip()]
@@ -182,7 +192,10 @@ def main() -> None:
                       "owner": "baselines_untargeted/selection.json"},
         "datasets": DATASETS, "baseline_attacks": BASELINE_ATTACKS,
         "baseline_args": BASELINE_ARGS, "primattack_args": PRIM_ARGS,
-        "primattack_mode": "joint", "python": sys.version.split()[0],
+        "primattack_mode": "joint (Exp A-E); timing-only / padding-only ablation stage",
+        "padding_capability": "Nf >= 1 AND Total Length of Fwd Packet > 0 AND Fwd Packet "
+                              "Length Mean > 0 AND Fwd Packet Length Min > 0",
+        "python": sys.version.split()[0],
     }, indent=2), encoding="utf-8")
 
     if "baselines" in stages:
@@ -196,7 +209,7 @@ def main() -> None:
     selection = None
     if "select" in stages:
         selection = select_optimizer()
-    if {"budgets", "untargeted"} & set(stages):
+    if {"budgets", "untargeted", "modes"} & set(stages):
         selection = selection or json.loads(
             (RUNS / "optimizer_selection.json").read_text(encoding="utf-8"))
     if "budgets" in stages:
@@ -209,6 +222,11 @@ def main() -> None:
             run_primattack(d, args.device, "primattack_untargeted", objective="untargeted",
                            methods=[selection["selected"]],
                            budgets=["maximum-evaluated", "unbounded"])
+    if "modes" in stages:
+        for d in datasets:
+            run_primattack(d, args.device, "primattack_untargeted_modes", objective="untargeted",
+                           methods=[selection["selected"]], budgets=["maximum-evaluated"],
+                           modes=("timing-only", "padding-only"))
 
 
 if __name__ == "__main__":

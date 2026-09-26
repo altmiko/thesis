@@ -69,7 +69,32 @@ _NO_EVAL = torch.iinfo(torch.int64).max
 # scoring never sees the floor.
 SURROGATE_FLOOR = 1e-3
 
-ValidityGate = Callable[[torch.Tensor], torch.Tensor]
+# ``gate(adv_raw, source_raw)``: validity of each realized flow given its unperturbed source
+# (validator_v2 has source-conditioned transition rules, e.g. an empty forward packet stays empty).
+ValidityGate = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
+
+# Per-row attack space implied by the per-flow hard box (capabilities, budget and primitive mode
+# already folded into ``bounds``): which controls have at least one integer unit of headroom.
+ROW_MODE_JOINT = "joint"
+ROW_MODE_TIMING_ONLY = "timing-only"
+ROW_MODE_PADDING_ONLY = "padding-only"
+ROW_MODE_NONE = "no-primitive"
+
+
+def row_primitive_modes(bounds: dict[str, torch.Tensor]) -> list[str]:
+    """Effective per-flow search space: joint / timing-only / padding-only / no-primitive.
+
+    Every optimizer searches exactly this space per row: a coordinate without integer headroom
+    is pinned at 0 in the normalized controls (no enumeration value, no random start, no
+    gradient, no update), so a timing-only row spends its whole evaluation budget on timing.
+    """
+    pad = (bounds["p"] >= 1.0).cpu().numpy()
+    timing = (bounds["delay"] >= 1.0).cpu().numpy()
+    return [
+        ROW_MODE_JOINT if p and t else ROW_MODE_PADDING_ONLY if p else
+        ROW_MODE_TIMING_ONLY if t else ROW_MODE_NONE
+        for p, t in zip(pad, timing)
+    ]
 
 
 @dataclass(frozen=True)
@@ -142,11 +167,14 @@ def targeted_margin(logits: torch.Tensor, target_class: int = 0) -> torch.Tensor
 
 
 def hybrid_valid_gate(dataset: str) -> ValidityGate:
-    """validator_v2 ``hybrid_valid`` of realized raw flows, as a device-preserving bool mask."""
+    """validator_v2 ``hybrid_valid`` of realized raw flows given their source flows, as a
+    device-preserving bool mask."""
     from validation.attack_interface import structural_masks
 
-    def gate(adv_raw: torch.Tensor) -> torch.Tensor:
-        valid = structural_masks(adv_raw.detach().cpu().numpy(), dataset=dataset)["hybrid_valid"]
+    def gate(adv_raw: torch.Tensor, source_raw: torch.Tensor) -> torch.Tensor:
+        valid = structural_masks(
+            adv_raw.detach().cpu().numpy(), dataset=dataset,
+            source_raw=source_raw.detach().cpu().numpy())["hybrid_valid"]
         return torch.as_tensor(valid, dtype=torch.bool, device=adv_raw.device)
 
     return gate
@@ -221,6 +249,14 @@ def _mask_q(q: torch.Tensor, bounds: dict[str, torch.Tensor]) -> torch.Tensor:
     pad = (bounds["p"] >= 1.0).to(q.dtype)
     timing = (bounds["delay"] >= 1.0).to(q.dtype)
     return q * torch.stack((pad, timing, timing), 1)
+
+
+def _free_grad_scale(grad: torch.Tensor, bounds: dict[str, torch.Tensor]) -> torch.Tensor:
+    """Mean |gradient| over each row's FREE coordinates only (pinned ones carry an exact 0), so
+    a timing-only row's momentum normalization does not depend on the pinned padding axis."""
+    free = _mask_q(torch.ones_like(grad), bounds)
+    return ((grad.abs() * free).sum(1, keepdim=True)
+            / free.sum(1, keepdim=True).clamp(min=1.0)).clamp(min=1e-12)
 
 
 def _position_within_row(rows: torch.Tensor) -> torch.Tensor:
@@ -317,7 +353,7 @@ class RealizedSearch:
             logits = self.victim((adv - self.center) / self.scale)
             hit = self.objective.hit(logits)
             valid = (
-                self.validity_fn(adv) if self.validity_fn is not None
+                self.validity_fn(adv, raw_s) if self.validity_fn is not None
                 else torch.ones_like(hit)
             )
             parts.append({
@@ -498,6 +534,11 @@ def optimize_primitive_candidates(
 ) -> PrimitiveOptimizationResult:
     """Hybrid Search: exact padding enumeration, then adaptive projected timing/shape search.
 
+    Each row searches its own space (:func:`row_primitive_modes`): a timing-only row (no
+    padding capability or headroom) is skipped by the enumeration at zero cost and spends its
+    whole evaluation budget on timing refinement and restarts; a padding-only row is solved by
+    the exhaustive enumeration; a no-primitive row keeps the identity.
+
     ``restarts=None`` keeps starting refinement restarts until every refined row has spent
     ``eval_budget`` (requires a budget).
     """
@@ -583,7 +624,7 @@ def optimize_primitive_candidates(
                 grad = objective_gradient(objective.margin(logits).sum(), q_alive)
                 search.iterations += 1
                 with torch.no_grad():
-                    grad_scale = grad.abs().mean(1, keepdim=True).clamp(min=1e-12)
+                    grad_scale = _free_grad_scale(grad, bounds_s)
                     velocity[alive] = 0.75 * velocity[alive] + grad / grad_scale
                     q_new = _mask_q(
                         (q[alive] - step_size[alive] * velocity[alive].sign()).clamp(0.0, 1.0),
@@ -668,7 +709,7 @@ def optimize_primitive_pgd(
             grad = objective_gradient(objective.margin(logits).sum(), q_alive)
             search.iterations += 1
             with torch.no_grad():
-                grad_scale = grad.abs().mean(1, keepdim=True).clamp(min=1e-12)
+                grad_scale = _free_grad_scale(grad, bounds_s)
                 velocity[alive] = momentum * velocity[alive] + grad / grad_scale
                 q_new = _mask_q(
                     (q[alive] - step_size * velocity[alive].sign()).clamp(0.0, 1.0), bounds_s

@@ -112,11 +112,13 @@ ever sees them*, returning a `PrimitiveCapabilities` object (`pad_allowed`, `tim
 bool tensors + one reason code per flow):
 
 - **`p` (forward-length augmentation)** is admissible iff the source has forward packets
-  (`Total Fwd Packet >= MIN_FWD_PACKETS_FOR_PADDING`, default 1) **and** non-zero forward
-  payload (`Total Length of Fwd Packet > 0` **and** `Fwd Packet Length Mean > 0`). A flow with
-  no forward payload (e.g. a single-SYN Recon probe: `Nf=1`, `TL_fwd=0`) has no forward data to
-  augment → `pad_allowed = False` (reason `NO_FORWARD_PAYLOAD`). This is the fix for the
-  pathological case where `p=28` was permitted on a zero-payload flow.
+  (`Total Fwd Packet >= MIN_FWD_PACKETS_FOR_PADDING`, default 1), non-zero forward
+  payload (`Total Length of Fwd Packet > 0` **and** `Fwd Packet Length Mean > 0`) **and** no
+  zero-length forward packet (`Fwd Packet Length Min > 0`). A flow with no forward payload
+  (e.g. a single-SYN Recon probe: `Nf=1`, `TL_fwd=0`) has no forward data to augment →
+  `pad_allowed = False` (reason `NO_FORWARD_PAYLOAD`). A flow with an empty forward packet
+  (e.g. a pure ACK) would have that packet filled by uniform padding → `pad_allowed = False`
+  (reason `EMPTY_FWD_PACKET`); it is attacked timing-only.
 - **`alpha` (forward timing dilation)** is admissible iff there are ≥2 forward packets (a
   forward IAT sequence exists; else `SINGLE_FWD_PACKET`) **and** that sequence is non-zero
   (`Fwd IAT Total > 0`; else `ZERO_TIMING_HEADROOM`).

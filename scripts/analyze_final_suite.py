@@ -45,21 +45,30 @@ from evaluation.paired_validity_gap import cochran_q, holm_adjust, mcnemar_test 
 from run_final_suite import CLASSES as SUITE_CLASSES, DATASETS as SUITE_DATASETS  # noqa: E402
 from src.classifiers.cicids2017d_victims import load_category_victim  # noqa: E402
 from validation import load_validator  # noqa: E402
-from validation.attack_interface import structural_masks  # noqa: E402
+from validation.validator.rule import TRANSITION_TYPES  # noqa: E402
+from validation.attack_interface import get_validator  # noqa: E402
 
 FINAL = REPO_ROOT / "FINAL_OUTPUTS"
 RUNS = FINAL / "runs"
+# Pre-capability-fix run (PrimAttack padded flows with an empty forward packet), kept only as
+# the "PrimAttack-relaxed-padding" sensitivity result (protocol amendment A2).
+RELAXED = FINAL / "superseded_relaxed_padding"
 SEEDS = (42, 2024, 2026)
 REF_SEED = 42
 ALPHA = 0.05
 CLASSES = tuple(SUITE_CLASSES.split(","))
 DATASETS = {d: tuple(spec["victims"].split(",")) for d, spec in SUITE_DATASETS.items()}
 DS_LABEL = {"cicids2017_distrinet": "CICIDS2017", "cicids2018_distrinet": "CICIDS2018"}
+# Exp A inferential family (locked): PrimAttack vs these four.
 BASELINE_LABEL = {"pgd_untargeted": "PGD", "cw_untargeted": "C&W",
                   "capgd_prim_support": "CAPGD-PrimSupport",
                   "cpgd_prim_support": "C-PGD-PrimSupport"}
+# Exp A descriptive rows (amendment A3): not part of Cochran's Q / Holm.
+DESCRIPTIVE_BASELINE_LABEL = {"capgd_native": "CAPGD (native)"}
 OPT_LABEL = {"hybrid": "Hybrid Search", "pgd": "Prim-PGD", "cw": "Prim-C&W"}
 FILE_BUDGET = {"p50": "p50", "p75": "p75", "unbounded": "unb"}
+EMPTY_PACKET_RULE = "PROTO_0080"
+FWD_MIN = "Fwd Packet Length Min"
 EXP_DIRS = {
     "A": ("A_primary_baseline_comparison", "primary_baseline_comparison.md"),
     "B": ("B_optimizer_selection", "primattack_optimizer_selection.md"),
@@ -73,6 +82,7 @@ BASELINE_NATIVE_BUDGET = {
     "cw_untargeted": "L2 penalty (unbounded), 79 features",
     "capgd_prim_support": "L2 ε=0.5 (train min-max space), 23-feature PrimAttack mask",
     "cpgd_prim_support": "L2 ε=0.5 (train min-max space), 23-feature PrimAttack mask",
+    "capgd_native": "L2 ε=0.5 (train min-max space), native CAPGD configuration mask",
 }
 
 
@@ -85,26 +95,30 @@ class Cond:
     budget: str
     objective: str
     label: str
+    mode: str = "joint"
 
     @property
     def prim(self) -> bool:
         return self.stage.startswith("primattack")
 
-    def npz(self, dataset: str, victim: str, cls: str, seed: int) -> Path:
-        art = RUNS / dataset / self.stage / "artifacts"
+    def npz(self, dataset: str, victim: str, cls: str, seed: int, runs: Path = RUNS) -> Path:
+        art = runs / dataset / self.stage / "artifacts"
         if self.prim:
-            return art / f"{victim}__{cls}__{FILE_BUDGET[self.budget]}__{self.method}__seed{seed}.npz"
+            tag = self.method if self.mode == "joint" else f"{self.method}-{self.mode}"
+            return art / f"{victim}__{cls}__{FILE_BUDGET[self.budget]}__{tag}__seed{seed}.npz"
         return art / f"{victim}__{cls}__{self.method}__seed{seed}.npz"
 
 
 def base_cond(name: str) -> Cond:
-    return Cond(f"{name}", "baselines_untargeted", name, "native", "untargeted",
-                BASELINE_LABEL[name])
+    label = BASELINE_LABEL.get(name) or DESCRIPTIVE_BASELINE_LABEL[name]
+    return Cond(f"{name}", "baselines_untargeted", name, "native", "untargeted", label)
 
 
-def prim_cond(stage: str, opt: str, budget: str, objective: str, label: str | None = None) -> Cond:
-    return Cond(f"prim_{opt}_{budget}_{objective}", stage, opt, budget, objective,
-                label or f"{OPT_LABEL[opt]} ({budget}, {objective})")
+def prim_cond(stage: str, opt: str, budget: str, objective: str, label: str | None = None,
+              mode: str = "joint") -> Cond:
+    suffix = "" if mode == "joint" else f"_{mode}"
+    return Cond(f"prim_{opt}_{budget}_{objective}{suffix}", stage, opt, budget, objective,
+                label or f"{OPT_LABEL[opt]} ({budget}, {objective})", mode)
 
 
 # ----------------------------------------------------------------------------- loading
@@ -121,6 +135,7 @@ class Store:
         self.scale: dict[str, np.ndarray] = {}
         self.center: dict[str, np.ndarray] = {}
         self.minmax_span: dict[str, np.ndarray] = {}
+        self.fwd_min_col: dict[str, int] = {}
         self.victims: dict[tuple[str, str], torch.nn.Module] = {}
         self.audit = {"npz_files": 0, "rows": 0, "validator_rechecked_rows": 0,
                       "prediction_rechecked_rows": 0, "prediction_mismatches": 0,
@@ -145,6 +160,7 @@ class Store:
         span = high - low
         self.minmax_span[dataset] = np.where(span > 0, span, 1.0)
         mapping = adapter.class_mapping()
+        self.fwd_min_col[dataset] = list(adapter.feature_manifest().names).index(FWD_MIN)
         canon = {}
         for victim in DATASETS[dataset]:
             if victim not in sel:
@@ -239,10 +255,19 @@ class Store:
             raise AssertionError(f"{where}: stored raw_success disagrees with adv_pred")
         validator_pass = np.asarray(data["validator_pass"], bool)
         adv_raw = np.asarray(data["adv_raw"], np.float32)
-        layers = structural_masks(adv_raw, dataset=dataset)
-        recheck = layers["hybrid_valid"]
+        clean_src = self.clean_raw[f"{dataset}|{victim}|{cls}"]
+        batch = get_validator(dataset).validate_batch(adv_raw, clean_src)
+        recheck = batch.hybrid_valid
         if not np.array_equal(recheck, validator_pass):
             raise AssertionError(f"{where}: validator_v2 recheck on the stored final flow differs")
+        empty_rule_violation = batch.violation(EMPTY_PACKET_RULE)
+        others_ok = np.ones(n, dtype=bool)
+        for rule in batch.rules:
+            if rule.id != EMPTY_PACKET_RULE:
+                others_ok &= ~batch.violation(rule.id)
+        fmin = self.fwd_min_col[dataset]
+        source_fwd_min_zero = clean_src[:, fmin] == 0
+        filled_empty = source_fwd_min_zero & (adv_raw[:, fmin] > 0)
         valid_success = raw_success & validator_pass
         if not np.array_equal(valid_success, np.asarray(data["valid_success"], bool)):
             raise AssertionError(f"{where}: stored valid_success != raw_success AND validator_pass")
@@ -274,7 +299,11 @@ class Store:
             accounting = "exact per flow: realized + surrogate victim forwards"
             runtime = float(np.asarray(data["elapsed_seconds"]))
             extra = {
-                "optimizer": cond.method, "primitive_mode": "joint",
+                "optimizer": cond.method, "primitive_mode": cond.mode,
+                "row_primitive_mode": data["row_primitive_mode"].astype(str),
+                "pad_allowed": np.asarray(data["pad_allowed"], bool),
+                "timing_allowed": np.asarray(data["timing_allowed"], bool),
+                "pad_reason": data["pad_reason"].astype(str),
                 "primitive_p": np.asarray(data["p"], np.float64),
                 "primitive_delay": np.asarray(data["delay"], np.float64),
                 "primitive_shape": np.asarray(data["shape"], np.float64),
@@ -290,6 +319,11 @@ class Store:
                 "restarts": np.full(n, int(np.asarray(data["restarts"]))),
                 "attack_parameters": np.full(n, json.dumps(self._prim_cfg(dataset, cond))),
             }
+            if str(np.asarray(data["primitive_mode"])) != cond.mode:
+                raise AssertionError(f"{where}: stored primitive mode differs from {cond.mode}")
+            if (extra["primitive_p"][~extra["pad_allowed"]] > 0).any() or filled_empty.any():
+                raise AssertionError(f"{where}: PrimAttack padded a flow without padding "
+                                     "capability (empty forward packet filled)")
             allowed = np.full(n, 23)
         else:
             per_row = np.asarray(data["model_evaluations"], np.float64)
@@ -303,6 +337,9 @@ class Store:
             runtime = float(np.asarray(data["runtime_seconds"]))
             extra = {
                 "optimizer": "n/a", "primitive_mode": "n/a (direct feature space)",
+                "row_primitive_mode": np.full(n, "n/a"),
+                "pad_allowed": np.zeros(n, bool), "timing_allowed": np.zeros(n, bool),
+                "pad_reason": np.full(n, "n/a"),
                 "primitive_p": nan, "primitive_delay": nan, "primitive_shape": nan,
                 "primitive_p_hi": nan, "primitive_delay_hi": nan,
                 "primitive_normalized_cost": nan, "objective_margin": nan,
@@ -313,6 +350,9 @@ class Store:
                 "attack_parameters": np.full(n, str(data["attack_parameters"])),
             }
             allowed = np.asarray(data["n_allowed_primattack_support_features"], np.int64)
+            if cond.method == "capgd_native":
+                params = json.loads(str(data["attack_parameters"]))
+                allowed = np.full(n, len(params["mutable_feature_mask"]))
         return pd.DataFrame({
             "dataset": dataset, "victim": victim,
             "victim_arch": self.victim_meta[dataset][victim]["arch"],
@@ -323,8 +363,12 @@ class Store:
             "method_id": cond.method, "budget": cond.budget, "objective": cond.objective,
             "clean_pred": clean_pred, "adv_pred": adv_pred, "raw_success": raw_success,
             "validator_pass": validator_pass, "valid_success": valid_success,
-            "schema_pass": layers["schema_valid"], "extractor_pass": layers["extractor_valid"],
-            "protocol_pass": layers["protocol_valid"], "mined_pass": layers["mined_valid"],
+            "schema_pass": batch.schema_valid, "extractor_pass": batch.extractor_valid,
+            "protocol_pass": batch.protocol_valid, "mined_pass": batch.mined_valid,
+            "empty_packet_rule_violation": empty_rule_violation,
+            "validator_pass_without_empty_packet_rule": others_ok,
+            "source_fwd_min_zero": source_fwd_min_zero,
+            "empty_fwd_packet_filled": filled_empty,
             "targeted_success": adv_pred == 0, "untargeted_success": adv_pred != cid,
             "n_allowed_features": allowed,
             "n_features_modified": np.asarray(data["n_features_modified"], np.int64),
@@ -376,12 +420,15 @@ GROUP = ["dataset", "victim", "condition", "method", "objective", "budget"]
 
 def seed_level(frame: pd.DataFrame) -> pd.DataFrame:
     rows = []
+    frame = frame.assign(valid_targeted_success=frame.targeted_success & frame.validator_pass)
     for scope in ("victim", "class"):
         keys = GROUP + (["source_class"] if scope == "class" else []) + ["seed"]
         g = frame.groupby(keys, sort=False)
         agg = g.agg(n=("raw_success", "size"), raw_successes=("raw_success", "sum"),
                     valid_successes=("valid_success", "sum"),
                     validator_passes=("validator_pass", "sum"),
+                    raw_targeted_benign_successes=("targeted_success", "sum"),
+                    valid_targeted_benign_successes=("valid_targeted_success", "sum"),
                     mean_model_evaluations=("model_evaluations", "mean"),
                     mean_l2_robust_scaled=("l2_robust_scaled", "mean"),
                     mean_linf_robust_scaled=("linf_robust_scaled", "mean"),
@@ -408,10 +455,14 @@ def seed_level(frame: pd.DataFrame) -> pd.DataFrame:
     out["valid_asr"] = out.valid_successes / out.n
     out["validity_gap_pp"] = 100 * (out.raw_asr - out.valid_asr)
     out["validator_pass_rate"] = out.validator_passes / out.n
+    out["raw_targeted_benign_asr"] = out.raw_targeted_benign_successes / out.n
+    out["valid_targeted_benign_asr"] = out.valid_targeted_benign_successes / out.n
     out["ms_per_flow"] = 1000 * out.runtime_seconds / out.n
     cols = ["scope"] + GROUP + ["source_class", "seed", "n", "raw_successes", "valid_successes",
                                 "validator_passes", "raw_asr", "valid_asr", "validity_gap_pp",
-                                "validator_pass_rate", "mean_model_evaluations",
+                                "validator_pass_rate", "raw_targeted_benign_successes",
+                                "valid_targeted_benign_successes", "raw_targeted_benign_asr",
+                                "valid_targeted_benign_asr", "mean_model_evaluations",
                                 "mean_l2_robust_scaled", "mean_linf_robust_scaled",
                                 "mean_l2_train_minmax",
                                 "mean_features_modified", "max_modified_outside_mask",
@@ -421,6 +472,7 @@ def seed_level(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 TABLE_METRICS = ("raw_asr", "valid_asr", "validity_gap_pp", "validator_pass_rate",
+                 "raw_targeted_benign_asr", "valid_targeted_benign_asr",
                  "mean_model_evaluations", "mean_l2_robust_scaled", "mean_linf_robust_scaled",
                  "mean_l2_train_minmax", "mean_features_modified",
                  "median_primitive_cost_valid", "ms_per_flow")
@@ -675,9 +727,13 @@ def experiment_a(store: Store, selection: dict, final: bool) -> dict:
     prim = prim_cond("primattack_untargeted", sel, "p75", "untargeted", prim_label)
     prim_unb = prim_cond("primattack_untargeted", sel, "unbounded", "untargeted",
                          f"PrimAttack ({OPT_LABEL[sel]}, unbounded)")
+    prim_modes = [prim_cond("primattack_untargeted_modes", sel, "p75", "untargeted",
+                            f"PrimAttack {mode} ({OPT_LABEL[sel]}, p75)", mode=mode)
+                  for mode in ("timing-only", "padding-only")]
     bases = [base_cond(n) for n in BASELINE_LABEL]
+    desc = [base_cond(n) for n in DESCRIPTIVE_BASELINE_LABEL]
     conds = [prim] + bases
-    frames = [store.frame(c) for c in conds + [prim_unb]]
+    frames = [store.frame(c) for c in conds + desc + [prim_unb] + prim_modes]
     assert_paired(frames, "Experiment A")
     per_sample = pd.concat(frames, ignore_index=True)
     seed_df = seed_level(per_sample)
@@ -707,15 +763,17 @@ def experiment_a(store: Store, selection: dict, final: bool) -> dict:
     # diagnostics
     vt = table[table.scope == "victim"]
     diag_rows = []
-    for c in [bases[2], bases[3], prim]:
+    for c in [bases[2], bases[3], desc[0], prim]:
         for dataset, victims in DATASETS.items():
             for victim in victims:
                 r = vt[(vt.dataset == dataset) & (vt.victim == victim) & (vt.condition == c.key)].iloc[0]
+                allowed = store.frame(c).n_allowed_features.iloc[0]
                 diag_rows.append({
                     "dataset": dataset, "victim": victim, "method": c.label,
-                    "allowed_downstream_features": 23,
+                    "allowed_downstream_features": int(allowed),
                     "mean_features_modified": r.mean_features_modified_mean,
-                    "max_modified_outside_mask": r.max_modified_outside_mask,
+                    "max_modified_outside_mask": (r.max_modified_outside_mask
+                                                  if c is not desc[0] else np.nan),
                     "raw_asr_mean": r.raw_asr_mean, "raw_asr_sd": r.raw_asr_sd,
                     "valid_asr_mean": r.valid_asr_mean, "valid_asr_sd": r.valid_asr_sd,
                     "validity_gap_pp_mean": r.validity_gap_pp_mean,
@@ -729,28 +787,532 @@ def experiment_a(store: Store, selection: dict, final: bool) -> dict:
     prim_cost = primitive_cost_table(per_sample[per_sample.condition.isin([prim.key, prim_unb.key])])
     prim_cost.to_csv(out / "primattack_primitive_costs.csv", index=False)
 
-    # plots
-    method_order = {d: [c.label for c in conds] for d in DATASETS}
+    # capability fix (amendment A2): eligibility, PrimAttack breakdown, primitive ablation,
+    # relaxed-padding comparison, validator-rule impact, CAPGD-PrimSupport fairness
+    cap_dir = out / "capability_fix"
+    cap_dir.mkdir(parents=True, exist_ok=True)
+    joint = store.frame(prim)
+    elig = capability_eligibility(joint)
+    breakdown = primattack_breakdown(joint)
+    ablation = mode_ablation(table, [prim] + prim_modes,
+                             pd.concat([joint] + [store.frame(c) for c in prim_modes]))
+    old_sel = json.loads((RELAXED / "runs" / "optimizer_selection.json").read_text(encoding="utf-8"))
+    relaxed = relaxed_padding_comparison(
+        store, joint, prim_cond("primattack_untargeted", old_sel["selected"], "p75", "untargeted"))
+    # like-for-like: every optimizer, targeted p75 (Exp B), relaxed vs capability-aware
+    relaxed_by_opt = pd.concat([
+        relaxed_padding_comparison(
+            store, store.frame(prim_cond("primattack_targeted_optimizers", m, "p75", "targeted",
+                                         OPT_LABEL[m])),
+            prim_cond("primattack_targeted_optimizers", m, "p75", "targeted"))
+        for m in OPT_LABEL], ignore_index=True)
+    impact = validator_rule_impact([store.frame(c) for c in conds + desc])
+    fairness = capgd_fairness(table, stats_df, prim, bases[2])
+    for name, df in (("eligibility", elig), ("primattack_breakdown", breakdown),
+                     ("relaxed_vs_capability_aware_by_optimizer_targeted", relaxed_by_opt),
+                     ("primitive_ablation", ablation), ("relaxed_vs_capability_aware", relaxed),
+                     ("validator_rule_impact", impact), ("capgd_primsupport_fairness", fairness)):
+        df.to_csv(cap_dir / f"{name}.csv", index=False)
+
+    # plots (native CAPGD: descriptive series at the end)
+    plot_conds = conds + desc
+    method_order = {d: [c.label for c in plot_conds] for d in DATASETS}
     vo = victims_order()
-    per_dataset_bars(vt[vt.condition.isin([c.key for c in conds])], "method", "victim", "raw_asr",
+    vt_plot = vt[vt.condition.isin([c.key for c in plot_conds])]
+    per_dataset_bars(vt_plot, "method", "victim", "raw_asr",
                      "Exp A — Raw ASR by attack (untargeted)", "Raw ASR (%)",
                      out / "plots" / "A1_raw_asr_by_attack.png", method_order, vo, VICTIM_COLORS)
-    per_dataset_bars(vt[vt.condition.isin([c.key for c in conds])], "method", "victim", "valid_asr",
+    per_dataset_bars(vt_plot, "method", "victim", "valid_asr",
                      "Exp A — Valid ASR by attack (untargeted)", "Valid ASR (%)",
                      out / "plots" / "A2_valid_asr_by_attack.png", method_order, vo, VICTIM_COLORS)
-    per_dataset_bars(vt[vt.condition.isin([c.key for c in conds])], "victim", "method", "valid_asr",
+    per_dataset_bars(vt_plot, "victim", "method", "valid_asr",
                      "Exp A — Model-wise Valid ASR", "Valid ASR (%)",
                      out / "plots" / "A4_modelwise_valid_asr.png", vo, method_order, METHOD_COLORS)
-    per_dataset_bars(vt[vt.condition.isin([c.key for c in conds])], "method", "victim",
+    per_dataset_bars(vt_plot, "method", "victim",
                      "validity_gap_pp", "Exp A — Validity Gap (Raw − Valid ASR) by attack",
                      "Validity gap (pp)", out / "plots" / "A5_validity_gap_by_attack.png",
                      method_order, vo, VICTIM_COLORS, percent=False)
-    classwise_heatmap(table[(table.scope == "class") & table.condition.isin([c.key for c in conds])],
-                      [c.label for c in conds], out / "plots" / "A3_classwise_valid_asr.png")
+    classwise_heatmap(table[(table.scope == "class") & table.condition.isin([c.key for c in plot_conds])],
+                      [c.label for c in plot_conds], out / "plots" / "A3_classwise_valid_asr.png")
     p75_vs_unbounded_plot(vt, prim, prim_unb, out / "plots" / "A6_primattack_p75_vs_unbounded.png")
+    mode_order = {d: [c.label for c in [prim] + prim_modes] for d in DATASETS}
+    per_dataset_bars(vt[vt.condition.isin([c.key for c in [prim] + prim_modes])], "victim",
+                     "method", "valid_asr", "Exp A — PrimAttack primitive ablation (untargeted, p75)",
+                     "Valid ASR (%)", out / "plots" / "A7_primitive_ablation.png", vo, mode_order,
+                     ["#3182bd", "#31a354", "#e6550d"])
+    relaxed_plot(relaxed, out / "plots" / "A8_relaxed_vs_capability_aware.png")
 
-    report_a(out, table, stats_df, diag, prim_cost, conds, prim, prim_unb, store, final)
-    return {"table": table, "stats": stats_df, "prim": prim, "bases": bases}
+    report_a(out, table, stats_df, diag, prim_cost, conds, desc, prim, prim_unb, store, final,
+             cap={"eligibility": elig, "breakdown": breakdown, "ablation": ablation,
+                  "relaxed": relaxed, "relaxed_by_opt": relaxed_by_opt, "impact": impact,
+                  "fairness": fairness, "modes": prim_modes})
+    return {"table": table, "stats": stats_df, "prim": prim, "bases": bases, "desc": desc,
+            "cap": {"eligibility": elig, "breakdown": breakdown, "ablation": ablation,
+                    "relaxed": relaxed, "relaxed_by_opt": relaxed_by_opt, "impact": impact,
+                    "fairness": fairness}}
+
+
+# ----------------------------------------------------------------------------- capability fix
+def _seed_invariant(frame: pd.DataFrame, column: str) -> pd.DataFrame:
+    """Per-flow capability columns must not depend on the attack seed."""
+    ref = frame[frame.seed == REF_SEED]
+    for s in SEEDS:
+        other = frame[frame.seed == s]
+        if not np.array_equal(other[column].to_numpy(), ref[column].to_numpy()):
+            raise AssertionError(f"{column} differs between seed {s} and seed {REF_SEED}")
+    return ref
+
+
+def capability_eligibility(joint: pd.DataFrame) -> pd.DataFrame:
+    """Per dataset × victim × class (+ ALL): source-flow capability shares (new rule, and the
+    relaxed payload-only rule for reference) and the effective per-row search space at p75."""
+    for col in ("pad_allowed", "timing_allowed", "row_primitive_mode", "pad_reason"):
+        _seed_invariant(joint, col)
+    ref = joint[joint.seed == REF_SEED]
+    recs = []
+    for (dataset, victim), g in ref.groupby(["dataset", "victim"], sort=False):
+        for cls, h in [(c, g[g.source_class == c]) for c in CLASSES] + [("ALL", g)]:
+            pad, tim = h.pad_allowed.to_numpy(), h.timing_allowed.to_numpy()
+            relaxed_pad = pad | (h.pad_reason.to_numpy() == "EMPTY_FWD_PACKET")
+            mode = h.row_primitive_mode.to_numpy()
+            n = len(h)
+            recs.append({
+                "dataset": dataset, "victim": victim, "source_class": cls, "n_attacked": n,
+                "n_fwd_min_zero": int(h.source_fwd_min_zero.sum()),
+                "pct_fwd_min_zero": 100 * h.source_fwd_min_zero.mean(),
+                "pct_timing_eligible": 100 * tim.mean(),
+                "pct_padding_eligible": 100 * pad.mean(),
+                "pct_joint_eligible": 100 * (pad & tim).mean(),
+                "pct_neither_eligible": 100 * (~pad & ~tim).mean(),
+                "pct_padding_eligible_relaxed_rule": 100 * relaxed_pad.mean(),
+                "n_padding_disabled_by_empty_packet": int((h.pad_reason == "EMPTY_FWD_PACKET").sum()),
+                "pct_p75_joint": 100 * (mode == "joint").mean(),
+                "pct_p75_timing_only": 100 * (mode == "timing-only").mean(),
+                "pct_p75_padding_only": 100 * (mode == "padding-only").mean(),
+                "pct_p75_no_primitive": 100 * (mode == "no-primitive").mean(),
+            })
+    return pd.DataFrame(recs)
+
+
+def _primitive_counts(h: pd.DataFrame) -> dict:
+    p, d = h.primitive_p.to_numpy() > 0, h.primitive_delay.to_numpy() > 0
+    v, r = h.valid_success.to_numpy(), h.raw_success.to_numpy()
+    return {
+        "n_attempted": len(h),
+        "n_fwd_min_zero": int(h.source_fwd_min_zero.sum()),
+        "n_padding_disabled": int((~h.pad_allowed).sum()),
+        "n_padding_disabled_by_empty_packet": int((h.pad_reason == "EMPTY_FWD_PACKET").sum()),
+        "n_padding_eligible": int(h.pad_allowed.sum()),
+        "n_timing_eligible": int(h.timing_allowed.sum()),
+        "n_attacked_timing_only": int((h.row_primitive_mode == "timing-only").sum()),
+        "n_attacked_joint": int((h.row_primitive_mode == "joint").sum()),
+        "n_attacked_padding_only": int((h.row_primitive_mode == "padding-only").sum()),
+        "n_attacked_no_primitive": int((h.row_primitive_mode == "no-primitive").sum()),
+        "raw_successes": int(r.sum()), "valid_successes": int(v.sum()),
+        "valid_timing_only_successes": int((v & ~p & d).sum()),
+        "valid_padding_only_successes": int((v & p & ~d).sum()),
+        "valid_joint_successes": int((v & p & d).sum()),
+        "valid_successes_involving_padding": int((v & p).sum()),
+        "valid_successes_on_timing_only_rows": int((v & (h.row_primitive_mode == "timing-only")).sum()),
+        "raw_successes_filling_empty_packet": int((r & h.empty_fwd_packet_filled).sum()),
+        "valid_successes_filling_empty_packet": int((v & h.empty_fwd_packet_filled).sum()),
+    }
+
+
+def primattack_breakdown(joint: pd.DataFrame) -> pd.DataFrame:
+    recs = []
+    for (dataset, victim, seed), g in joint.groupby(["dataset", "victim", "seed"], sort=False):
+        for cls, h in [(c, g[g.source_class == c]) for c in CLASSES] + [("ALL", g)]:
+            recs.append({"dataset": dataset, "victim": victim, "source_class": cls, "seed": seed,
+                         **_primitive_counts(h)})
+    df = pd.DataFrame(recs)
+    if df.valid_successes_filling_empty_packet.any() or df.raw_successes_filling_empty_packet.any():
+        raise AssertionError("capability-aware PrimAttack filled an empty forward packet")
+    return df
+
+
+def mode_ablation(table: pd.DataFrame, mode_conds: list[Cond], frame: pd.DataFrame) -> pd.DataFrame:
+    """Joint / timing-only / padding-only at p75: Valid ASR over all attacked flows (table rows)
+    and, for padding-only, also conditional on padding-eligible flows (denominator shown)."""
+    recs = []
+    for c in mode_conds:
+        f = frame[frame.condition == c.key]
+        for (dataset, victim), g in f.groupby(["dataset", "victim"], sort=False):
+            for cls in CLASSES + ("ALL",):
+                h = g if cls == "ALL" else g[g.source_class == cls]
+                row = table[(table.condition == c.key) & (table.dataset == dataset)
+                            & (table.victim == victim)
+                            & (table.source_class == cls)].iloc[0]
+                per_seed = {s: h[h.seed == s] for s in SEEDS}
+                cond_vals = []
+                for s in SEEDS:
+                    e = per_seed[s][per_seed[s].pad_allowed]
+                    cond_vals.append(e.valid_success.mean() if len(e) else np.nan)
+                n_pad = int(per_seed[REF_SEED].pad_allowed.sum())
+                recs.append({
+                    "dataset": dataset, "victim": victim, "source_class": cls, "mode": c.mode,
+                    "method": c.label, "n_attempted": int(row.n_per_seed),
+                    "raw_asr_mean": row.raw_asr_mean, "raw_asr_sd": row.raw_asr_sd,
+                    "valid_asr_mean": row.valid_asr_mean, "valid_asr_sd": row.valid_asr_sd,
+                    **{f"valid_asr_seed{s}": row[f"valid_asr_seed{s}"] for s in SEEDS},
+                    "n_padding_eligible": n_pad,
+                    "valid_asr_on_padding_eligible_mean": (float(np.nanmean(cond_vals))
+                                                           if n_pad else np.nan),
+                    "valid_asr_on_padding_eligible_sd": (float(np.nanstd(cond_vals, ddof=1))
+                                                         if n_pad else np.nan),
+                    **{f"valid_asr_on_padding_eligible_seed{s}": v
+                       for s, v in zip(SEEDS, cond_vals)},
+                    "valid_successes_mean": float(np.mean([per_seed[s].valid_success.sum()
+                                                           for s in SEEDS])),
+                })
+    return pd.DataFrame(recs)
+
+
+def relaxed_padding_comparison(store: Store, joint: pd.DataFrame, old: Cond) -> pd.DataFrame:
+    """Old ``PrimAttack-relaxed-padding`` cell ``old`` vs the fresh capability-aware frame, per
+    (dataset, victim, seed): old valid ASR as run (old validator), the old flows re-judged by
+    the current validator (post-hoc filter = lower bound), and the new re-run."""
+    old_opt = old.method
+    recs = []
+    for dataset, victims in DATASETS.items():
+        fmin = store.fwd_min_col[dataset]
+        validator = get_validator(dataset)
+        for victim in victims:
+            for seed in SEEDS:
+                o = {"n": 0, "valid": 0, "postfilter": 0, "timing": 0, "padding": 0,
+                     "filled": 0, "pad_cap": 0}
+                for cls in CLASSES:
+                    path = old.npz(dataset, victim, cls, seed, runs=RELAXED / "runs")
+                    with np.load(path, allow_pickle=True) as d:
+                        data = {k: d[k] for k in ("sample_id", "clean_raw_sha256", "raw_success",
+                                                  "valid_success", "adv_raw", "p", "delay",
+                                                  "p_hi")}
+                    canon = store.canonical[dataset][(victim, cls)]
+                    if not np.array_equal(data["sample_id"].astype("U128"), canon["sample_ids"]):
+                        raise AssertionError(f"{path}: relaxed run is not paired with the canonical list")
+                    if str(data["clean_raw_sha256"]) != canon["clean_raw_sha256"]:
+                        raise AssertionError(f"{path}: relaxed run clean-input hash differs")
+                    clean = store.clean_raw[f"{dataset}|{victim}|{cls}"]
+                    adv = np.asarray(data["adv_raw"], np.float32)
+                    raw_s = np.asarray(data["raw_success"], bool)
+                    val_s = np.asarray(data["valid_success"], bool)
+                    now = raw_s & validator.validate_batch(adv, clean).hybrid_valid
+                    p, dl = np.asarray(data["p"]) > 0, np.asarray(data["delay"]) > 0
+                    filled = (clean[:, fmin] == 0) & (adv[:, fmin] > 0)
+                    o["n"] += len(raw_s)
+                    o["valid"] += int(val_s.sum())
+                    o["postfilter"] += int(now.sum())
+                    o["timing"] += int((val_s & ~p & dl).sum())
+                    o["padding"] += int((val_s & p).sum())
+                    o["filled"] += int((val_s & filled).sum())
+                    o["pad_cap"] += int((np.asarray(data["p_hi"]) >= 1).sum())
+                g = joint[(joint.dataset == dataset) & (joint.victim == victim) & (joint.seed == seed)]
+                if len(g) != o["n"]:
+                    raise AssertionError(f"{dataset}/{victim}/{seed}: denominators differ")
+                v = g.valid_success.to_numpy()
+                p_new, d_new = g.primitive_p.to_numpy() > 0, g.primitive_delay.to_numpy() > 0
+                recs.append({
+                    "dataset": dataset, "victim": victim, "seed": seed, "n_attempted": o["n"],
+                    "objective": old.objective,
+                    "relaxed_optimizer": old_opt, "capability_aware_optimizer": joint.optimizer.iloc[0],
+                    "relaxed_valid_successes": o["valid"],
+                    "relaxed_valid_asr": o["valid"] / o["n"],
+                    "relaxed_postfilter_valid_successes": o["postfilter"],
+                    "relaxed_postfilter_valid_asr": o["postfilter"] / o["n"],
+                    "new_valid_successes": int(v.sum()), "new_valid_asr": v.mean(),
+                    "abs_diff_pp_new_minus_relaxed": 100 * (v.mean() - o["valid"] / o["n"]),
+                    "rel_diff_new_vs_relaxed": ((v.mean() - o["valid"] / o["n"]) / (o["valid"] / o["n"])
+                                                if o["valid"] else np.nan),
+                    "timing_recovery_successes": int(v.sum()) - o["postfilter"],
+                    "timing_recovery_pp": 100 * (v.mean() - o["postfilter"] / o["n"]),
+                    "relaxed_timing_only_valid_successes": o["timing"],
+                    "new_timing_only_valid_successes": int((v & ~p_new & d_new).sum()),
+                    "relaxed_padding_valid_successes": o["padding"],
+                    "new_padding_valid_successes": int((v & p_new).sum()),
+                    "relaxed_valid_successes_filling_empty_packet": o["filled"],
+                    "new_valid_successes_filling_empty_packet": int((v & g.empty_fwd_packet_filled).sum()),
+                    "relaxed_padding_headroom_rate": o["pad_cap"] / o["n"],
+                    "new_padding_eligibility_rate": g.pad_allowed.mean(),
+                    "new_padding_headroom_rate": (g.primitive_p_hi >= 1).mean(),
+                })
+    return pd.DataFrame(recs)
+
+
+def relaxed_plot(relaxed: pd.DataFrame, path: Path) -> None:
+    rows = []
+    for (dataset, victim), g in relaxed.groupby(["dataset", "victim"], sort=False):
+        for col, name in (("relaxed_valid_asr", "relaxed padding (as run)"),
+                          ("relaxed_postfilter_valid_asr", "relaxed, post-hoc filtered"),
+                          ("new_valid_asr", "capability-aware re-run")):
+            vals = g[col].to_numpy(float)
+            rows.append({"dataset": dataset, "victim": victim, "series": name,
+                         "x_mean": vals.mean(), "x_sd": vals.std(ddof=1)})
+    order = ["relaxed padding (as run)", "relaxed, post-hoc filtered", "capability-aware re-run"]
+    per_dataset_bars(pd.DataFrame(rows), "victim", "series", "x",
+                     "Exp A — PrimAttack Valid ASR: relaxed padding vs capability-aware",
+                     "Valid ASR (%)", path, victims_order(), {d: order for d in DATASETS},
+                     ["#fdae6b", "#bdbdbd", "#3182bd"])
+
+
+def validator_rule_impact(frames: list[pd.DataFrame]) -> pd.DataFrame:
+    """Per method × dataset × victim × seed: effect of the empty-forward-packet rule."""
+    recs = []
+    for f in frames:
+        for (dataset, victim, seed), g in f.groupby(["dataset", "victim", "seed"], sort=False):
+            r = g.raw_success.to_numpy()
+            recs.append({
+                "dataset": dataset, "victim": victim, "method": g.method.iloc[0], "seed": seed,
+                "n_attempted": len(g), "raw_successes": int(r.sum()),
+                "raw_successes_filling_empty_packet": int((r & g.empty_fwd_packet_filled).sum()),
+                "raw_successes_violating_rule": int((r & g.empty_packet_rule_violation).sum()),
+                "valid_successes": int(g.valid_success.sum()),
+                "valid_successes_without_rule": int((r & g.validator_pass_without_empty_packet_rule).sum()),
+                "valid_successes_lost_only_to_rule": int(
+                    (r & g.validator_pass_without_empty_packet_rule & g.empty_packet_rule_violation).sum()),
+            })
+    df = pd.DataFrame(recs)
+    df["valid_asr"] = df.valid_successes / df.n_attempted
+    df["valid_asr_without_rule"] = df.valid_successes_without_rule / df.n_attempted
+    df["delta_pp"] = 100 * (df.valid_asr - df.valid_asr_without_rule)
+    return df
+
+
+def capgd_fairness(table: pd.DataFrame, stats: pd.DataFrame, prim: Cond, capgd: Cond) -> pd.DataFrame:
+    vt = table[table.scope == "victim"]
+    recs = []
+    for dataset, victims in DATASETS.items():
+        for victim in victims:
+            p = vt[(vt.dataset == dataset) & (vt.victim == victim) & (vt.condition == prim.key)].iloc[0]
+            c = vt[(vt.dataset == dataset) & (vt.victim == victim) & (vt.condition == capgd.key)].iloc[0]
+            s = stats[(stats.dataset == dataset) & (stats.victim == victim)
+                      & (stats.comparison == f"{prim.label} vs {capgd.label}")].iloc[0]
+            recs.append({
+                "dataset": dataset, "victim": victim, "n_per_seed": int(p.n_per_seed),
+                "primattack_valid_asr_mean": p.valid_asr_mean, "primattack_valid_asr_sd": p.valid_asr_sd,
+                "capgd_primsupport_valid_asr_mean": c.valid_asr_mean,
+                "capgd_primsupport_valid_asr_sd": c.valid_asr_sd,
+                "diff_pp_primattack_minus_capgd": 100 * (p.valid_asr_mean - c.valid_asr_mean),
+                **{f"diff_pp_seed{sd}": 100 * (p[f"valid_asr_seed{sd}"] - c[f"valid_asr_seed{sd}"])
+                   for sd in SEEDS},
+                "primattack_only_seed42": s.get("A_only", np.nan),
+                "capgd_only_seed42": s.get("B_only", np.nan),
+                "mcnemar_p": s.get("p_value", np.nan), "holm_p": s.get("p_holm", np.nan),
+                "test_status": s.get("interpretation", ""),
+                "higher_valid_asr": ("PrimAttack" if p.valid_asr_mean > c.valid_asr_mean else
+                                     "CAPGD-PrimSupport" if c.valid_asr_mean > p.valid_asr_mean
+                                     else "tie"),
+            })
+    return pd.DataFrame(recs)
+
+
+def _per_seed(g: pd.DataFrame, col: str, fmt: str = "d") -> str:
+    vals = [g[g.seed == s][col].iloc[0] for s in SEEDS]
+    return " / ".join(f"{v:{fmt}}" for v in vals)
+
+
+def _mean_sd(vals, pct: bool = False) -> str:
+    vals = np.asarray(list(vals), dtype=float)
+    k = 100 if pct else 1
+    sd = vals.std(ddof=1) if len(vals) > 1 else 0.0
+    return f"{k * vals.mean():.2f}{'%' if pct else ''} ± {k * sd:.2f}{'%' if pct else ''}"
+
+
+def eligibility_md(elig: pd.DataFrame) -> str:
+    return md_table(pd.DataFrame([{
+        "Dataset": DS_LABEL[r.dataset], "Victim": r.victim, "Class": r.source_class,
+        "n": r.n_attacked, "Fwd min = 0": f"{r.n_fwd_min_zero} ({r.pct_fwd_min_zero:.1f}%)",
+        "Timing eligible": f"{r.pct_timing_eligible:.1f}%",
+        "Padding eligible": f"{r.pct_padding_eligible:.1f}%",
+        "Joint eligible": f"{r.pct_joint_eligible:.1f}%",
+        "Neither": f"{r.pct_neither_eligible:.1f}%",
+        "Padding eligible, relaxed rule": f"{r.pct_padding_eligible_relaxed_rule:.1f}%",
+        "p75 box: joint / timing-only / padding-only / none": (
+            f"{r.pct_p75_joint:.1f} / {r.pct_p75_timing_only:.1f} / "
+            f"{r.pct_p75_padding_only:.1f} / {r.pct_p75_no_primitive:.1f}%"),
+    } for _, r in elig.iterrows()]))
+
+
+def breakdown_md(breakdown: pd.DataFrame, classes: bool) -> str:
+    rows = []
+    scope = breakdown[breakdown.source_class != "ALL"] if classes else \
+        breakdown[breakdown.source_class == "ALL"]
+    for (dataset, victim, cls), g in scope.groupby(["dataset", "victim", "source_class"], sort=False):
+        r0 = g[g.seed == REF_SEED].iloc[0]
+        rows.append({
+            "Dataset": DS_LABEL[dataset], "Victim": victim, "Class": cls,
+            "N": r0.n_attempted, "Fwd min = 0": r0.n_fwd_min_zero,
+            "Padding disabled (empty pkt)": f"{r0.n_padding_disabled} ({r0.n_padding_disabled_by_empty_packet})",
+            "Attacked timing-only": r0.n_attacked_timing_only,
+            "Padding eligible": r0.n_padding_eligible,
+            "Valid successes (42/2024/2026)": _per_seed(g, "valid_successes"),
+            "Valid timing-only": _per_seed(g, "valid_timing_only_successes"),
+            "Valid padding-only": _per_seed(g, "valid_padding_only_successes"),
+            "Valid joint": _per_seed(g, "valid_joint_successes"),
+            "Valid involving padding": _per_seed(g, "valid_successes_involving_padding"),
+            "Filled empty packet (valid / raw)": (
+                f"{int(g.valid_successes_filling_empty_packet.sum())} / "
+                f"{int(g.raw_successes_filling_empty_packet.sum())}"),
+        })
+    return md_table(pd.DataFrame(rows))
+
+
+def ablation_md(ablation: pd.DataFrame) -> str:
+    rows = []
+    for _, r in ablation[ablation.source_class == "ALL"].iterrows():
+        cond = ("—" if r["mode"] != "padding-only" else
+                (f"{pm(r.valid_asr_on_padding_eligible_mean, r.valid_asr_on_padding_eligible_sd)}"
+                 f" (n = {r.n_padding_eligible})" if r.n_padding_eligible else "n = 0 eligible"))
+        rows.append({
+            "Dataset": DS_LABEL[r.dataset], "Victim": r.victim, "Mode": r["mode"],
+            "n/seed": r.n_attempted, "Raw ASR": pm(r.raw_asr_mean, r.raw_asr_sd),
+            "Valid ASR (all attacked flows)": pm(r.valid_asr_mean, r.valid_asr_sd),
+            "Valid per seed (%)": " / ".join(f"{100 * r[f'valid_asr_seed{s}']:.2f}" for s in SEEDS),
+            "Valid ASR on padding-eligible flows": cond,
+        })
+    return md_table(pd.DataFrame(rows))
+
+
+def relaxed_md(relaxed: pd.DataFrame) -> str:
+    rows = []
+    for (opt_old, opt_new, dataset, victim), g in relaxed.groupby(
+            ["relaxed_optimizer", "capability_aware_optimizer", "dataset", "victim"], sort=False):
+        old, new = g.relaxed_valid_asr.to_numpy(float), g.new_valid_asr.to_numpy(float)
+        rel = (new.mean() - old.mean()) / old.mean() if old.mean() > 0 else np.nan
+        rows.append({
+            "Optimizer (relaxed → new)": (OPT_LABEL[opt_old] if opt_old == opt_new
+                                          else f"{OPT_LABEL[opt_old]} → {OPT_LABEL[opt_new]}"),
+            "Objective": g.objective.iloc[0],
+            "Dataset": DS_LABEL[dataset], "Victim": victim,
+            "Relaxed Valid ASR": _mean_sd(old, pct=True),
+            "Relaxed, post-hoc filtered": _mean_sd(g.relaxed_postfilter_valid_asr, pct=True),
+            "Capability-aware Valid ASR": _mean_sd(new, pct=True),
+            "Δ new − relaxed (pp)": f"{100 * (new.mean() - old.mean()):+.2f}",
+            "Relative Δ": "—" if np.isnan(rel) else f"{100 * rel:+.1f}%",
+            "Timing recovery vs filter (successes, 42/2024/2026)": _per_seed(g, "timing_recovery_successes"),
+            "Timing-only valid: relaxed → new (seed mean)": (
+                f"{g.relaxed_timing_only_valid_successes.mean():.1f} → "
+                f"{g.new_timing_only_valid_successes.mean():.1f}"),
+            "Padding-based valid: relaxed → new": (
+                f"{g.relaxed_padding_valid_successes.mean():.1f} → "
+                f"{g.new_padding_valid_successes.mean():.1f}"),
+            "Padding headroom: relaxed → new": (
+                f"{100 * g.relaxed_padding_headroom_rate.iloc[0]:.1f}% → "
+                f"{100 * g.new_padding_headroom_rate.iloc[0]:.1f}%"),
+        })
+    return md_table(pd.DataFrame(rows))
+
+
+def impact_md(impact: pd.DataFrame) -> str:
+    rows = []
+    for (dataset, victim, method), g in impact.groupby(["dataset", "victim", "method"], sort=False):
+        rows.append({
+            "Dataset": DS_LABEL[dataset], "Victim": victim, "Attack": method,
+            "Raw successes (seed mean)": f"{g.raw_successes.mean():.1f}",
+            "…filling an empty fwd packet": f"{g.raw_successes_filling_empty_packet.mean():.1f}",
+            "Valid ASR with rule": _mean_sd(g.valid_asr, pct=True),
+            "Valid ASR without rule": _mean_sd(g.valid_asr_without_rule, pct=True),
+            "Δ (pp, seed mean)": f"{g.delta_pp.mean():+.3f}",
+            "Valid successes lost only to the rule (Σ seeds)": int(g.valid_successes_lost_only_to_rule.sum()),
+        })
+    return md_table(pd.DataFrame(rows))
+
+
+def fairness_md(fairness: pd.DataFrame) -> str:
+    return md_table(pd.DataFrame([{
+        "Dataset": DS_LABEL[r.dataset], "Victim": r.victim, "n/seed": r.n_per_seed,
+        "PrimAttack Valid ASR": pm(r.primattack_valid_asr_mean, r.primattack_valid_asr_sd),
+        "CAPGD-PrimSupport Valid ASR": pm(r.capgd_primsupport_valid_asr_mean,
+                                          r.capgd_primsupport_valid_asr_sd),
+        "Δ PrimAttack − CAPGD (pp)": f"{r.diff_pp_primattack_minus_capgd:+.2f}",
+        "Δ per seed (pp)": " / ".join(f"{r[f'diff_pp_seed{s}']:+.2f}" for s in SEEDS),
+        "Discordant (Prim-only / CAPGD-only, seed 42)": (
+            "—" if pd.isna(r.primattack_only_seed42) else
+            f"{int(r.primattack_only_seed42)} / {int(r.capgd_only_seed42)}"),
+        "Holm p": fmt_p(r.holm_p),
+        "Higher": r.higher_valid_asr,
+    } for _, r in fairness.iterrows()]))
+
+
+CAPABILITY_NOTE = (
+    "**Capability-aware PrimAttack (amendment A2).** Padding adds `p` bytes to *every* forward "
+    "packet. A source flow with `Fwd Packet Length Min = 0` contains at least one zero-length "
+    "forward packet (e.g. a pure ACK), and aggregate features do not say which one, so padding "
+    "would put bytes into an empty packet (payload insertion, not length augmentation). "
+    "PrimAttack therefore infers `pad_allowed = payload present ∧ Fwd Packet Length Min > 0` "
+    "before optimization; such flows are attacked timing-only with the full per-flow budget. "
+    "validator_v2 independently rejects any attack output that turns a source minimum of 0 into "
+    "a positive value (source-conditioned PROTOCOL rule `PROTO_0080`, both datasets). The "
+    "pre-fix run is kept only as the `PrimAttack-relaxed-padding` sensitivity result "
+    "(`../superseded_relaxed_padding/`).")
+
+
+def capability_sections(cap: dict) -> list[str]:
+    return [
+        "## Capability-aware PrimAttack: eligibility, primitive use and ablation",
+        "",
+        CAPABILITY_NOTE,
+        "",
+        "### Primitive eligibility of the attacked source flows",
+        "",
+        "Capability shares are seed-independent (asserted). `Padding eligible, relaxed rule` = the "
+        "pre-fix rule (payload present only). `p75 box` = effective per-flow search space after "
+        "capabilities and the p75 budget (≥ 1 integer unit of headroom).",
+        "",
+        eligibility_md(cap["eligibility"]),
+        "",
+        "### PrimAttack primitive use (victim level)",
+        "",
+        "Counts per seed 42 / 2024 / 2026. Timing-only = p = 0 ∧ delay > 0; padding-only = p > 0 ∧ "
+        "delay = 0; joint = both. `Filled empty packet` must be 0 (also asserted).",
+        "",
+        breakdown_md(cap["breakdown"], classes=False),
+        "",
+        "Class level:",
+        "",
+        breakdown_md(cap["breakdown"], classes=True),
+        "",
+        "### Primitive ablation (untargeted, p75, selected optimizer)",
+        "",
+        "Joint = the Exp A PrimAttack cell; timing-only / padding-only restrict the box to one "
+        "primitive. Denominator = all attacked flows; padding-only is also shown on the "
+        "padding-eligible flows only (n shown).",
+        "",
+        ablation_md(cap["ablation"]),
+        "",
+        "### PrimAttack-relaxed-padding vs capability-aware PrimAttack",
+        "",
+        "Relaxed = the pre-fix Exp A PrimAttack cell as run (old validator). Post-hoc filtered = "
+        "the same relaxed flows re-judged by the current validator (a lower bound: it cannot "
+        "find new timing successes). Capability-aware = the fresh re-run. Timing recovery = "
+        "capability-aware valid successes − post-hoc filtered valid successes.",
+        "",
+        relaxed_md(cap["relaxed"]),
+        "",
+        "The Exp A cell above changes two things at once when the pre-registered selection "
+        "picks a different optimizer. Like-for-like (same optimizer, targeted→Benign, p75, Exp B "
+        "cells), relaxed vs capability-aware:",
+        "",
+        relaxed_md(cap["relaxed_by_opt"]),
+        "",
+        "### Impact of the empty-forward-packet validator rule on every Exp A attack",
+        "",
+        "`Valid ASR without rule` recomputes validator_v2 with `PROTO_0080` removed on the same "
+        "stored final flows.",
+        "",
+        impact_md(cap["impact"]),
+        "",
+        "### CAPGD-PrimSupport vs capability-aware PrimAttack",
+        "",
+        "Identical source flows, victims, seeds, validator and metrics; matched 23-feature "
+        "downstream support. Different parameterization: CAPGD-PrimSupport optimizes the allowed "
+        "feature values directly; PrimAttack optimizes primitives and reaches features only "
+        "through deterministic recomputation under capability restrictions. The comparison "
+        "quantifies the cost of the primitive-domain parameterization; PrimAttack is not "
+        "expected to win. Test = the planned Exp A McNemar (Holm over 4) at seed 42.",
+        "",
+        fairness_md(cap["fairness"]),
+        "",
+    ]
 
 
 def primitive_cost_table(frame: pd.DataFrame) -> pd.DataFrame:
@@ -851,17 +1413,27 @@ def fairness_guide_a() -> str:
         "(TabularBench CAPGD) | CE (untargeted) | L2 ball + train box + mask + integer-type repair "
         "| fixed steps | forward-hook batch mean | frozen `external/tabularbench` via "
         "`comparisons/capgd_cicids2017.py` |",
+        "| CAPGD (native) † | native CAPGD configuration mask (directly perturbable + repairable "
+        "derived features; not the PrimAttack mask) | L2 ε = 0.5 in train min-max space | 10 "
+        "steps, 2 restarts | CE (untargeted) | L2 ball + train box + mask + CAPGD relation "
+        "repair | fixed steps | forward-hook batch mean | same frozen TabularBench CAPGD |",
         "| C-PGD-PrimSupport | same 23-feature mask (asserted) | L2 ε = 0.5 in train min-max space "
         "| 40 steps, step 0.05, 1 random start | CE − 1.0·differentiable relation penalty | L2 ball "
         "+ train box + mask + integer-type repair | fixed steps | exact per flow | "
         "`comparisons/cpgd_prim_support.py` (Simonetto et al., IJCAI 2022) |",
-        "| PrimAttack | primitive controls only: padding p (bytes/fwd packet, increase-only), "
-        "added forward delay (µs) + shape; downstream changes only through the canonical "
+        "| PrimAttack (capability-aware) | primitive controls only: padding p (bytes/fwd packet, "
+        "increase-only; only for flows with forward payload AND no zero-length forward packet, "
+        "`Fwd Packet Length Min > 0`), added forward delay (µs) + shape (flows with ≥ 2 forward "
+        "packets and non-zero forward IAT); downstream changes only through the canonical "
         "recomputation φ onto the same 23-feature support | train-calibrated per-class p75 box "
-        "(joint) | per-flow cap of 256 victim evaluations | untargeted margin "
-        "z_true − max z_other on realized flows | integer bytes/µs projection, capability gates, "
-        "quantized recomputation | incumbent: success > failure, lowest primitive cost among "
-        "successes, best margin among failures | exact per flow | `attack/primitive_optimizer.py` |",
+        "(joint; per flow: joint / timing-only / padding-only / none by capability) | per-flow "
+        "cap of 256 victim evaluations, the whole cap spent on timing for timing-only flows | "
+        "untargeted margin z_true − max z_other on realized flows | integer bytes/µs projection, "
+        "capability gates, quantized recomputation | incumbent: success > failure, lowest "
+        "primitive cost among successes, best margin among failures | exact per flow | "
+        "`attack/primitive_optimizer.py` |",
+        "",
+        "† descriptive row (amendment A3), not part of Cochran's Q / Holm.",
         "",
         "**Validator in the loop.** PrimAttack's search success predicate includes validator_v2 "
         "(it keeps the cheapest *valid* success). PGD, C&W and CAPGD optimize without the "
@@ -871,19 +1443,22 @@ def fairness_guide_a() -> str:
         "",
         "**Matched support is not matched feasibility.** CAPGD/C-PGD may move any of the 23 "
         "coordinates independently within their norm ball. PrimAttack reaches the same coordinates "
-        "only through two coupled, increase-only primitives. The mask gives a controlled "
-        "matched-support comparison. It does not give CAPGD/C-PGD packet-level realizability.",
+        "only through two coupled, increase-only primitives, and only where the source flow "
+        "supports the primitive (most attack flows contain an empty forward packet and are "
+        "timing-only). The mask gives a controlled matched-support comparison of the "
+        "parameterization; it does not give CAPGD/C-PGD packet-level realizability, and "
+        "PrimAttack is not expected to reach a higher Valid ASR.",
     ])
 
 
 def report_a(out: Path, table: pd.DataFrame, stats: pd.DataFrame, diag: pd.DataFrame,
-             prim_cost: pd.DataFrame, conds: list[Cond], prim: Cond, prim_unb: Cond,
-             store: Store, final: bool) -> None:
+             prim_cost: pd.DataFrame, conds: list[Cond], desc: list[Cond], prim: Cond,
+             prim_unb: Cond, store: Store, final: bool, cap: dict) -> None:
     vt = table[table.scope == "victim"]
     main_rows = []
     for dataset, victims in DATASETS.items():
         for victim in victims:
-            for c in conds + [prim_unb]:
+            for c in conds + desc + [prim_unb]:
                 r = vt[(vt.dataset == dataset) & (vt.victim == victim) & (vt.condition == c.key)].iloc[0]
                 if c.prim:
                     budget = f"primitive box {c.budget} (joint), ≤256 evals/flow"
@@ -899,11 +1474,12 @@ def report_a(out: Path, table: pd.DataFrame, stats: pd.DataFrame, diag: pd.DataF
                             f"{r.mean_features_modified_mean:.1f} features modified")
                 else:
                     budget = BASELINE_NATIVE_BUDGET[c.method]
+                    allowed = int(store.frame(c).n_allowed_features.iloc[0])
                     pert = (f"mean L2 (train min-max) {r.mean_l2_train_minmax_mean:.3f}; "
-                            f"{r.mean_features_modified_mean:.1f} of 23 features modified")
+                            f"{r.mean_features_modified_mean:.1f} of {allowed} features modified")
                 main_rows.append({
                     "Dataset": DS_LABEL[dataset], "Victim": victim,
-                    "Attack": c.label + (" †" if c is prim_unb else ""),
+                    "Attack": c.label + (" †" if c is prim_unb or c in desc else ""),
                     "Budget / configuration": budget, "n/seed": r.n_per_seed,
                     "Raw ASR": pm(r.raw_asr_mean, r.raw_asr_sd),
                     "Valid ASR": pm(r.valid_asr_mean, r.valid_asr_sd),
@@ -915,7 +1491,8 @@ def report_a(out: Path, table: pd.DataFrame, stats: pd.DataFrame, diag: pd.DataF
         "Dataset": DS_LABEL[r.dataset], "Victim": r.victim, "Attack": r.method,
         "Allowed downstream features": r.allowed_downstream_features,
         "Mean modified features": f"{r.mean_features_modified:.2f}",
-        "Max modified outside mask": int(r.max_modified_outside_mask),
+        "Max modified outside mask": ("n/a (own mask)" if pd.isna(r.max_modified_outside_mask)
+                                      else int(r.max_modified_outside_mask)),
         "Raw ASR": pm(r.raw_asr_mean, r.raw_asr_sd),
         "Valid ASR": pm(r.valid_asr_mean, r.valid_asr_sd),
         "Validity Gap": pm_pp(r.validity_gap_pp_mean, r.validity_gap_pp_sd),
@@ -934,7 +1511,7 @@ def report_a(out: Path, table: pd.DataFrame, stats: pd.DataFrame, diag: pd.DataF
         "Median per-flow cap p_hi (bytes) / delay_hi (µs)": f"{r.median_p_hi_bytes:.1f} / {r.median_delay_hi_us:.0f}",
         "Flows with no primitive headroom": f"{100 * r.share_no_headroom:.1f}%",
     } for _, r in prim_cost.iterrows()])
-    classwise = table[(table.scope == "class") & table.condition.isin([c.key for c in conds])]
+    classwise = table[(table.scope == "class") & table.condition.isin([c.key for c in conds + desc])]
     cw_md = pd.DataFrame([{
         "Dataset": DS_LABEL[r.dataset], "Victim": r.victim, "Class": r.source_class,
         "Attack": r.method, "n/seed": r.n_per_seed, "Raw ASR": pm(r.raw_asr_mean, r.raw_asr_sd),
@@ -951,8 +1528,11 @@ def report_a(out: Path, table: pd.DataFrame, stats: pd.DataFrame, diag: pd.DataF
         "never pooled. Protocol: `../00_PROTOCOL.md`.",
         "",
         f"PrimAttack configuration: optimizer **{prim.label}** (selected by the pre-registered "
-        "Exp B rule; see `../B_optimizer_selection/`), joint mode, p75 budget. † = descriptive "
-        "p75-vs-unbounded row, not part of the inferential comparison.",
+        "Exp B rule; see `../B_optimizer_selection/`), joint mode, p75 budget, capability-aware "
+        "padding. † = descriptive rows (PrimAttack unbounded; native CAPGD, amendment A3), not "
+        "part of the inferential comparison.",
+        "",
+        CAPABILITY_NOTE,
         "",
         fairness_guide_a(),
         "",
@@ -980,6 +1560,7 @@ def report_a(out: Path, table: pd.DataFrame, stats: pd.DataFrame, diag: pd.DataF
         "",
         md_table(cost_md),
         "",
+        *capability_sections(cap),
         "## Statistical analysis (Valid Success)",
         "",
         STAT_METHOD_TEXT,
@@ -1003,13 +1584,18 @@ def report_a(out: Path, table: pd.DataFrame, stats: pd.DataFrame, diag: pd.DataF
         "- `plots/A4_modelwise_valid_asr.png` — model-wise Valid ASR",
         "- `plots/A5_validity_gap_by_attack.png` — Validity Gap by attack",
         "- `plots/A6_primattack_p75_vs_unbounded.png` — PrimAttack p75 vs unbounded",
+        "- `plots/A7_primitive_ablation.png` — PrimAttack joint vs timing-only vs padding-only",
+        "- `plots/A8_relaxed_vs_capability_aware.png` — relaxed-padding vs capability-aware "
+        "PrimAttack",
         "",
         "## Machine-readable outputs",
         "",
         "`per_sample.parquet` (every flow × seed × attack, incl. clean/adversarial prediction, raw "
         "success, validator pass, valid success, evaluations, primitive controls, attack "
         "parameters), `seed_level.csv`, `table_level.csv`, `statistical_tests.csv`, "
-        "`constrained_baseline_diagnostics.csv`, `primattack_primitive_costs.csv`.",
+        "`constrained_baseline_diagnostics.csv`, `primattack_primitive_costs.csv`; "
+        "`capability_fix/{eligibility, primattack_breakdown, primitive_ablation, "
+        "relaxed_vs_capability_aware, validator_rule_impact, capgd_primsupport_fairness}.csv`.",
         "",
         "## Interpretation",
         "",
@@ -1577,10 +2163,13 @@ def experiment_f(final: bool) -> dict:
         names = list(adapter.class_mapping().names)
         counts = pd.Series([r.source_type for r in v.rules]).value_counts()
         for st in ("SCHEMA", "EXTRACTOR", "PROTOCOL", "MINED"):
+            rules_st = [r for r in v.rules if r.source_type == st]
             rule_inventory.append({"dataset": dataset, "source_type": st,
                                    "layer": "dataset-specific (train-mined)" if st == "MINED"
                                    else "general flow consistency",
-                                   "n_rules": int(counts.get(st, 0))})
+                                   "n_rules": int(counts.get(st, 0)),
+                                   "n_transition_rules": sum(r.rule_type in TRANSITION_TYPES
+                                                             for r in rules_st)})
         for split in ("val", "test"):
             X = np.asarray(np.load(adapter._processed / f"X_{split}_pristine.npy", mmap_mode="r"))
             y = np.load(adapter._processed / f"y_{split}_cat.npy").astype(np.int64)
@@ -1659,7 +2248,9 @@ def experiment_f(final: bool) -> dict:
                             "General + dataset-specific acceptance": f"{100 * r.hybrid_acceptance:.4f}%",
                             "Rejected (hybrid)": r.hybrid_rejected} for _, r in cls.iterrows()])
     inv_md = pd.DataFrame([{"Dataset": DS_LABEL[r.dataset], "Category": r.source_type,
-                            "Layer": r.layer, "Rules": r.n_rules} for _, r in inv.iterrows()])
+                            "Layer": r.layer, "Rules": r.n_rules,
+                            "of which source-conditioned (perturbed flows only)":
+                                r.n_transition_rules} for _, r in inv.iterrows()])
     lines = [
         "# Final Experiment F — Validator evaluation (descriptive)",
         "",
@@ -1674,6 +2265,11 @@ def experiment_f(final: bool) -> dict:
         "## Rule inventory",
         "",
         md_table(inv_md),
+        "",
+        "The source-conditioned PROTOCOL rule `PROTO_0080` (an empty forward packet stays empty: "
+        "source `Fwd Packet Length Min = 0` ⇒ perturbed `Fwd Packet Length Min = 0`) constrains "
+        "perturbed flows against their source. A genuine flow is its own source, so the rule is "
+        "never eligible here and cannot change genuine-flow acceptance.",
         "",
         "## Acceptance / rejection of genuine held-out flows",
         "",
@@ -1716,13 +2312,15 @@ def write_summary(store: Store, selection: dict, a: dict, b: dict, c: dict, d: d
     n_lo = int(at[at.scope == "class"].n_per_seed.min())
     n_hi = int(at[at.scope == "class"].n_per_seed.max())
     n_txt = f"{n_lo}" if n_lo == n_hi else f"{n_lo}–{n_hi}"
-    vt = at[(at.scope == "victim") & ~at.method.str.contains("unbounded")]
+    head_conds = [a["prim"]] + a["bases"] + a["desc"]
+    vt = at[(at.scope == "victim") & at.condition.isin([c.key for c in head_conds])]
     head = []
     for dataset, victims in DATASETS.items():
         for victim in victims:
             rec = {"Dataset": DS_LABEL[dataset], "Victim": victim}
             for _, r in vt[(vt.dataset == dataset) & (vt.victim == victim)].iterrows():
-                rec[r.method] = f"{pm(r.raw_asr_mean, r.raw_asr_sd)} → {pm(r.valid_asr_mean, r.valid_asr_sd)}"
+                label = r.method + (" †" if r.condition in {c.key for c in a["desc"]} else "")
+                rec[label] = f"{pm(r.raw_asr_mean, r.raw_asr_sd)} → {pm(r.valid_asr_mean, r.valid_asr_sd)}"
             head.append(rec)
     n_tests = {k: int(len(v["stats"].dropna(subset=["p_value"]))) for k, v in
                (("A", a), ("B", b), ("C", c), ("D", d), ("E", e))}
@@ -1782,6 +2380,17 @@ def write_summary(store: Store, selection: dict, a: dict, b: dict, c: dict, d: d
         "## Headline: Experiment A (Raw ASR → Valid ASR, untargeted, mean ± SD)",
         "",
         md_table(pd.DataFrame(head)),
+        "",
+        "† CAPGD (native): descriptive row (amendment A3), not in the inferential family.",
+        "",
+        CAPABILITY_NOTE.replace("`../superseded_relaxed_padding/`",
+                                "`superseded_relaxed_padding/`"),
+        "",
+        "Capability-fix analyses (eligibility, primitive use, primitive ablation, relaxed vs "
+        "capability-aware PrimAttack, validator-rule impact, CAPGD-PrimSupport fairness): "
+        "`A_primary_baseline_comparison/primary_baseline_comparison.md` and "
+        "`A_primary_baseline_comparison/capability_fix/`; root report "
+        "`primattack_empty_packet_fix_report.md`.",
         "",
         f"Selected PrimAttack optimizer (Exp B, pre-registered aggregate-Valid-Targeted-ASR rule): "
         f"**{OPT_LABEL[selection['selected']]}**. Ranking: "

@@ -120,7 +120,8 @@ p\ge 0.
 \]
 
 After projection it is an integer number of bytes. It is active only when the source flow
-has at least one forward packet and positive forward payload evidence.
+has at least one forward packet, positive forward payload evidence, and no zero-length
+forward packet (`Fwd Packet Length Min > 0`).
 
 ### 5.2 Total added forward delay `delay`
 
@@ -168,9 +169,14 @@ The total becomes exactly `T + delay`. `shape` is zeroed whenever delay is inact
 
 - `Total Fwd Packet >= 1`; and
 - `Total Length of Fwd Packet > 0`; and
-- `Fwd Packet Length Mean > 0`.
+- `Fwd Packet Length Mean > 0`; and
+- `Fwd Packet Length Min > 0` (no zero-length forward packet; reason `EMPTY_FWD_PACKET`
+  otherwise). Padding adds `p` bytes to every forward packet, so on a flow with an empty
+  forward packet it would fill that packet. Most attack flows contain one (e.g. pure ACKs)
+  and are attacked timing-only.
 
-Otherwise the projected padding value is exactly zero.
+Otherwise the projected padding value is exactly zero. The support mask below is unchanged:
+every padding coordinate is still written for flows without an empty forward packet.
 
 ### 6.2 Timing capability
 

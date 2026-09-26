@@ -1,61 +1,67 @@
-Numbers below are seed means over the six victims (3 per dataset, n = 3,200 flows per victim
-and seed). All tests are McNemar on seed-42 Valid Success, Holm over the four
-PrimAttack-vs-baseline comparisons.
+Numbers are seed means (n = 3,200 flows per victim and seed). Tests are McNemar on seed-42
+Valid Success, Holm over the four PrimAttack-vs-baseline comparisons. PrimAttack is the
+capability-aware version (amendment A2): padding only for flows without a zero-length forward
+packet, every other flow timing-only.
 
-**1. Unrestricted feature-space attacks: high raw success, no valid success.** PGD reaches a
-Raw ASR of 91.70–100.00% and C&W 53.59–99.94% on all six victims. Every one of these
-adversarial flows is rejected by validator_v2 (Valid ASR = 0.00% for all 12 PGD/C&W cells), so
-the Validity Gap equals the Raw ASR. Among the rejected seed-42 examples, 100% violate SCHEMA,
-EXTRACTOR and PROTOCOL rules and ≥ 98.5% violate MINED rules (Exp E breakdown). Moving all 79
-scaled features independently yields vectors that lie outside the feature domain (SCHEMA),
-contradict CICFlowMeter's own aggregate identities (EXTRACTOR), and break protocol rules
-(PROTOCOL).
+**1. Unrestricted feature-space attacks: high raw success, no valid success.** PGD reaches a Raw
+ASR of 91.70–100.00% and C&W 53.59–99.94% on all six victims. validator_v2 rejects every one of
+these flows (Valid ASR 0.00% in all 12 cells), so the Validity Gap equals the Raw ASR. Moving all
+79 scaled features independently leaves the feature domain (SCHEMA), contradicts CICFlowMeter's
+aggregate identities (EXTRACTOR) and breaks protocol rules (PROTOCOL): 100% of the seed-42
+invalid examples fail each of these categories (Exp E).
 
 **2. Public constrained attacks restricted to PrimAttack's 23 downstream coordinates.**
-Limiting CAPGD and C-PGD to the canonical `primattack_joint_feature_mask` lowers raw success
-without removing it. CAPGD-PrimSupport reaches 9.74–96.53% and C-PGD-PrimSupport 1.65–60.42%.
-No feature outside the mask changed in any flow (max = 0, asserted). Almost none of this success
-is valid. C-PGD reaches a Valid ASR of 0.00% on every victim. CAPGD reaches at most 5.21% (CICIDS2017
-CNN), 2.18% on CICIDS2017 MLP and ≤ 0.29% elsewhere. The resulting Validity Gaps are 9.74–92.23 pp
-(CAPGD) and 1.65–60.42 pp (C-PGD). Their invalid examples mostly break EXTRACTOR identities
-(67–100%) and MINED invariants (84–100%). Changing the 23 coordinates independently decouples
-features that one packet-level change moves together. For example, padding changes forward
-total length, mean, max, min and byte rate jointly. C-PGD's differentiable penalty covers only
-11 of those relations (λ = 1) and does not prevent this. Restricting the support therefore
-constrains which features move but not whether they stay mutually consistent.
+CAPGD-PrimSupport reaches a Raw ASR of 9.74–96.53% and C-PGD-PrimSupport 1.65–60.42%, with no
+feature changed outside the mask (asserted). Almost none of it is valid. C-PGD has a Valid ASR of
+0.00% on every victim. CAPGD reaches 2.01% / 5.15% / 0.18% on CICIDS2017 MLP / CNN /
+FT-Transformer and 0.14% / 0.29% / 0.00% on CICIDS2018. Their invalid examples mostly break
+EXTRACTOR identities (67–100%) and MINED invariants (84–100%). Changing the 23 coordinates
+independently decouples features that one packet-level change moves together. The new
+empty-forward-packet rule `PROTO_0080` removes only 16 (MLP) and 6 (CNN) of CAPGD's CICIDS2017
+valid successes over three seeds (−0.17 / −0.06 pp) and none elsewhere.
 
-**3. Reaching the same coordinates only through packet-size/timing primitives.** PrimAttack
-(Hybrid Search, p75, untargeted) has far lower raw success than any feature-space baseline:
-11.06% / 36.67% / 0.50% on CICIDS2017 MLP / CNN / FT-Transformer, and 12.00% / 15.31% / 0.33% on
-CICIDS2018. On CICIDS2017 every raw success is also valid (gap 0.00 pp). That makes it the method
-with the highest **Valid** ASR on all three CICIDS2017 victims. Cochran's Q is significant for
-each victim, and PrimAttack beats every baseline after Holm correction. The margins are +11.06 pp
-over PGD, C&W and C-PGD and +8.88 pp over CAPGD on MLP. On CNN they are +36.69 pp and +31.44 pp.
-On FT-Transformer they are +0.50 pp and +0.34 pp (Holm p = 0.027 against CAPGD). On
-CICIDS2018 at p75, Valid ASR is near zero for every method: PrimAttack 0.19% / 0.03% / 0.00%,
-CAPGD 0.14% / 0.29% / 0.00%. Cochran's Q is significant for MLP and CNN, but none of the four planned
-PrimAttack comparisons survives Holm correction (all |Δ| ≤ 0.19 pp). FT-Transformer has no valid
-success under any attack (Q = 0, tests not performed). The CICIDS2018 PrimAttack raw successes
-are rejected by a single dataset-specific rule, `MINED_0001` (`Fwd Packet Length Min ≈ Packet
-Length Min`). Every rejected example uses padding. The p75 timing budget is also small
-(median per-flow delay cap about 31 ms vs about 0.9 s on CICIDS2017). The descriptive unbounded run
-confirms that the budget, not the method, limits CICIDS2018. Valid ASR rises to 23.51% (MLP) and
-5.01% (CNN) there, and to 47.91% / 73.41% on CICIDS2017 MLP / CNN (plot A6).
+**3. Capability-aware PrimAttack is a timing attack on almost every attack flow.** 99.97%
+(CICIDS2017) and 99.63% (CICIDS2018) of the attacked flows contain a zero-length forward packet,
+so only 1 of 3,200 (CICIDS2017) and 12 of 3,200 (CICIDS2018) flows per victim may be padded. At
+p75, 73.8–74.7% of the flows are searched timing-only and 25.0–26.2% have no primitive at all
+(mostly Recon: single-packet or zero-IAT probes). Every valid success uses timing only
+(p = 0, delay > 0); none fills an empty packet (asserted). PrimAttack (Prim-PGD, p75, untargeted)
+reaches a Valid ASR of 4.09% / 13.47% / 0.12% on CICIDS2017 and 2.53% / 1.16% / 0.00% on
+CICIDS2018, with a Validity Gap of 0.00 pp everywhere. Its successes come from DoS and DDoS (and
+21 CICIDS2018 Recon flows on MLP); BruteForce and Recon barely move.
 
-**4. How much Raw ASR disappears under the validator.** For PGD and C&W all of it: 53.59–100 pp
-per victim. For CAPGD 9.74–92.23 pp and for C-PGD 1.65–60.42 pp. For PrimAttack 0.00 pp on CICIDS2017
-and 0.33–15.28 pp on CICIDS2018. PrimAttack's raw successes survive validation far more
-often. PrimAttack is **not** valid by construction, though: when no valid success exists, its
-incumbent is the best-margin failure, which can evade and still be invalid.
+**4. Inference.** Cochran's Q is significant on five victims (not on CICIDS2018 FT-Transformer,
+where none of the five attacks has a valid success). PrimAttack has a higher Valid ASR than PGD, C&W and C-PGD on
+CICIDS2017 MLP / CNN and CICIDS2018 MLP / CNN (Holm p ≤ 1.3e-8) and than CAPGD-PrimSupport on the
+same four victims: +2.06, +8.28, +2.41 and +0.94 pp at seed 42 (364 vs 99 discordant flows on the
+CICIDS2017 CNN; Holm p ≤ 1.3e-5). On CICIDS2017 FT-Transformer none of the four comparisons is
+significant (4 PrimAttack-only flows; vs CAPGD Δ = −0.03 pp, Holm p = 1).
 
-**How to read these differences.** The attack with the highest Raw ASR (PGD) is not the best
-attack. It is the one with the least constrained threat model, and none of its evasions is a valid
-flow. The attacks also differ in validator access. PrimAttack's search uses validator_v2 as part
-of its success predicate. The baselines never query it, and C-PGD only sees a differentiable
-subset. PrimAttack's valid-success advantage therefore reflects both the primitive
-parameterization and this validity-aware search. The comparison controls downstream feature
-support. It does not give CAPGD/C-PGD packet-level realizability, and it does not give
-PrimAttack realizability beyond the feature-space proxy (no PCAP is modified). Valid evasion is
-strongly victim-dependent. FT-Transformer resists every validity-preserving attack
-(≤ 0.50% Valid ASR at p75 and ≤ 0.97% even unbounded), while the CICIDS2017 CNN is the most
-exposed victim.
+**5. What the capability fix changed.** The relaxed pre-fix PrimAttack reached 11.06% / 36.67% /
+0.50% on CICIDS2017, almost all of it by padding empty packets. Re-judging those flows with the
+new rule leaves 0.15% / 2.31% / 0.03%. The fresh timing-focused re-run recovers 126–127, 348–366
+and 3 valid successes per seed above that filter and lands at 4.09% / 13.47% / 0.12%: 63–75% below
+the relaxed result, but 27×, 5.8× and 4× the post-hoc lower bound. On CICIDS2018 the fix raises
+PrimAttack from 0.19% / 0.03% to 2.53% / 1.16%. There the relaxed search spent its evaluations on
+padding that `MINED_0001` always rejected; now the whole budget goes to timing. The selected
+optimizer also changed (Hybrid → Prim-PGD, a tie broken by evaluations; Exp B). The like-for-like
+targeted comparison with a fixed optimizer shows the same direction (e.g. Hybrid on CICIDS2018
+MLP 0.29% → 0.78%).
+
+**6. Descriptive rows.** Native CAPGD (†, its own 16-feature configuration mask, not the PrimAttack
+support) reaches a Valid ASR of 9.53% / 19.24% / 5.71% (CICIDS2017) and 28.42% / 16.30% / 0.45%
+(CICIDS2018): higher than every inferential attack on every victim. It is not a matched-support
+comparison. `PROTO_0080` removes 131 / 260 / 29 of its CICIDS2017 valid successes over three seeds
+(−1.37 / −2.71 / −0.30 pp). Unbounded PrimAttack reaches 22.97% / 59.94% / 0.59% and 44.32% /
+26.28% / 0.12%, so the p75 timing box (median per-flow delay cap about 0.9 s on CICIDS2017 and
+31 ms on CICIDS2018), not the search, limits p75 success.
+
+**How to read these differences.** The highest Raw ASR (PGD) belongs to the least constrained
+threat model, and none of its evasions is a valid flow. PrimAttack's search includes validator_v2
+in its success predicate; the baselines never query it, and C-PGD sees only a differentiable
+subset. PrimAttack's advantage over CAPGD-PrimSupport therefore reflects the primitive
+parameterization together with this validity-aware search, and it is limited to the victims
+where timing alone moves the decision. Matched support does not give CAPGD/C-PGD packet-level
+realizability, and PrimAttack's results are flow-level proxies (no PCAP is modified). Valid
+evasion is strongly victim-dependent: FT-Transformer resists every validity-preserving attack
+(≤ 0.18% Valid ASR at p75 across the inferential attacks).

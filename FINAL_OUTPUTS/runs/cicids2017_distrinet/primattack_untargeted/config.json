@@ -1,9 +1,13 @@
 {
   "dataset": "cicids2017_distrinet",
-  "mode": "joint",
+  "modes": [
+    "joint"
+  ],
   "objective": "untargeted",
+  "padding_capability": "Nf >= 1 AND Total Length of Fwd Packet > 0 AND Fwd Packet Length Mean > 0 AND Fwd Packet Length Min > 0",
+  "timing_capability": "Nf >= 2 AND Fwd IAT Total > 0",
   "methods": [
-    "hybrid"
+    "pgd"
   ],
   "method_configs": {
     "hybrid": {

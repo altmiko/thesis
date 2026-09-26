@@ -1,30 +1,20 @@
-**Valid success hardly depends on the objective.** With Hybrid Search at p75, Valid ASR is:
+**Targeted→Benign vs untargeted (Prim-PGD, p75, same flows and seeds).** On CICIDS2017 the two
+objectives give almost the same Valid ASR: MLP 4.09% vs 4.09% and FT-Transformer 0.12% vs 0.12%
+(identical success sets, 0 discordant flows), CNN 13.25% vs 13.47% (7 flows succeed only
+untargeted; McNemar p = 0.016). There, the flows that timing moves out of their class almost all
+move to Benign (seed 42: 423 of 431 untargeted CNN successes; the rest are DDoS↔Recon). On
+CICIDS2018 the untargeted objective is clearly easier: MLP 0.78% vs 2.53% (56 vs 0 discordant
+flows, p = 2.0e-13) and CNN 0.00% vs 1.16% (37 vs 0, p = 3.3e-9). These extra untargeted
+successes are DDoS flows pushed into DoS, i.e. into another attack class, not into Benign; the 25
+targeted successes on the MLP (4 DDoS, 21 Recon) reach Benign under both objectives.
+FT-Transformer has no valid success under either objective on CICIDS2018.
 
-| Victim | Targeted → Benign | Untargeted | Δ | Planned McNemar test (seed 42) |
-|---|---|---|---|---|
-| CICIDS2017 MLP | 11.06% | 11.06% | 0.00 pp | 0 vs 0 discordant, p = 1 |
-| CICIDS2017 CNN | 36.15% | 36.67% | −0.53 pp | 0 vs 17, p = 1.5e-5 |
-| CICIDS2017 FT-Transformer | 0.44% | 0.50% | −0.06 pp | 0 vs 2, p = 0.5 |
-| CICIDS2018 MLP | 0.29% | 0.19% | +0.13 pp | 4 vs 0, p = 0.125 |
-| CICIDS2018 CNN | 0.00% | 0.03% | −0.03 pp | 0 vs 1, p = 1 |
-| CICIDS2018 FT-Transformer | 0.00% | 0.00% | 0.00 pp | 0 vs 0, p = 1 |
+**Direction of the effect.** No flow is valid-targeted-only on any victim (targeted-only = 0
+everywhere), consistent with Benign being one of the classes an untargeted success may reach.
 
-Only CICIDS2017 CNN shows a significant difference: 17 flows that the untargeted search
-evades validly but the targeted search does not. That is a small effect (0.53 pp). Its sign
-agrees on seeds 2024 (−0.50 pp) and 2026 (−0.53 pp). A valid evasion that PrimAttack finds for a
-malicious flow almost always lands in the Benign class. On five of six victims, requiring
-"→ Benign" instead of "any other class" costs nothing measurable.
+**Validity.** Both objectives have a Validity Gap of 0.00 pp on every victim. The objective
+changes which flows succeed, not whether the successes are valid.
 
-**Raw success depends on the objective.** Raw untargeted ASR is much higher than raw targeted
-ASR on CICIDS2018 MLP (12.00% vs 1.28%). The two are similar elsewhere (e.g. CICIDS2018 CNN
-15.31% vs 15.00%; CICIDS2017 identical to within 0.52 pp). At seed 42, 343 of the 379 invalid raw
-untargeted successes on CICIDS2018 MLP are DDoS flows pushed into the DoS class, all by padding,
-and all fail the validator (`MINED_0001`). The Validity Gap is therefore 11.81 pp untargeted vs
-0.99 pp targeted. Without the validator, the untargeted objective would look far stronger. With
-it, the difference disappears. This is a direct example of why objective and validity must be
-reported separately (Contribution 2).
-
-**Reading.** The targeted-to-Benign setting is the operationally relevant evasion goal and
-PrimAttack's primary contribution. On these victims it costs almost no valid success compared
-with the easier untargeted goal. The weak valid results on CICIDS2018 at p75 and on
-FT-Transformer are therefore not an artefact of choosing the harder targeted objective.
+**Reading.** Reporting untargeted evasion (Exp A) and targeted evasion (Exp B/C) separately
+matters only on CICIDS2018, where up to 1.75 pp of the untargeted Valid ASR is class-to-class
+confusion between attack categories rather than evasion to Benign.

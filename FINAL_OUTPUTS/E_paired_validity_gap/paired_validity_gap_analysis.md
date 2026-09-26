@@ -8,12 +8,12 @@ Paired unit = one source flow. Inference uses the pre-specified reference seed 4
 
 | Group | Dataset | Victim | Condition | n (seed 42) | Raw ASR | Valid ASR | Validity Gap | Raw-success-but-invalid (seed 42) | Valid successes (seed 42) | Gap seed 42 (pp) | Test | Statistic | McNemar p | Interpretation |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| A (untargeted) | CICIDS2017 | mlp | PrimAttack (Hybrid Search, p75) | 3200 | 11.06% ± 0.00% | 11.06% ± 0.00% | 0.00 ± 0.00 pp | 0 | 354 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
-| A (untargeted) | CICIDS2017 | cnn | PrimAttack (Hybrid Search, p75) | 3200 | 36.67% ± 0.04% | 36.67% ± 0.04% | 0.00 ± 0.00 pp | 0 | 1174 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
-| A (untargeted) | CICIDS2017 | ft_transformer | PrimAttack (Hybrid Search, p75) | 3200 | 0.50% ± 0.00% | 0.50% ± 0.00% | 0.00 ± 0.00 pp | 0 | 16 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
-| A (untargeted) | CICIDS2018 | mlp-s42 | PrimAttack (Hybrid Search, p75) | 3200 | 12.00% ± 0.03% | 0.19% ± 0.03% | 11.81 ± 0.03 pp | 379 | 6 | 11.84 | asymptotic chi-square (continuity corrected) | 377.0 | 5.59e-84 | 379 of 385 raw successes fail the validator (11.84 pp lost); the paired loss is systematic (p = 5.59e-84). |
-| A (untargeted) | CICIDS2018 | cnn-s42 | PrimAttack (Hybrid Search, p75) | 3200 | 15.31% ± 0.00% | 0.03% ± 0.00% | 15.28 ± 0.00 pp | 489 | 1 | 15.28 | asymptotic chi-square (continuity corrected) | 487.0 | 6.4e-108 | 489 of 490 raw successes fail the validator (15.28 pp lost); the paired loss is systematic (p = 6.4e-108). |
-| A (untargeted) | CICIDS2018 | ft_transformer-s42 | PrimAttack (Hybrid Search, p75) | 3200 | 0.33% ± 0.02% | 0.00% ± 0.00% | 0.33 ± 0.02 pp | 11 | 0 | 0.34 | exact binomial McNemar |  | 0.000977 | 11 of 11 raw successes fail the validator (0.34 pp lost); the paired loss is systematic (p = 0.000977). |
+| A (untargeted) | CICIDS2017 | mlp | PrimAttack (Prim-PGD, p75) | 3200 | 4.09% ± 0.00% | 4.09% ± 0.00% | 0.00 ± 0.00 pp | 0 | 131 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| A (untargeted) | CICIDS2017 | cnn | PrimAttack (Prim-PGD, p75) | 3200 | 13.47% ± 0.00% | 13.47% ± 0.00% | 0.00 ± 0.00 pp | 0 | 431 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| A (untargeted) | CICIDS2017 | ft_transformer | PrimAttack (Prim-PGD, p75) | 3200 | 0.12% ± 0.00% | 0.12% ± 0.00% | 0.00 ± 0.00 pp | 0 | 4 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| A (untargeted) | CICIDS2018 | mlp-s42 | PrimAttack (Prim-PGD, p75) | 3200 | 2.53% ± 0.00% | 2.53% ± 0.00% | 0.00 ± 0.00 pp | 0 | 81 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| A (untargeted) | CICIDS2018 | cnn-s42 | PrimAttack (Prim-PGD, p75) | 3200 | 1.16% ± 0.00% | 1.16% ± 0.00% | 0.00 ± 0.00 pp | 0 | 37 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| A (untargeted) | CICIDS2018 | ft_transformer-s42 | PrimAttack (Prim-PGD, p75) | 3200 | 0.00% ± 0.00% | 0.00% ± 0.00% | 0.00 ± 0.00 pp | 0 | 0 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
 | A (untargeted) | CICIDS2017 | mlp | PGD | 3200 | 100.00% ± 0.00% | 0.00% ± 0.00% | 100.00 ± 0.00 pp | 3200 | 0 | 100.00 | asymptotic chi-square (continuity corrected) | 3198.0 | <1e-300 | 3200 of 3200 raw successes fail the validator (100.00 pp lost); the paired loss is systematic (p = <1e-300). |
 | A (untargeted) | CICIDS2017 | cnn | PGD | 3200 | 96.12% ± 0.09% | 0.00% ± 0.00% | 96.12 ± 0.09 pp | 3079 | 0 | 96.22 | asymptotic chi-square (continuity corrected) | 3077.0 | <1e-300 | 3079 of 3079 raw successes fail the validator (96.22 pp lost); the paired loss is systematic (p = <1e-300). |
 | A (untargeted) | CICIDS2017 | ft_transformer | PGD | 3200 | 97.36% ± 0.28% | 0.00% ± 0.00% | 97.36 ± 0.28 pp | 3115 | 0 | 97.34 | asymptotic chi-square (continuity corrected) | 3113.0 | <1e-300 | 3115 of 3115 raw successes fail the validator (97.34 pp lost); the paired loss is systematic (p = <1e-300). |
@@ -26,8 +26,8 @@ Paired unit = one source flow. Inference uses the pre-specified reference seed 4
 | A (untargeted) | CICIDS2018 | mlp-s42 | C&W | 3200 | 87.63% ± 0.00% | 0.00% ± 0.00% | 87.62 ± 0.00 pp | 2804 | 0 | 87.62 | asymptotic chi-square (continuity corrected) | 2802.0 | <1e-300 | 2804 of 2804 raw successes fail the validator (87.62 pp lost); the paired loss is systematic (p = <1e-300). |
 | A (untargeted) | CICIDS2018 | cnn-s42 | C&W | 3200 | 99.16% ± 0.00% | 0.00% ± 0.00% | 99.16 ± 0.00 pp | 3173 | 0 | 99.16 | asymptotic chi-square (continuity corrected) | 3171.0 | <1e-300 | 3173 of 3173 raw successes fail the validator (99.16 pp lost); the paired loss is systematic (p = <1e-300). |
 | A (untargeted) | CICIDS2018 | ft_transformer-s42 | C&W | 3200 | 53.59% ± 0.00% | 0.00% ± 0.00% | 53.59 ± 0.00 pp | 1715 | 0 | 53.59 | asymptotic chi-square (continuity corrected) | 1713.0 | <1e-300 | 1715 of 1715 raw successes fail the validator (53.59 pp lost); the paired loss is systematic (p = <1e-300). |
-| A (untargeted) | CICIDS2017 | mlp | CAPGD-PrimSupport | 3200 | 94.41% ± 0.71% | 2.18% ± 0.08% | 92.23 ± 0.78 pp | 2957 | 70 | 92.41 | asymptotic chi-square (continuity corrected) | 2955.0 | <1e-300 | 2957 of 3027 raw successes fail the validator (92.41 pp lost); the paired loss is systematic (p = <1e-300). |
-| A (untargeted) | CICIDS2017 | cnn | CAPGD-PrimSupport | 3200 | 96.53% ± 1.07% | 5.21% ± 0.07% | 91.32 ± 1.00 pp | 2953 | 168 | 92.28 | asymptotic chi-square (continuity corrected) | 2951.0 | <1e-300 | 2953 of 3121 raw successes fail the validator (92.28 pp lost); the paired loss is systematic (p = <1e-300). |
+| A (untargeted) | CICIDS2017 | mlp | CAPGD-PrimSupport | 3200 | 94.41% ± 0.71% | 2.01% ± 0.10% | 92.40 ± 0.79 pp | 2962 | 65 | 92.56 | asymptotic chi-square (continuity corrected) | 2960.0 | <1e-300 | 2962 of 3027 raw successes fail the validator (92.56 pp lost); the paired loss is systematic (p = <1e-300). |
+| A (untargeted) | CICIDS2017 | cnn | CAPGD-PrimSupport | 3200 | 96.53% ± 1.07% | 5.15% ± 0.07% | 91.39 ± 1.00 pp | 2955 | 166 | 92.34 | asymptotic chi-square (continuity corrected) | 2953.0 | <1e-300 | 2955 of 3121 raw successes fail the validator (92.34 pp lost); the paired loss is systematic (p = <1e-300). |
 | A (untargeted) | CICIDS2017 | ft_transformer | CAPGD-PrimSupport | 3200 | 52.21% ± 4.33% | 0.18% ± 0.02% | 52.03 ± 4.32 pp | 1653 | 5 | 51.66 | asymptotic chi-square (continuity corrected) | 1651.0 | <1e-300 | 1653 of 1658 raw successes fail the validator (51.66 pp lost); the paired loss is systematic (p = <1e-300). |
 | A (untargeted) | CICIDS2018 | mlp-s42 | CAPGD-PrimSupport | 3200 | 91.57% ± 0.84% | 0.14% ± 0.02% | 91.44 ± 0.85 pp | 2957 | 4 | 92.41 | asymptotic chi-square (continuity corrected) | 2955.0 | <1e-300 | 2957 of 2961 raw successes fail the validator (92.41 pp lost); the paired loss is systematic (p = <1e-300). |
 | A (untargeted) | CICIDS2018 | cnn-s42 | CAPGD-PrimSupport | 3200 | 76.01% ± 1.68% | 0.29% ± 0.07% | 75.72 ± 1.69 pp | 2448 | 7 | 76.50 | asymptotic chi-square (continuity corrected) | 2446.0 | <1e-300 | 2448 of 2455 raw successes fail the validator (76.50 pp lost); the paired loss is systematic (p = <1e-300). |
@@ -38,24 +38,24 @@ Paired unit = one source flow. Inference uses the pre-specified reference seed 4
 | A (untargeted) | CICIDS2018 | mlp-s42 | C-PGD-PrimSupport | 3200 | 28.25% ± 0.51% | 0.00% ± 0.00% | 28.25 ± 0.51 pp | 885 | 0 | 27.66 | asymptotic chi-square (continuity corrected) | 883.0 | 4.87e-194 | 885 of 885 raw successes fail the validator (27.66 pp lost); the paired loss is systematic (p = 4.87e-194). |
 | A (untargeted) | CICIDS2018 | cnn-s42 | C-PGD-PrimSupport | 3200 | 50.54% ± 3.30% | 0.00% ± 0.00% | 50.54 ± 3.30 pp | 1531 | 0 | 47.84 | asymptotic chi-square (continuity corrected) | 1529.0 | <1e-300 | 1531 of 1531 raw successes fail the validator (47.84 pp lost); the paired loss is systematic (p = <1e-300). |
 | A (untargeted) | CICIDS2018 | ft_transformer-s42 | C-PGD-PrimSupport | 3200 | 1.65% ± 0.42% | 0.00% ± 0.00% | 1.65 ± 0.42 pp | 39 | 0 | 1.22 | asymptotic chi-square (continuity corrected) | 37.0 | 1.17e-09 | 39 of 39 raw successes fail the validator (1.22 pp lost); the paired loss is systematic (p = 1.17e-09). |
-| B (targeted→Benign) | CICIDS2017 | mlp | Hybrid Search (targeted, p75) | 3200 | 11.06% ± 0.00% | 11.06% ± 0.00% | 0.00 ± 0.00 pp | 0 | 354 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
-| B (targeted→Benign) | CICIDS2017 | cnn | Hybrid Search (targeted, p75) | 3200 | 36.15% ± 0.02% | 36.15% ± 0.02% | 0.00 ± 0.00 pp | 0 | 1157 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
-| B (targeted→Benign) | CICIDS2017 | ft_transformer | Hybrid Search (targeted, p75) | 3200 | 0.44% ± 0.00% | 0.44% ± 0.00% | 0.00 ± 0.00 pp | 0 | 14 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
-| B (targeted→Benign) | CICIDS2018 | mlp-s42 | Hybrid Search (targeted, p75) | 3200 | 1.28% ± 0.03% | 0.29% ± 0.04% | 0.99 ± 0.02 pp | 32 | 10 | 1.00 | asymptotic chi-square (continuity corrected) | 30.0 | 4.25e-08 | 32 of 42 raw successes fail the validator (1.00 pp lost); the paired loss is systematic (p = 4.25e-08). |
-| B (targeted→Benign) | CICIDS2018 | cnn-s42 | Hybrid Search (targeted, p75) | 3200 | 15.00% ± 0.00% | 0.00% ± 0.00% | 15.00 ± 0.00 pp | 480 | 0 | 15.00 | asymptotic chi-square (continuity corrected) | 478.0 | 5.81e-106 | 480 of 480 raw successes fail the validator (15.00 pp lost); the paired loss is systematic (p = 5.81e-106). |
-| B (targeted→Benign) | CICIDS2018 | ft_transformer-s42 | Hybrid Search (targeted, p75) | 3200 | 0.33% ± 0.02% | 0.00% ± 0.00% | 0.33 ± 0.02 pp | 11 | 0 | 0.34 | exact binomial McNemar |  | 0.000977 | 11 of 11 raw successes fail the validator (0.34 pp lost); the paired loss is systematic (p = 0.000977). |
-| B (targeted→Benign) | CICIDS2017 | mlp | Prim-PGD (targeted, p75) | 3200 | 11.06% ± 0.00% | 11.06% ± 0.00% | 0.00 ± 0.00 pp | 0 | 354 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
-| B (targeted→Benign) | CICIDS2017 | cnn | Prim-PGD (targeted, p75) | 3200 | 36.10% ± 0.13% | 36.10% ± 0.13% | 0.00 ± 0.00 pp | 0 | 1153 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
-| B (targeted→Benign) | CICIDS2017 | ft_transformer | Prim-PGD (targeted, p75) | 3200 | 0.44% ± 0.00% | 0.44% ± 0.00% | 0.00 ± 0.00 pp | 0 | 14 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
-| B (targeted→Benign) | CICIDS2018 | mlp-s42 | Prim-PGD (targeted, p75) | 3200 | 1.31% ± 0.00% | 0.26% ± 0.02% | 1.05 ± 0.02 pp | 33 | 9 | 1.03 | asymptotic chi-square (continuity corrected) | 31.0 | 2.54e-08 | 33 of 42 raw successes fail the validator (1.03 pp lost); the paired loss is systematic (p = 2.54e-08). |
-| B (targeted→Benign) | CICIDS2018 | cnn-s42 | Prim-PGD (targeted, p75) | 3200 | 15.01% ± 0.02% | 0.00% ± 0.00% | 15.01 ± 0.02 pp | 480 | 0 | 15.00 | asymptotic chi-square (continuity corrected) | 478.0 | 5.81e-106 | 480 of 480 raw successes fail the validator (15.00 pp lost); the paired loss is systematic (p = 5.81e-106). |
-| B (targeted→Benign) | CICIDS2018 | ft_transformer-s42 | Prim-PGD (targeted, p75) | 3200 | 0.32% ± 0.02% | 0.00% ± 0.00% | 0.32 ± 0.02 pp | 10 | 0 | 0.31 | exact binomial McNemar |  | 0.00195 | 10 of 10 raw successes fail the validator (0.31 pp lost); the paired loss is systematic (p = 0.00195). |
-| B (targeted→Benign) | CICIDS2017 | mlp | Prim-C&W (targeted, p75) | 3200 | 11.00% ± 0.00% | 11.00% ± 0.00% | 0.00 ± 0.00 pp | 0 | 352 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
-| B (targeted→Benign) | CICIDS2017 | cnn | Prim-C&W (targeted, p75) | 3200 | 14.31% ± 0.00% | 14.31% ± 0.00% | 0.00 ± 0.00 pp | 0 | 458 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
-| B (targeted→Benign) | CICIDS2017 | ft_transformer | Prim-C&W (targeted, p75) | 3200 | 0.44% ± 0.00% | 0.44% ± 0.00% | 0.00 ± 0.00 pp | 0 | 14 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
-| B (targeted→Benign) | CICIDS2018 | mlp-s42 | Prim-C&W (targeted, p75) | 3200 | 1.28% ± 0.00% | 0.72% ± 0.00% | 0.56 ± 0.00 pp | 18 | 23 | 0.56 | exact binomial McNemar |  | 7.63e-06 | 18 of 41 raw successes fail the validator (0.56 pp lost); the paired loss is systematic (p = 7.63e-06). |
-| B (targeted→Benign) | CICIDS2018 | cnn-s42 | Prim-C&W (targeted, p75) | 3200 | 13.81% ± 0.00% | 0.00% ± 0.00% | 13.81 ± 0.00 pp | 442 | 0 | 13.81 | asymptotic chi-square (continuity corrected) | 440.0 | 1.08e-97 | 442 of 442 raw successes fail the validator (13.81 pp lost); the paired loss is systematic (p = 1.08e-97). |
-| B (targeted→Benign) | CICIDS2018 | ft_transformer-s42 | Prim-C&W (targeted, p75) | 3200 | 0.19% ± 0.00% | 0.00% ± 0.00% | 0.19 ± 0.00 pp | 6 | 0 | 0.19 | exact binomial McNemar |  | 0.0312 | 6 of 6 raw successes fail the validator (0.19 pp lost); the paired loss is systematic (p = 0.0312). |
+| B (targeted→Benign) | CICIDS2017 | mlp | Hybrid Search (targeted, p75) | 3200 | 4.09% ± 0.00% | 4.09% ± 0.00% | 0.00 ± 0.00 pp | 0 | 131 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2017 | cnn | Hybrid Search (targeted, p75) | 3200 | 13.25% ± 0.00% | 13.25% ± 0.00% | 0.00 ± 0.00 pp | 0 | 424 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2017 | ft_transformer | Hybrid Search (targeted, p75) | 3200 | 0.12% ± 0.00% | 0.12% ± 0.00% | 0.00 ± 0.00 pp | 0 | 4 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2018 | mlp-s42 | Hybrid Search (targeted, p75) | 3200 | 0.78% ± 0.00% | 0.78% ± 0.00% | 0.00 ± 0.00 pp | 0 | 25 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2018 | cnn-s42 | Hybrid Search (targeted, p75) | 3200 | 0.00% ± 0.00% | 0.00% ± 0.00% | 0.00 ± 0.00 pp | 0 | 0 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2018 | ft_transformer-s42 | Hybrid Search (targeted, p75) | 3200 | 0.00% ± 0.00% | 0.00% ± 0.00% | 0.00 ± 0.00 pp | 0 | 0 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2017 | mlp | Prim-PGD (targeted, p75) | 3200 | 4.09% ± 0.00% | 4.09% ± 0.00% | 0.00 ± 0.00 pp | 0 | 131 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2017 | cnn | Prim-PGD (targeted, p75) | 3200 | 13.25% ± 0.00% | 13.25% ± 0.00% | 0.00 ± 0.00 pp | 0 | 424 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2017 | ft_transformer | Prim-PGD (targeted, p75) | 3200 | 0.12% ± 0.00% | 0.12% ± 0.00% | 0.00 ± 0.00 pp | 0 | 4 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2018 | mlp-s42 | Prim-PGD (targeted, p75) | 3200 | 0.78% ± 0.00% | 0.78% ± 0.00% | 0.00 ± 0.00 pp | 0 | 25 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2018 | cnn-s42 | Prim-PGD (targeted, p75) | 3200 | 0.00% ± 0.00% | 0.00% ± 0.00% | 0.00 ± 0.00 pp | 0 | 0 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2018 | ft_transformer-s42 | Prim-PGD (targeted, p75) | 3200 | 0.00% ± 0.00% | 0.00% ± 0.00% | 0.00 ± 0.00 pp | 0 | 0 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2017 | mlp | Prim-C&W (targeted, p75) | 3200 | 4.09% ± 0.00% | 4.09% ± 0.00% | 0.00 ± 0.00 pp | 0 | 131 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2017 | cnn | Prim-C&W (targeted, p75) | 3200 | 4.00% ± 0.00% | 4.00% ± 0.00% | 0.00 ± 0.00 pp | 0 | 128 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2017 | ft_transformer | Prim-C&W (targeted, p75) | 3200 | 0.12% ± 0.00% | 0.12% ± 0.00% | 0.00 ± 0.00 pp | 0 | 4 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2018 | mlp-s42 | Prim-C&W (targeted, p75) | 3200 | 0.75% ± 0.00% | 0.75% ± 0.00% | 0.00 ± 0.00 pp | 0 | 24 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2018 | cnn-s42 | Prim-C&W (targeted, p75) | 3200 | 0.00% ± 0.00% | 0.00% ± 0.00% | 0.00 ± 0.00 pp | 0 | 0 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
+| B (targeted→Benign) | CICIDS2018 | ft_transformer-s42 | Prim-C&W (targeted, p75) | 3200 | 0.00% ± 0.00% | 0.00% ± 0.00% | 0.00 ± 0.00 pp | 0 | 0 | 0.00 | exact binomial McNemar |  | 1 | No raw-success-but-invalid example: no validity gap at seed 42. |
 
 ## Why raw successes are rejected (descriptive)
 
@@ -63,9 +63,6 @@ For every raw-success-but-invalid example at seed 42: the share that violates at
 
 | Group | Dataset | Victim | Condition | Raw-success-but-invalid (seed 42) | Failing SCHEMA | Failing EXTRACTOR | Failing PROTOCOL | Failing MINED |
 |---|---|---|---|---|---|---|---|---|
-| A (untargeted) | CICIDS2018 | mlp-s42 | PrimAttack (Hybrid Search, p75) | 379 | 0.0% | 0.0% | 0.0% | 100.0% |
-| A (untargeted) | CICIDS2018 | cnn-s42 | PrimAttack (Hybrid Search, p75) | 489 | 0.0% | 0.0% | 0.0% | 100.0% |
-| A (untargeted) | CICIDS2018 | ft_transformer-s42 | PrimAttack (Hybrid Search, p75) | 11 | 0.0% | 0.0% | 0.0% | 100.0% |
 | A (untargeted) | CICIDS2017 | mlp | PGD | 3200 | 100.0% | 100.0% | 100.0% | 100.0% |
 | A (untargeted) | CICIDS2017 | cnn | PGD | 3079 | 100.0% | 100.0% | 100.0% | 99.9% |
 | A (untargeted) | CICIDS2017 | ft_transformer | PGD | 3115 | 100.0% | 100.0% | 100.0% | 99.7% |
@@ -78,27 +75,18 @@ For every raw-success-but-invalid example at seed 42: the share that violates at
 | A (untargeted) | CICIDS2018 | mlp-s42 | C&W | 2804 | 100.0% | 100.0% | 100.0% | 100.0% |
 | A (untargeted) | CICIDS2018 | cnn-s42 | C&W | 3173 | 100.0% | 100.0% | 100.0% | 100.0% |
 | A (untargeted) | CICIDS2018 | ft_transformer-s42 | C&W | 1715 | 100.0% | 100.0% | 100.0% | 100.0% |
-| A (untargeted) | CICIDS2017 | mlp | CAPGD-PrimSupport | 2957 | 0.0% | 67.4% | 0.0% | 92.9% |
-| A (untargeted) | CICIDS2017 | cnn | CAPGD-PrimSupport | 2953 | 0.0% | 84.7% | 0.0% | 86.3% |
-| A (untargeted) | CICIDS2017 | ft_transformer | CAPGD-PrimSupport | 1653 | 0.0% | 83.2% | 0.0% | 96.2% |
-| A (untargeted) | CICIDS2018 | mlp-s42 | CAPGD-PrimSupport | 2957 | 0.0% | 82.7% | 0.0% | 92.5% |
-| A (untargeted) | CICIDS2018 | cnn-s42 | CAPGD-PrimSupport | 2448 | 0.0% | 95.8% | 0.0% | 92.3% |
-| A (untargeted) | CICIDS2018 | ft_transformer-s42 | CAPGD-PrimSupport | 335 | 0.0% | 100.0% | 0.0% | 99.1% |
-| A (untargeted) | CICIDS2017 | mlp | C-PGD-PrimSupport | 1645 | 0.0% | 100.0% | 0.0% | 89.5% |
-| A (untargeted) | CICIDS2017 | cnn | C-PGD-PrimSupport | 2032 | 0.0% | 100.0% | 0.0% | 84.4% |
-| A (untargeted) | CICIDS2017 | ft_transformer | C-PGD-PrimSupport | 686 | 0.0% | 100.0% | 0.0% | 95.2% |
-| A (untargeted) | CICIDS2018 | mlp-s42 | C-PGD-PrimSupport | 885 | 0.0% | 100.0% | 0.0% | 95.7% |
-| A (untargeted) | CICIDS2018 | cnn-s42 | C-PGD-PrimSupport | 1531 | 0.0% | 100.0% | 0.0% | 95.2% |
-| A (untargeted) | CICIDS2018 | ft_transformer-s42 | C-PGD-PrimSupport | 39 | 0.0% | 100.0% | 0.0% | 100.0% |
-| B (targeted→Benign) | CICIDS2018 | mlp-s42 | Hybrid Search (targeted, p75) | 32 | 0.0% | 0.0% | 0.0% | 100.0% |
-| B (targeted→Benign) | CICIDS2018 | cnn-s42 | Hybrid Search (targeted, p75) | 480 | 0.0% | 0.0% | 0.0% | 100.0% |
-| B (targeted→Benign) | CICIDS2018 | ft_transformer-s42 | Hybrid Search (targeted, p75) | 11 | 0.0% | 0.0% | 0.0% | 100.0% |
-| B (targeted→Benign) | CICIDS2018 | mlp-s42 | Prim-PGD (targeted, p75) | 33 | 0.0% | 0.0% | 0.0% | 100.0% |
-| B (targeted→Benign) | CICIDS2018 | cnn-s42 | Prim-PGD (targeted, p75) | 480 | 0.0% | 0.0% | 0.0% | 100.0% |
-| B (targeted→Benign) | CICIDS2018 | ft_transformer-s42 | Prim-PGD (targeted, p75) | 10 | 0.0% | 0.0% | 0.0% | 100.0% |
-| B (targeted→Benign) | CICIDS2018 | mlp-s42 | Prim-C&W (targeted, p75) | 18 | 0.0% | 0.0% | 0.0% | 100.0% |
-| B (targeted→Benign) | CICIDS2018 | cnn-s42 | Prim-C&W (targeted, p75) | 442 | 0.0% | 0.0% | 0.0% | 100.0% |
-| B (targeted→Benign) | CICIDS2018 | ft_transformer-s42 | Prim-C&W (targeted, p75) | 6 | 0.0% | 0.0% | 0.0% | 100.0% |
+| A (untargeted) | CICIDS2017 | mlp | CAPGD-PrimSupport | 2962 | 0.0% | 67.3% | 16.3% | 92.7% |
+| A (untargeted) | CICIDS2017 | cnn | CAPGD-PrimSupport | 2955 | 0.0% | 84.6% | 11.4% | 86.2% |
+| A (untargeted) | CICIDS2017 | ft_transformer | CAPGD-PrimSupport | 1653 | 0.0% | 83.2% | 16.6% | 96.2% |
+| A (untargeted) | CICIDS2018 | mlp-s42 | CAPGD-PrimSupport | 2957 | 0.0% | 82.7% | 15.5% | 92.5% |
+| A (untargeted) | CICIDS2018 | cnn-s42 | CAPGD-PrimSupport | 2448 | 0.0% | 95.8% | 22.2% | 92.3% |
+| A (untargeted) | CICIDS2018 | ft_transformer-s42 | CAPGD-PrimSupport | 335 | 0.0% | 100.0% | 61.8% | 99.1% |
+| A (untargeted) | CICIDS2017 | mlp | C-PGD-PrimSupport | 1645 | 0.0% | 100.0% | 53.3% | 89.5% |
+| A (untargeted) | CICIDS2017 | cnn | C-PGD-PrimSupport | 2032 | 0.0% | 100.0% | 54.9% | 84.4% |
+| A (untargeted) | CICIDS2017 | ft_transformer | C-PGD-PrimSupport | 686 | 0.0% | 100.0% | 51.6% | 95.2% |
+| A (untargeted) | CICIDS2018 | mlp-s42 | C-PGD-PrimSupport | 885 | 0.0% | 100.0% | 47.9% | 95.7% |
+| A (untargeted) | CICIDS2018 | cnn-s42 | C-PGD-PrimSupport | 1531 | 0.0% | 100.0% | 57.3% | 95.2% |
+| A (untargeted) | CICIDS2018 | ft_transformer-s42 | C-PGD-PrimSupport | 39 | 0.0% | 100.0% | 82.1% | 100.0% |
 
 ## Plots
 
@@ -107,38 +95,35 @@ For every raw-success-but-invalid example at seed 42: the share that violates at
 
 ## Interpretation
 
-**How much classifier-level success disappears when validity is required.** On identical
-adversarial examples (seed-42 McNemar, raw vs valid):
+**Size of the gap.** On identical source flows, the share of raw successes that validator_v2
+rejects depends almost entirely on the attack's threat model:
 
-- **Unconstrained feature-space attacks (PGD, C&W):** all of it. 1,715–3,200 raw successes per
-  victim, 0 valid, gap 53.59–100.00 pp. Every test is significant (p < 1e-300).
-- **Matched-support constrained attacks:** almost all of it. CAPGD-PrimSupport keeps 0–168 valid
-  of 335–3,121 raw successes (gap 9.74–92.23 pp). C-PGD-PrimSupport keeps none of 39–2,032
-  (gap 1.65–60.42 pp). Every test is significant (p ≤ 1.2e-9). The invalid examples fail
-  EXTRACTOR identities (67–100%) and MINED invariants (84–100%). They never fail SCHEMA or
-  PROTOCOL: the attacks' train-range box and type repair keep single features in-domain, but not
-  their mutual consistency.
-- **PrimAttack (untargeted and all three targeted optimizers, p75):** none of it on CICIDS2017.
-  There is no raw-success-but-invalid example on any victim (p = 1, gap 0.00 pp). On
-  CICIDS2018 a systematic gap appears. Untargeted: 379 of 385 (MLP), 489 of 490 (CNN) and 11 of 11 (FT)
-  raw successes are invalid (gap 11.81 / 15.28 / 0.33 pp; p ≤ 0.001). Targeted: gaps of
-  0.56–1.05 pp (MLP), 13.81–15.01 pp (CNN) and 0.19–0.33 pp (FT) across the three optimizers.
-  Every such example violates only the MINED category, specifically `MINED_0001`
-  (`Fwd Packet Length Min ≈ Packet Length Min`), and uses padding.
+- PGD and C&W: every raw success is invalid on every victim (Validity Gap = Raw ASR,
+  53.59–100.00 pp; McNemar p < 1e-300 on all 12 cells).
+- CAPGD-PrimSupport: gaps of 9.74–92.40 pp; at seed 42 between 5 (CICIDS2017 FT-Transformer)
+  and 166 (CICIDS2017 CNN) of up to 3,121 raw successes survive.
+- C-PGD-PrimSupport: gaps of 1.65–60.42 pp; no raw success survives on any victim.
+- Capability-aware PrimAttack (Exp A untargeted and all three Exp B optimizers, targeted): gap
+  0.00 pp in all 24 cells; every raw success is valid (McNemar p = 1, no discordant flow).
 
-**Is the loss systematic?** Yes, wherever it exists. Because Valid ⊆ Raw, the discordant cell
-"raw success, invalid" is one-sided by construction, and every non-zero count is significant.
-The seed replicates show the same picture: the Validity Gap SD across seeds is ≤ 0.03 pp for
-every PrimAttack condition and ≤ 4.32 pp for every baseline. What matters is the size of the
-gap, not the p-value. The feature-space baselines lose essentially their whole Raw ASR, and
-PrimAttack loses nothing on CICIDS2017 and 0.2–15.3 pp on CICIDS2018.
+**Why raw successes are rejected.** PGD and C&W examples fail every validator category (SCHEMA,
+EXTRACTOR and PROTOCOL for 100% of them; MINED for ≥ 98.5%). The matched-support attacks never
+fail SCHEMA (their type repair works) but mostly break CICFlowMeter identities (EXTRACTOR:
+67–100% of CAPGD, 100% of C-PGD invalid examples) and mined invariants (MINED: 84–100%).
+PROTOCOL failures (11–82%) all come from the empty-forward-packet rule `PROTO_0080` (0% before
+amendment A2 on the identical adversarial flows): both attacks raise `Fwd Packet Length Min` of
+flows that had a zero-length forward packet (CAPGD-PrimSupport in about 454 of 3,021 raw
+successes per seed on CICIDS2017 MLP). The rule changes almost no verdict on its own: those flows
+usually also violate EXTRACTOR or MINED rules, and only 16 / 6 CAPGD-PrimSupport valid successes
+(CICIDS2017 MLP / CNN, three seeds) were lost to it alone.
 
-**What the gap measures.** Raw ASR alone would rank PGD (≥ 91.70%) far above PrimAttack
-(≤ 36.67% at p75). Valid ASR reverses that ranking on CICIDS2017 and flattens it to near zero on
-CICIDS2018. The paired validity gap separates two failure modes: classifier robustness (low
-raw success) and domain invalidity (high raw, low valid). It also shows where the independent
-validator adds information that the attack's own constraints do not encode. For C-PGD, the
-differentiable relation penalty did not prevent EXTRACTOR failures. For PrimAttack on
-CICIDS2018, the train-mined regularity `Fwd Packet Length Min ≈ Packet Length Min` is not one of
-the constraints PrimAttack's recomputation φ preserves. Padding raises the forward minimum, and
-the validator rejects the resulting flow (Contribution 3).
+**Why PrimAttack has no gap.** It constructs every candidate through the canonical recomputation
+φ (identities hold by construction), keeps only validator-accepted incumbents in its search, and
+under the capability rule never pads a flow with an empty forward packet. Before amendment A2 the
+relaxed PrimAttack had a 0.33–15.28 pp gap on CICIDS2018, entirely from `MINED_0001` rejecting
+padded flows; that source of invalidity is now excluded before optimization.
+
+**Reading (Contribution 3).** A high Raw ASR says little about constrained evasion: the attacks
+with the highest raw success produce no valid flow, and matched feature support alone does not
+keep flows consistent. The validity gap is a property of the attack parameterization, measured on
+the same flows, not an artefact of different samples.

@@ -1,8 +1,8 @@
 {
-  "npz_files": 936,
-  "rows": 748800,
-  "validator_rechecked_rows": 748800,
-  "prediction_rechecked_rows": 748800,
+  "npz_files": 1152,
+  "rows": 921600,
+  "validator_rechecked_rows": 921600,
+  "prediction_rechecked_rows": 921600,
   "prediction_mismatches": 0,
-  "raw_success_recomputed_rows": 748800
+  "raw_success_recomputed_rows": 921600
 }

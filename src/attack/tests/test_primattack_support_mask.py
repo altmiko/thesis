@@ -39,9 +39,10 @@ def test_representative_primitive_recomputation_equals_declared_support() -> Non
     adapter = get_adapter("cicids2017")
     manifest = adapter.feature_manifest()
     model = CICIDS2017PrimitiveModel(manifest)
-    raw_np = np.asarray(
-        np.load(adapter._processed / "X_test_pristine.npy", mmap_mode="r")[:8192]
-    ).copy()
+    # Strided over the whole test split: padding now needs flows without an empty forward
+    # packet, which the first rows of the split do not cover for every declared coordinate.
+    x_all = np.load(adapter._processed / "X_test_pristine.npy", mmap_mode="r")
+    raw_np = np.asarray(x_all[np.linspace(0, len(x_all) - 1, 40000).astype(np.int64)]).copy()
     raw = torch.as_tensor(raw_np)
     caps = model.infer_capabilities(raw)
     zero = torch.zeros(len(raw), dtype=raw.dtype)

@@ -2,32 +2,32 @@
   "rule": "highest aggregate Valid Targeted ASR at p75 pooled over both datasets, all victims, classes and seeds (sum successes / sum attempts); ties -> fewer mean victim evaluations per flow -> order hybrid, pgd, cw",
   "aggregate": {
     "hybrid": {
-      "valid_targeted_successes": 4602,
+      "valid_targeted_successes": 1752,
       "attempts": 57600,
-      "aggregate_valid_targeted_asr": 0.07989583333333333,
-      "mean_evaluations_per_flow": 190.56598958333333
+      "aggregate_valid_targeted_asr": 0.030416666666666668,
+      "mean_evaluations_per_flow": 189.644375
     },
     "pgd": {
-      "valid_targeted_successes": 4595,
+      "valid_targeted_successes": 1752,
       "attempts": 57600,
-      "aggregate_valid_targeted_asr": 0.07977430555555555,
-      "mean_evaluations_per_flow": 194.003125
+      "aggregate_valid_targeted_asr": 0.030416666666666668,
+      "mean_evaluations_per_flow": 188.50375
     },
     "cw": {
-      "valid_targeted_successes": 2541,
+      "valid_targeted_successes": 861,
       "attempts": 57600,
-      "aggregate_valid_targeted_asr": 0.04411458333333333,
-      "mean_evaluations_per_flow": 194.003125
+      "aggregate_valid_targeted_asr": 0.014947916666666667,
+      "mean_evaluations_per_flow": 188.50375
     }
   },
   "ranking": [
-    "hybrid",
     "pgd",
+    "hybrid",
     "cw"
   ],
-  "selected": "hybrid",
+  "selected": "pgd",
   "budget_sensitivity_optimizers": [
-    "hybrid",
-    "pgd"
+    "pgd",
+    "hybrid"
   ]
 }

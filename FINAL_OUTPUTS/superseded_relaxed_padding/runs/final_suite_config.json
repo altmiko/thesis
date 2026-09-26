@@ -1,0 +1,83 @@
+{
+  "seeds": "42,2024,2026",
+  "classes": "DoS,DDoS,Recon,BruteForce",
+  "n_per_class": 800,
+  "selection": {
+    "rule": "random",
+    "seed": 42,
+    "owner": "baselines_untargeted/selection.json"
+  },
+  "datasets": {
+    "cicids2017_distrinet": {
+      "cli": "cicids2017",
+      "victims": "mlp,cnn,ft_transformer"
+    },
+    "cicids2018_distrinet": {
+      "cli": "cicids2018",
+      "victims": "mlp-s42,cnn-s42,ft_transformer-s42"
+    }
+  },
+  "baseline_attacks": "pgd_untargeted,cw_untargeted,capgd_prim_support,cpgd_prim_support",
+  "baseline_args": [
+    "--pgd-epsilon",
+    "0.5",
+    "--pgd-alpha",
+    "0.05",
+    "--pgd-steps",
+    "40",
+    "--cw-lambda",
+    "1.0",
+    "--cw-kappa",
+    "0.0",
+    "--cw-iters",
+    "60",
+    "--cw-lr",
+    "0.01",
+    "--cw-conv",
+    "1e-5",
+    "--capgd-norm",
+    "L2",
+    "--capgd-epsilon",
+    "0.5",
+    "--capgd-steps",
+    "10",
+    "--capgd-batch-size",
+    "64",
+    "--cpgd-epsilon",
+    "0.5",
+    "--cpgd-norm",
+    "L2",
+    "--cpgd-step-size",
+    "0.05",
+    "--cpgd-iterations",
+    "40",
+    "--cpgd-constraint-weight",
+    "1.0",
+    "--cpgd-batch-size",
+    "64"
+  ],
+  "primattack_args": [
+    "--eval-budget",
+    "256",
+    "--hybrid-steps",
+    "40",
+    "--hybrid-lr",
+    "0.1",
+    "--pgd-restarts",
+    "3",
+    "--pgd-step",
+    "0.05",
+    "--pgd-momentum",
+    "0.75",
+    "--cw-stages",
+    "3",
+    "--cw-lr",
+    "0.5",
+    "--cw-c",
+    "1.0",
+    "--cw-kappa",
+    "0.0"
+  ],
+  "primattack_mode": "joint",
+  "python": "3.11.15"
+}

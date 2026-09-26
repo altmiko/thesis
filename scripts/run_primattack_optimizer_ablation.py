@@ -6,7 +6,11 @@ the victims, the primitive controls ``(p, delay, shape)``, the calibrated per-fl
 each budget (p50 / p75 / envelope-only "unbounded"), the canonical feature recomputation with
 integer quantization, the validator_v2 ``hybrid_valid`` gate, the success predicate, the
 incumbent ordering, and one per-flow cap on victim forward evaluations (realized +
-surrogate). Mode is ``joint`` (all three controls).
+surrogate). ``--modes`` restricts the primitive space (``joint`` = both primitives; the
+``timing-only`` / ``padding-only`` ablations zero the other primitive's box). Per-flow
+capabilities (padding needs forward payload and no empty forward packet; timing needs a
+forward IAT sequence) are folded into the box first, so each row searches its own
+joint / timing-only / padding-only / no-primitive space (recorded per row).
 
 ``--objective targeted`` (default): success = realized flow classified Benign AND
 ``hybrid_valid``. ``--objective untargeted``: success = realized flow NOT classified as its
@@ -43,7 +47,7 @@ from attack.primattack_budget import (  # noqa: E402
 )
 from attack.primitive_optimizer import (  # noqa: E402
     CANDIDATE_NAMES, AttackObjective, hybrid_valid_gate, optimize_primitive_candidates,
-    optimize_primitive_cw, optimize_primitive_pgd,
+    optimize_primitive_cw, optimize_primitive_pgd, row_primitive_modes,
 )
 from attack.realizability.cicids2017 import (  # noqa: E402
     CICIDS2017PrimitiveModel, primattack_joint_feature_mask,
@@ -61,7 +65,13 @@ from src.classifiers.cicids2017d_victims import load_category_victim  # noqa: E4
 from vae.cicids2017_stage_a import ATTACK_CLASSES  # noqa: E402
 
 METHODS = ("hybrid", "pgd", "cw")
-MODE = "joint"
+PRIMITIVE_MODES = ("joint", "timing-only", "padding-only")
+
+
+def artifact_name(vname: str, cname: str, budget: str, method: str, mode: str, seed: int) -> str:
+    """Per-row artifact file name; ``joint`` keeps the historical name without a mode tag."""
+    tag = method if mode == "joint" else f"{method}-{mode}"
+    return f"{vname}__{cname}__{BUDGET_LABEL[budget]}__{tag}__seed{seed}.npz"
 
 
 def _csv(value: str) -> list[str]:
@@ -134,6 +144,8 @@ def main() -> None:
     ap.add_argument("--classes", default=",".join(ATTACK_CLASSES))
     ap.add_argument("--budgets", default="intermediate,maximum-evaluated,unbounded")
     ap.add_argument("--methods", default=",".join(METHODS))
+    ap.add_argument("--modes", default="joint",
+                    help=f"comma-separated primitive modes from {PRIMITIVE_MODES}")
     ap.add_argument("--eval-budget", type=int, default=256,
                     help="per-flow cap on victim forward evaluations (realized + surrogate), "
                          "including the shared identity evaluation")
@@ -165,6 +177,9 @@ def main() -> None:
     if set(methods) - set(METHODS):
         raise ValueError(f"unknown methods {sorted(set(methods) - set(METHODS))}")
     budgets, classes = _csv(args.budgets), _csv(args.classes)
+    modes = _csv(args.modes)
+    if set(modes) - set(PRIMITIVE_MODES):
+        raise ValueError(f"unknown primitive modes {sorted(set(modes) - set(PRIMITIVE_MODES))}")
     victims = _csv(args.victims or defaults["victims"])
     base_seeds = [int(s) for s in _csv(args.seeds)]
     cfgs = method_configs(args)
@@ -262,7 +277,10 @@ def main() -> None:
     margin_rule = ("max(non-Benign) - Benign" if args.objective == "targeted"
                    else "source logit - max(non-source)")
     config = {
-        "dataset": dataset, "mode": MODE, "objective": args.objective,
+        "dataset": dataset, "modes": modes, "objective": args.objective,
+        "padding_capability": "Nf >= 1 AND Total Length of Fwd Packet > 0 AND Fwd Packet "
+                              "Length Mean > 0 AND Fwd Packet Length Min > 0",
+        "timing_capability": "Nf >= 2 AND Fwd IAT Total > 0",
         "methods": methods, "method_configs": cfgs,
         "eval_budget_per_flow": args.eval_budget,
         "evaluation_unit": "one victim forward pass on one flow (realized quantized flow or "
@@ -287,7 +305,8 @@ def main() -> None:
     cells_path = out / "cells.json"
     prior = {}
     if args.resume and cells_path.exists():
-        prior = {(c["victim"], c["class"], c["budget"], c["seed"], c["method"]): c
+        prior = {(c["victim"], c["class"], c["budget"], c["seed"], c["method"],
+                  c.get("mode", "joint")): c
                  for c in json.loads(cells_path.read_text(encoding="utf-8"))}
     cells = []
     t_start = time.time()
@@ -299,18 +318,22 @@ def main() -> None:
             raw, cid, n = R["raw"], R["cid"], R["raw"].shape[0]
             labels = np.full(n, cid, dtype=np.int64)
             caps = model.infer_capabilities(raw)
+            pad_cap = caps.pad_allowed.cpu().numpy()
+            timing_cap = caps.timing_allowed.cpu().numpy()
+            fwd_min_zero = (raw[:, model.i["Fwd Packet Length Min"]] == 0).cpu().numpy()
             objective = (AttackObjective("targeted", BENIGN_ID) if args.objective == "targeted"
                          else AttackObjective("untargeted", cid))
-            for budget in budgets:
+            for budget, mode in ((b, m) for b in budgets for m in modes):
                 ccfg = (unbounded_calibration(calibration, cname) if budget == "unbounded"
                         else class_calibration(calibration, cname, budget))
                 bounds = _apply_primitive_mode(
-                    model.per_flow_bounds(raw, ccfg.bounds_config(), capabilities=caps), MODE)
+                    model.per_flow_bounds(raw, ccfg.bounds_config(), capabilities=caps), mode)
                 movable = ((bounds["p"] >= 1.0) | (bounds["delay"] >= 1.0)).cpu().numpy()
+                row_modes = np.asarray(row_primitive_modes(bounds))
                 for seed in info["attack_seeds"]:
                     for method in methods:
-                        key = (vname, cname, budget, seed, method)
-                        npz = art / f"{vname}__{cname}__{BUDGET_LABEL[budget]}__{method}__seed{seed}.npz"
+                        key = (vname, cname, budget, seed, method, mode)
+                        npz = art / artifact_name(vname, cname, budget, method, mode, seed)
                         if key in prior and npz.exists():
                             cells.append(prior[key])
                             continue
@@ -362,6 +385,11 @@ def main() -> None:
                         p = np_(res.projected["p"]); d = np_(res.projected["delay"])
                         shape = np_(res.projected["shape"])
                         total = np_(res.total_evaluations)
+                        fmin = model.i["Fwd Packet Length Min"]
+                        filled = fwd_min_zero & np_(adv[:, fmin] > 0)
+                        if bool((p[~pad_cap] > 0).any()) or bool(filled.any()):
+                            raise AssertionError(
+                                f"PrimAttack padded a flow without padding capability {key}")
                         np.savez_compressed(
                             npz, sample_id=R["sids"], positional_idx=R["idx"],
                             true_class=labels, clean_pred=np_(clean_pred).astype(np.int64),
@@ -398,6 +426,11 @@ def main() -> None:
                             elapsed_seconds=np.float64(elapsed), iterations=res.iterations,
                             restarts=res.restarts, method=method, victim=vname,
                             attack_class=cname, budget=budget, seed=seed, dataset=dataset,
+                            primitive_mode=mode, row_primitive_mode=row_modes,
+                            pad_allowed=pad_cap, timing_allowed=timing_cap,
+                            pad_reason=np.asarray(caps.pad_reason),
+                            timing_reason=np.asarray(caps.timing_reason),
+                            source_fwd_min_zero=fwd_min_zero, empty_fwd_packet_filled=filled,
                         )
                         s = final_success
                         cost_mean, cost_med = _stats(np_(res.normalized_cost)[s])
@@ -405,7 +438,12 @@ def main() -> None:
                         cell = {
                             "dataset": dataset, "victim": vname, "arch": info["arch"],
                             "class": cname, "budget": budget, "budget_label": BUDGET_LABEL[budget],
-                            "seed": seed, "method": method, "n": n,
+                            "seed": seed, "method": method, "mode": mode, "n": n,
+                            "n_pad_allowed": int(pad_cap.sum()),
+                            "n_timing_allowed": int(timing_cap.sum()),
+                            "n_source_fwd_min_zero": int(fwd_min_zero.sum()),
+                            "row_modes": {m: int((row_modes == m).sum())
+                                          for m in np.unique(row_modes)},
                             "n_movable": int(movable.sum()),
                             "successes": int(s.sum()), "asr_valid": float(s.mean()),
                             "raw_targeted": int(targeted.sum()),
@@ -440,7 +478,7 @@ def main() -> None:
                         }
                         cells.append(cell)
                         print(f"[{time.time() - t_start:7.0f}s] {vname}/{cname}/"
-                              f"{BUDGET_LABEL[budget]}/s{seed}/{method}: valid ASR "
+                              f"{BUDGET_LABEL[budget]}/s{seed}/{method}/{mode}: valid ASR "
                               f"{cell['asr_valid']:.4f} raw {cell['asr_raw']:.4f} "
                               f"evals {cell['evals_mean']:.1f} t {elapsed:.1f}s "
                               f"mismatch {cell['incumbent_final_mismatch']}", flush=True)

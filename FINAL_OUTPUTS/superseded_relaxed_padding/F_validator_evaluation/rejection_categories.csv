@@ -1,0 +1,17 @@
+dataset,split,rejection_category,n_genuine,rejected_by_category,rate,rejected_only_by_this_category
+cicids2017_distrinet,val,SCHEMA,312058,94,0.0003012260541309628,94
+cicids2017_distrinet,val,EXTRACTOR,312058,0,0.0,0
+cicids2017_distrinet,val,PROTOCOL,312058,0,0.0,0
+cicids2017_distrinet,val,MINED,312058,0,0.0,0
+cicids2017_distrinet,test,SCHEMA,312056,0,0.0,0
+cicids2017_distrinet,test,EXTRACTOR,312056,0,0.0,0
+cicids2017_distrinet,test,PROTOCOL,312056,0,0.0,0
+cicids2017_distrinet,test,MINED,312056,0,0.0,0
+cicids2018_distrinet,val,SCHEMA,125033,0,0.0,0
+cicids2018_distrinet,val,EXTRACTOR,125033,0,0.0,0
+cicids2018_distrinet,val,PROTOCOL,125033,0,0.0,0
+cicids2018_distrinet,val,MINED,125033,84,0.0006718226388233506,84
+cicids2018_distrinet,test,SCHEMA,125032,0,0.0,0
+cicids2018_distrinet,test,EXTRACTOR,125032,0,0.0,0
+cicids2018_distrinet,test,PROTOCOL,125032,0,0.0,0
+cicids2018_distrinet,test,MINED,125032,80,0.0006398362019323054,80

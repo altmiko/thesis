@@ -1,0 +1,9 @@
+dataset,split,validator,n_genuine,accepted,rejected,acceptance_rate,rejection_rate
+cicids2017_distrinet,val,general only (SCHEMA ∧ EXTRACTOR ∧ PROTOCOL),312058,311964,94,0.999698773945869,0.0003012260541309628
+cicids2017_distrinet,val,general + dataset-specific (hybrid_valid),312058,311964,94,0.999698773945869,0.0003012260541309628
+cicids2017_distrinet,test,general only (SCHEMA ∧ EXTRACTOR ∧ PROTOCOL),312056,312056,0,1.0,0.0
+cicids2017_distrinet,test,general + dataset-specific (hybrid_valid),312056,312056,0,1.0,0.0
+cicids2018_distrinet,val,general only (SCHEMA ∧ EXTRACTOR ∧ PROTOCOL),125033,125033,0,1.0,0.0
+cicids2018_distrinet,val,general + dataset-specific (hybrid_valid),125033,124949,84,0.9993281773611766,0.0006718226388233506
+cicids2018_distrinet,test,general only (SCHEMA ∧ EXTRACTOR ∧ PROTOCOL),125032,125032,0,1.0,0.0
+cicids2018_distrinet,test,general + dataset-specific (hybrid_valid),125032,124952,80,0.9993601637980677,0.0006398362019323054

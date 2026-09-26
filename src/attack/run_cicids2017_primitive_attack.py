@@ -115,7 +115,8 @@ def evaluate_cell(model, val, victim, raw, adv_raw, center, scale, class_id, gro
         x_adv = (adv_raw - center) / scale
         clean_pred = victim(x_clean).argmax(1)
         adv_pred = victim(x_adv).argmax(1)
-        validator = structural_masks(adv_raw.detach().cpu().numpy(), dataset=model.dataset)
+        validator = structural_masks(adv_raw.detach().cpu().numpy(), dataset=model.dataset,
+                                     source_raw=raw.detach().cpu().numpy())
         report = val.validate(adv_raw, raw)
         categories = report.categories
         cost = _decompose_cost(adv_raw, raw, scale, groups_idx)

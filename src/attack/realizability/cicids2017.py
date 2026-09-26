@@ -31,7 +31,10 @@ below had 0% violation across 400k-600k train rows:
     <dir> Packets/s        = count / (duration_us / 1e6)                           (exact)
     Flow Bytes/s           = (TL_fwd + TL_bwd) / (duration_us / 1e6)               (exact)
 
-Padding identities follow from adding a constant to every forward packet length.
+Padding identities follow from adding a constant to every forward packet length. Because the
+constant reaches EVERY forward packet, padding is only admissible when no forward packet is
+empty (``Fwd Packet Length Min > 0``); otherwise it would put bytes into a zero-length packet
+(e.g. a pure ACK), which is payload insertion, not length augmentation.
 Flow Duration and Flow IAT Max under added delay remain conservative packet-sequence
 projections. Subflow bytes, bulk stats, Flow IAT Std/Min, and active/idle features are
 not reconstructable from aggregate flows and remain explicit Level-C limitations.
@@ -44,6 +47,7 @@ from typing import Mapping
 import torch
 
 from attack.realizability.base import (
+    EMPTY_FWD_PACKET,
     INSUFFICIENT_FWD_PACKETS,
     NO_FORWARD_PAYLOAD,
     PAD_ALLOWED,
@@ -59,9 +63,9 @@ from datasets.feature_manifest import FeatureManifest
 
 # Minimum forward-packet count for which forward-length augmentation is considered
 # semantically supported. A single forward packet that DOES carry payload is paddable, so the
-# discriminating evidence is forward payload presence (Total Length of Fwd Packet > 0), not the
-# packet count; this floor stays at 1 and the payload gate does the real work. Raise to 2 for a
-# stricter "multi-packet forward stream only" posture.
+# discriminating evidence is forward payload presence (Total Length of Fwd Packet > 0) and the
+# absence of any zero-length forward packet (Fwd Packet Length Min > 0), not the packet count;
+# this floor stays at 1 and the payload / empty-packet gates do the real work.
 MIN_FWD_PACKETS_FOR_PADDING = 1.0
 
 # RobustScaler float64 round-trip residue is <= 1.5e-8 (audited); frozen-preservation slack.
@@ -384,27 +388,38 @@ class CICIDS2017PrimitiveModel:
 
     # -- semantic capabilities, activity & bounds -----------------------------
     def infer_capabilities(self, raw: torch.Tensor) -> PrimitiveCapabilities:
-        """Infer conservative per-flow admissibility and materialize audit reasons once."""
+        """Infer conservative per-flow admissibility and materialize audit reasons once.
+
+        Padding adds ``p`` bytes to every forward packet, so it needs forward payload AND no
+        zero-length forward packet (``Fwd Packet Length Min > 0``): the aggregate flow cannot say
+        which packets are empty, and padding an empty one would be payload insertion. Timing
+        needs a forward IAT sequence (``Nf >= 2``) with non-zero total.
+        """
         i = self.i
         Nf = raw[:, i["Total Fwd Packet"]]
         tl_fwd = raw[:, i["Total Length of Fwd Packet"]]
         mean_fwd = raw[:, i["Fwd Packet Length Mean"]]
+        min_fwd = raw[:, i["Fwd Packet Length Min"]]
         fit = raw[:, i["Fwd IAT Total"]]
 
         has_fwd_packets = Nf >= MIN_FWD_PACKETS_FOR_PADDING
         has_fwd_payload = (tl_fwd > 0.0) & (mean_fwd > 0.0)
-        pad_allowed = has_fwd_packets & has_fwd_payload
+        no_empty_fwd_packet = min_fwd > 0.0
+        pad_allowed = has_fwd_packets & has_fwd_payload & no_empty_fwd_packet
         has_fwd_iat_seq = Nf >= 2.0
         has_timing_headroom = fit > 0.0
         timing_allowed = has_fwd_iat_seq & has_timing_headroom
 
-        pad_np = pad_allowed.detach().cpu().numpy()
         payload_np = has_fwd_payload.detach().cpu().numpy()
+        packets_np = has_fwd_packets.detach().cpu().numpy()
         seq_np = has_fwd_iat_seq.detach().cpu().numpy()
         timing_np = timing_allowed.detach().cpu().numpy()
         pad_reason = [
-            PAD_ALLOWED if ok else (NO_FORWARD_PAYLOAD if not pay else INSUFFICIENT_FWD_PACKETS)
-            for ok, pay in zip(pad_np, payload_np)
+            NO_FORWARD_PAYLOAD if not pay else (
+                INSUFFICIENT_FWD_PACKETS if not pkts else (
+                    EMPTY_FWD_PACKET if not nonempty else PAD_ALLOWED))
+            for pay, pkts, nonempty in zip(
+                payload_np, packets_np, no_empty_fwd_packet.detach().cpu().numpy())
         ]
         timing_reason = [
             TIMING_ALLOWED if ok else (SINGLE_FWD_PACKET if not seq else ZERO_TIMING_HEADROOM)

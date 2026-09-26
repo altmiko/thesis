@@ -32,12 +32,12 @@ and composes one `Validator`.
 dataset profile (schema YAML, inferred on train)
    │  schema_rules_from_profile()            → SCHEMA rules  (per-feature type facts)
 extractor_rules.yaml   → EXTRACTOR rules      (CICFlowMeter algebraic identities)
-protocol_rules.yaml    → PROTOCOL rules       (domain non-negativity)
+protocol_rules.yaml    → PROTOCOL rules       (domain non-negativity + source-conditioned transition)
 mined_rules.json       → MINED rules          (empirical train invariants)
 plausibility_profile.json → PlausibilityProfile (distributional band)
    │
    ▼
-Validator.validate_batch(X)  → per-rule (satisfied, eligible) masks
+Validator.validate_batch(X, source)  → per-rule (satisfied, eligible) masks
    │
    ▼
 BatchResult  → schema_valid, extractor_valid, protocol_valid, mined_valid,
@@ -50,7 +50,8 @@ or a ratio with ~0 denominator) are *never* violations — this is what makes co
 and ratio rules safe.
 
 Rule counts actually loaded for `cicids2017_distrinet`:
-**SCHEMA 133** (79 finite + type rules), **EXTRACTOR 7**, **PROTOCOL 79**, **MINED 16**.
+**SCHEMA 133** (79 finite + type rules), **EXTRACTOR 7**, **PROTOCOL 80** (79 non-negativity +
+1 transition), **MINED 16**.
 
 ---
 
@@ -81,6 +82,18 @@ durations, rates, ratios, ports/protocol codes) cannot be negative by constructi
 `hardness="PROTOCOL"`, `automatically_mined=False` (domain knowledge), but each is
 **verified** to hold on train and validation (support stored in `evidence`). This is a
 minimal, domain-justified layer — not hand-invented per feature.
+
+**Transition rule (amendment A2).** `PROTO_0080` = `zero_preserved::Fwd Packet Length Min`
+(rule type in `rule.py:TRANSITION_TYPES`, generator `run_mining.py:transition_protocol_rules`,
+both datasets): if the **source** flow has `Fwd Packet Length Min = 0` (≥ 1 zero-length
+forward packet), the perturbed flow must keep it at 0 — an empty packet cannot receive
+bytes, and aggregate features do not identify which packet is empty. It is evaluated on
+(perturbed, source) pairs: `validate_batch(X, source)`; attack paths must pass the source
+(`attack_interface.structural_masks(..., source_raw=...)`). With `source=None` the rows are
+unperturbed flows and the rule is ineligible, so genuine-flow acceptance is unchanged. It is
+the dataset-independent counterpart of CICIDS2018's mined `MINED_0001`
+(`Fwd Packet Length Min == Packet Length Min`, support 0.99943), which CICIDS2017 cannot mine
+(support 0.9969 < 0.999).
 
 ---
 
@@ -221,7 +234,8 @@ evidence for PrimAttack outputs:
   Packet Length Variance/Std, Flow Packets/s, and the totals=count×mean products exactly
   (doc 2 §2.4). PrimAttack cannot violate EXT_0001–0007.
 - **PROTOCOL non-negativity** — φ only adds bytes / dilates time (increase-only), and
-  frozen features are copied; outputs stay non-negative.
+  frozen features are copied; outputs stay non-negative. **PROTOCOL `PROTO_0080`** — the
+  capability gate never pads a flow with an empty forward packet, so φ cannot violate it.
 - **MINED monotone chains / PSH-sum** — preserved because φ shifts min/max/mean uniformly
   and never touches flags/backward fields.
 - **MINED backward implications** — φ never touches backward features, so

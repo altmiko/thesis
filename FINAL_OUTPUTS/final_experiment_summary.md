@@ -33,20 +33,26 @@ Bachelor's thesis: constrained adversarial attacks against NIDS classifiers. Thi
 - Raw ASR is descriptive except in the dedicated validity-gap analysis (E);
 - F is descriptive (no test).
 
-Inferential tests actually computed: A 26, B 12, C 36, D 6, E 48 (see each `statistical_tests.csv`).
+Inferential tests actually computed: A 26, B 9, C 36, D 6, E 48 (see each `statistical_tests.csv`).
 
 ## Headline: Experiment A (Raw ASR → Valid ASR, untargeted, mean ± SD)
 
-| Dataset | Victim | PrimAttack (Hybrid Search, p75) | PGD | C&W | CAPGD-PrimSupport | C-PGD-PrimSupport |
-|---|---|---|---|---|---|---|
-| CICIDS2017 | mlp | 11.06% ± 0.00% → 11.06% ± 0.00% | 100.00% ± 0.00% → 0.00% ± 0.00% | 99.94% ± 0.00% → 0.00% ± 0.00% | 94.41% ± 0.71% → 2.18% ± 0.08% | 50.80% ± 2.04% → 0.00% ± 0.00% |
-| CICIDS2017 | cnn | 36.67% ± 0.04% → 36.67% ± 0.04% | 96.12% ± 0.09% → 0.00% ± 0.00% | 95.53% ± 0.00% → 0.00% ± 0.00% | 96.53% ± 1.07% → 5.21% ± 0.07% | 60.42% ± 2.98% → 0.00% ± 0.00% |
-| CICIDS2017 | ft_transformer | 0.50% ± 0.00% → 0.50% ± 0.00% | 97.36% ± 0.28% → 0.00% ± 0.00% | 77.16% ± 0.00% → 0.00% ± 0.00% | 52.21% ± 4.33% → 0.18% ± 0.02% | 21.61% ± 0.31% → 0.00% ± 0.00% |
-| CICIDS2018 | mlp-s42 | 12.00% ± 0.03% → 0.19% ± 0.03% | 94.34% ± 0.25% → 0.00% ± 0.00% | 87.63% ± 0.00% → 0.00% ± 0.00% | 91.57% ± 0.84% → 0.14% ± 0.02% | 28.25% ± 0.51% → 0.00% ± 0.00% |
-| CICIDS2018 | cnn-s42 | 15.31% ± 0.00% → 0.03% ± 0.00% | 99.70% ± 0.02% → 0.00% ± 0.00% | 99.16% ± 0.00% → 0.00% ± 0.00% | 76.01% ± 1.68% → 0.29% ± 0.07% | 50.54% ± 3.30% → 0.00% ± 0.00% |
-| CICIDS2018 | ft_transformer-s42 | 0.33% ± 0.02% → 0.00% ± 0.00% | 91.70% ± 0.18% → 0.00% ± 0.00% | 53.59% ± 0.00% → 0.00% ± 0.00% | 9.74% ± 0.70% → 0.00% ± 0.00% | 1.65% ± 0.42% → 0.00% ± 0.00% |
+| Dataset | Victim | PrimAttack (Prim-PGD, p75) | PGD | C&W | CAPGD-PrimSupport | C-PGD-PrimSupport | CAPGD (native) † |
+|---|---|---|---|---|---|---|---|
+| CICIDS2017 | mlp | 4.09% ± 0.00% → 4.09% ± 0.00% | 100.00% ± 0.00% → 0.00% ± 0.00% | 99.94% ± 0.00% → 0.00% ± 0.00% | 94.41% ± 0.71% → 2.01% ± 0.10% | 50.80% ± 2.04% → 0.00% ± 0.00% | 94.65% ± 0.88% → 9.53% ± 0.85% |
+| CICIDS2017 | cnn | 13.47% ± 0.00% → 13.47% ± 0.00% | 96.12% ± 0.09% → 0.00% ± 0.00% | 95.53% ± 0.00% → 0.00% ± 0.00% | 96.53% ± 1.07% → 5.15% ± 0.07% | 60.42% ± 2.98% → 0.00% ± 0.00% | 96.25% ± 1.19% → 19.24% ± 0.13% |
+| CICIDS2017 | ft_transformer | 0.12% ± 0.00% → 0.12% ± 0.00% | 97.36% ± 0.28% → 0.00% ± 0.00% | 77.16% ± 0.00% → 0.00% ± 0.00% | 52.21% ± 4.33% → 0.18% ± 0.02% | 21.61% ± 0.31% → 0.00% ± 0.00% | 50.61% ± 3.39% → 5.71% ± 1.07% |
+| CICIDS2018 | mlp-s42 | 2.53% ± 0.00% → 2.53% ± 0.00% | 94.34% ± 0.25% → 0.00% ± 0.00% | 87.63% ± 0.00% → 0.00% ± 0.00% | 91.57% ± 0.84% → 0.14% ± 0.02% | 28.25% ± 0.51% → 0.00% ± 0.00% | 80.42% ± 0.69% → 28.42% ± 1.13% |
+| CICIDS2018 | cnn-s42 | 1.16% ± 0.00% → 1.16% ± 0.00% | 99.70% ± 0.02% → 0.00% ± 0.00% | 99.16% ± 0.00% → 0.00% ± 0.00% | 76.01% ± 1.68% → 0.29% ± 0.07% | 50.54% ± 3.30% → 0.00% ± 0.00% | 66.44% ± 1.28% → 16.30% ± 3.22% |
+| CICIDS2018 | ft_transformer-s42 | 0.00% ± 0.00% → 0.00% ± 0.00% | 91.70% ± 0.18% → 0.00% ± 0.00% | 53.59% ± 0.00% → 0.00% ± 0.00% | 9.74% ± 0.70% → 0.00% ± 0.00% | 1.65% ± 0.42% → 0.00% ± 0.00% | 5.96% ± 0.53% → 0.45% ± 0.45% |
 
-Selected PrimAttack optimizer (Exp B, pre-registered aggregate-Valid-Targeted-ASR rule): **Hybrid Search**. Ranking: Hybrid Search > Prim-PGD > Prim-C&W.
+† CAPGD (native): descriptive row (amendment A3), not in the inferential family.
+
+**Capability-aware PrimAttack (amendment A2).** Padding adds `p` bytes to *every* forward packet. A source flow with `Fwd Packet Length Min = 0` contains at least one zero-length forward packet (e.g. a pure ACK), and aggregate features do not say which one, so padding would put bytes into an empty packet (payload insertion, not length augmentation). PrimAttack therefore infers `pad_allowed = payload present ∧ Fwd Packet Length Min > 0` before optimization; such flows are attacked timing-only with the full per-flow budget. validator_v2 independently rejects any attack output that turns a source minimum of 0 into a positive value (source-conditioned PROTOCOL rule `PROTO_0080`, both datasets). The pre-fix run is kept only as the `PrimAttack-relaxed-padding` sensitivity result (`superseded_relaxed_padding/`).
+
+Capability-fix analyses (eligibility, primitive use, primitive ablation, relaxed vs capability-aware PrimAttack, validator-rule impact, CAPGD-PrimSupport fairness): `A_primary_baseline_comparison/primary_baseline_comparison.md` and `A_primary_baseline_comparison/capability_fix/`; root report `primattack_empty_packet_fix_report.md`.
+
+Selected PrimAttack optimizer (Exp B, pre-registered aggregate-Valid-Targeted-ASR rule): **Prim-PGD**. Ranking: Prim-PGD > Hybrid Search > Prim-C&W.
 
 ## Thesis contribution mapping
 
@@ -60,10 +66,10 @@ Selected PrimAttack optimizer (Exp B, pre-registered aggregate-Valid-Targeted-AS
 
 ## Provenance and integrity audit
 
-- Per-sample artifacts read: 936 files, 748,800 attacked flow-instances.
-- validator_v2 recomputed on the stored final adversarial flow for 748,800 rows: 0 mismatches (analysis aborts on any).
-- Raw/valid success recomputed from stored predictions for 748,800 rows: 0 mismatches (analysis aborts on any).
-- Victim re-prediction of the stored final flows: 748,800 rows, 0 mismatches.
+- Per-sample artifacts read: 1152 files, 921,600 attacked flow-instances.
+- validator_v2 recomputed on the stored final adversarial flow for 921,600 rows: 0 mismatches (analysis aborts on any).
+- Raw/valid success recomputed from stored predictions for 921,600 rows: 0 mismatches (analysis aborts on any).
+- Victim re-prediction of the stored final flows: 921,600 rows, 0 mismatches.
 - Pairing asserted per experiment: identical canonical sample IDs (order, no duplicates), clean-input SHA-256, labels, clean predictions, victim checkpoint SHA-256, seed set {42, 2024, 2026} and equal denominators.
 - Run configurations with every hyperparameter: `runs/final_suite_config.json`, `runs/<dataset>/<stage>/config.json`; run logs: `runs/<dataset>/logs/`.
 
@@ -71,53 +77,67 @@ Selected PrimAttack optimizer (Exp B, pre-registered aggregate-Valid-Targeted-AS
 
 **Main findings (per contribution).**
 
-1. **PrimAttack (Contribution 1).** At the p75 train-calibrated budget, PrimAttack is the only
-   attack that produces validator-valid evasions at scale on CICIDS2017. Valid ASR is 11.06%
-   (MLP), 36.67% (CNN) and 0.50% (FT-Transformer), untargeted, and it beats every baseline
-   significantly after Holm correction. PGD, C&W, CAPGD-PrimSupport and C-PGD-PrimSupport reach
-   up to 100% Raw ASR but at most 5.21% Valid ASR. On CICIDS2018 at p75 every method is near zero
-   valid (≤ 0.29%), with no significant PrimAttack-vs-baseline difference. The three optimizers
-   are practically tied on aggregate Valid Targeted ASR: Hybrid Search 7.990% vs Prim-PGD 7.977%,
-   with Prim-C&W at 4.411%. Hybrid Search is selected by the locked criterion and also uses the
-   fewest victim evaluations.
-2. **Evaluation methodology (Contribution 2).** Changing objective, validity requirement and
-   budget moves results in different directions. The objective barely changes Valid ASR
-   (Δ ≤ 0.53 pp; one significant victim) but can change Raw ASR ten-fold (CICIDS2018 MLP: 1.28%
-   targeted vs 12.00% untargeted raw). The budget is a first-order control of Valid ASR:
-   CICIDS2017 CNN goes from 13.10% to 36.15% to 70.48%, and CICIDS2018 MLP/CNN rise from ≈ 0% to
-   22–25% only when the budget is unbounded.
-3. **Paired validity gap (Contribution 3).** On identical adversarial examples, feature-space
-   baselines lose 53.6–100 pp (PGD/C&W) and 1.7–92.2 pp (matched-support CAPGD/C-PGD) of their
-   Raw ASR to the validator. PrimAttack loses 0 pp on CICIDS2017 and 0.2–15.3 pp on CICIDS2018.
-   The loss is systematic wherever it occurs (McNemar p ≤ 0.032; every non-zero case one-sided).
-   On CICIDS2017, Raw ASR ranks the attacks almost in reverse order of their valid success.
-4. **Independent validator (Contribution 4).** On 874,179 genuine held-out flows it accepts
-   99.93–100% per split. Rejections come from the train-constant URG-flag schema rules
-   (CICIDS2017) or a single mined rule, `MINED_0001` (CICIDS2018). That same mined rule causes
-   PrimAttack's entire CICIDS2018 validity gap. Its 0.06% false-rejection rate on genuine
-   CICIDS2018 traffic is the relevant caveat.
+1. **PrimAttack (Contribution 1).** After the empty-forward-packet capability correction,
+   PrimAttack is almost entirely a timing attack: only 0.03% (CICIDS2017) and 0.38%
+   (CICIDS2018) of its attacked flows are padding-eligible, and none of its valid successes uses
+   padding. At the p75 train-calibrated budget its untargeted Valid ASR is 4.09% / 13.47% / 0.12%
+   (CICIDS2017 MLP / CNN / FT-Transformer) and 2.53% / 1.16% / 0.00% (CICIDS2018). It exceeds
+   CAPGD-PrimSupport significantly on the MLP/CNN of both datasets, is statistically
+   indistinguishable on CICIDS2017 FT and ties at zero on CICIDS2018 FT. Hybrid and Prim-PGD tie
+   exactly on the selection outcome (1,752 / 57,600 valid targeted successes); fewer mean victim
+   evaluations selects Prim-PGD.
+2. **Evaluation methodology (Contribution 2).** Threat-model restrictions reverse the raw-success
+   ranking. PGD/C&W reach 53.59–100% Raw ASR but 0% Valid ASR. CAPGD/C-PGD restricted to
+   PrimAttack's 23-feature support retain high raw success but little or no valid success.
+   PrimAttack has much lower Raw ASR but zero gap between Raw and Valid ASR for every successful
+   cell. Targeted and untargeted objectives coincide on CICIDS2017 except for 7 CNN flows, but
+   differ by 1.16–1.75 pp on CICIDS2018 MLP/CNN because untargeted DDoS flows can move to DoS.
+3. **Paired validity gap (Contribution 3).** On the same source samples, PGD/C&W lose 53.6–100 pp
+   and matched-support CAPGD/C-PGD lose 1.7–92.4 pp from Raw to Valid ASR; capability-aware
+   PrimAttack loses 0 pp. The new transition rule removes only 0.06–0.17 pp from
+   CAPGD-PrimSupport on CICIDS2017 and nothing elsewhere; those direct feature-space outputs
+   already fail other identities in almost every case.
+4. **Independent validator (Contribution 4).** On 874,179 genuine held-out flows validator_v2
+   accepts 99.93–100% per split. `PROTO_0080` is source-conditioned (an empty forward packet stays
+   empty) and cannot reject genuine flows. Rejections remain the train-constant URG schema rules
+   on CICIDS2017 or `MINED_0001` on CICIDS2018. The transition rule is independently applied to
+   every attack, while PrimAttack also removes unsupported padding before search.
 5. **Budget analysis (Contribution 5).** Valid Targeted ASR never decreases with the budget.
-   In 23 of 24 adjacent comparisons every discordant flow favors the larger budget; the single
-   exception is one flow. The CICIDS2018 p50/p75 calibrations are too tight for valid
-   timing-only evasion, and padding violates `MINED_0001` there.
+   The unbounded timing box raises p75 Valid ASR from 4.09% to 22.94% (CICIDS2017 MLP), 13.25% to
+   59.69% (CICIDS2017 CNN), 0.78% to 24.76% (CICIDS2018 MLP) and 0% to 26.09%
+   (CICIDS2018 CNN). The p75 result is therefore a conservative calibrated-budget result, not a
+   bound on timing-based evasion.
 
-**Victim dependence.** Valid evasion depends strongly on the victim. The FT-Transformer stays at
-≤ 0.97% Valid ASR under every PrimAttack configuration and at 0.00–0.18% under every baseline. The
-CICIDS2017 CNN is the most exposed victim. Results are reported per victim and dataset and are
-never pooled.
+**Effect of amendment A2.** The relaxed pre-fix PrimAttack had 11.06% / 36.67% / 0.50% Valid ASR
+on CICIDS2017, dominated by padding empty packets. The capability-aware result is 63–75% lower,
+but fresh timing optimization recovers 126–127 / 348–366 / 3 valid successes per seed beyond
+simply filtering the old outputs. On CICIDS2018 the correction raises Valid ASR because it stops
+spending evaluations on padding that `MINED_0001` rejects. This is the methodological point:
+capability restrictions belong in the attack space, not only in validation.
 
-**Claim boundary.** All results are feature-space proxies on CICFlowMeter aggregates of a
-chronological within-label test split. No PCAP is edited or replayed. Neither packet-level
-realizability nor preserved malicious functionality is claimed, for PrimAttack or for the
-matched-support baselines. The seeds are attack seeds on one frozen victim per architecture
-(CICIDS2018: the training-seed-42 replicate). They quantify attack-run variability, which is
-tiny (SD ≤ 0.20 pp for any PrimAttack Valid ASR, ≤ 4.33 pp for any baseline Raw ASR). They do
-not quantify victim-training variability. PrimAttack's search queries validator_v2, while the
-baselines do not. This is part of its threat model and part of its valid-success advantage.
+**Matched-support interpretation.** CAPGD-PrimSupport directly optimizes the 23 downstream
+features; PrimAttack reaches those potential coordinates only through source-applicable
+primitives and coupled recomputation. Their comparison quantifies constrained feature-space
+reachability versus primitive-domain reachability; it does not require PrimAttack to win. Native
+CAPGD (descriptive, its different 16-feature configuration mask) has the highest Valid ASR on all
+six victims (0.45–28.42%), showing that the chosen support and parameterization materially define
+the threat model.
 
-**Protocol amendment disclosed.** During the first Exp B run, a methodological bug surfaced in
-the shared PrimAttack optimizer core. A pinned (zero-headroom) padding control on CICIDS2018
-flows without backward packets produced a NaN surrogate gradient. That crashed Prim-C&W and would
-silently freeze Hybrid/Prim-PGD rows (sign(NaN) = 0). The fix, which cuts the autograd path of
-pinned controls and fails loudly on any non-finite gradient, was applied before any optimizer
-selection. Stage B was then re-run from scratch on both datasets. See `00_PROTOCOL.md` §7.
+**Victim dependence.** FT-Transformer stays at ≤ 0.59% Valid ASR under any PrimAttack budget and
+≤ 0.18% under the five inferential p75 attacks. CICIDS2017 CNN is the most exposed victim. Results
+are reported per victim and dataset and are never pooled.
+
+**Claim boundary.** PrimAttack is a restrictive, realizability-oriented **flow-level abstraction**:
+feature changes must arise from modeled padding/timing primitives and deterministic
+recomputation. No PCAP is edited, replayed or re-extracted; aggregate features do not identify
+individual payload packets; complete malicious functionality and packet-level realizability are
+not established. The conservative `Fwd Packet Length Min > 0` condition sacrifices possible
+legitimate data-packet padding on mixed empty/data flows. Seeds are attack seeds on one frozen
+victim per architecture, not victim-training seeds. PrimAttack queries validator_v2 during
+search; baselines do not.
+
+**Amendments.** A1 fixed non-finite gradients at pinned controls before optimizer selection. A2
+added capability-aware padding and `PROTO_0080`, preserved the old run as
+`superseded_relaxed_padding/`, and reran every stage from scratch. A3 adds native CAPGD only as a
+descriptive row; the locked five-method inferential family is unchanged. See `00_PROTOCOL.md` §7
+and `../primattack_empty_packet_fix_report.md`.

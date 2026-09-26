@@ -481,7 +481,9 @@ def main() -> None:
                 idx = elig[: args.n_per_class]
             sids = sample_ids_all[idx]
             raw_t = raw_all_t[torch.tensor(idx, device=device)]
-            clean_valid = structural_masks(raw_t.cpu().numpy(), dataset=dataset)["hybrid_valid"]
+            clean_np = raw_t.cpu().numpy()
+            clean_valid = structural_masks(clean_np, dataset=dataset,
+                                           source_raw=clean_np)["hybrid_valid"]
             clean_sha = hashlib.sha256(
                 np.ascontiguousarray(raw_t.cpu().numpy()).tobytes()).hexdigest()
             selection[vname][cname] = {

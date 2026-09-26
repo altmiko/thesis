@@ -222,7 +222,8 @@ def run(args: argparse.Namespace) -> Path:
                         adv_pred = victim((adv_raw - center) / scale).argmax(1).cpu().numpy().astype(np.int64)
                     evasion = adv_pred != class_id
                     targeted = adv_pred == 0
-                    validator = structural_masks(adv_raw.cpu().numpy())
+                    validator = structural_masks(adv_raw.cpu().numpy(),
+                                                 source_raw=raw.cpu().numpy())
                     domain = np.asarray(validator["hybrid_valid"], bool)
                     transform_report = realizability.validate(adv_raw, raw)
                     transform_ok = transform_report.valid.cpu().numpy()

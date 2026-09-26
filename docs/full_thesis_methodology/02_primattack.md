@@ -157,8 +157,8 @@ For one PrimAttack cell:
 | Identity | `0` |
 | Direction | increase only |
 | Absolute range | `[0, +inf)` before per-flow bounds |
-| Capability | at least one forward packet, positive total forward length, and positive forward mean length |
-| Disabled reasons | `NO_FORWARD_PAYLOAD` or `INSUFFICIENT_FWD_PACKETS` |
+| Capability | at least one forward packet, positive total forward length, positive forward mean length, and no zero-length forward packet (`Fwd Packet Length Min > 0`) |
+| Disabled reasons | `NO_FORWARD_PAYLOAD`, `INSUFFICIENT_FWD_PACKETS` or `EMPTY_FWD_PACKET` |
 | Projection | `min(round(max(p,0)), floor(p_hi))`, then capability mask |
 
 The capability check is:
@@ -167,11 +167,20 @@ $$
 m_p =
 [N_f \ge 1]
 \land [L_f > 0]
-\land [\bar l_f > 0].
+\land [\bar l_f > 0]
+\land [\min l_f > 0].
 $$
 
 If it fails, `p_hi=0` before the optimizer sees the row. A zero-payload SYN-like flow
 is therefore not treated as paddable merely because a numeric envelope has headroom.
+Because `p` reaches every forward packet, a flow with a zero-length forward packet
+(`Fwd Packet Length Min = 0`, e.g. a pure ACK) is not paddable either: padding would put
+bytes into an empty packet (payload insertion), and the aggregate flow does not say which
+packet is empty (protocol amendment A2). Such a flow is attacked timing-only
+(`primitive_optimizer.row_primitive_modes`), with its whole evaluation budget on timing.
+validator_v2 enforces the same semantics independently for every attack through the
+source-conditioned PROTOCOL rule `PROTO_0080` (source `Fwd Packet Length Min = 0` ⇒
+perturbed `Fwd Packet Length Min = 0`).
 
 The numeric upper bound is:
 
@@ -686,50 +695,53 @@ comparison rather than native feature-space CAPGD.
 
 ## 2.12 Current measured behavior
 
-The committed v2 campaign is
-`outputs/full_adv_eval_primattack_v2`:
+The canonical results are the capability-aware FINAL suite:
 
-- three victims: MLP, CNN, FT-Transformer;
-- four attack classes;
-- 800 frozen clean-correct rows per victim/class;
-- legacy head selection: first 800 clean-correct rows in test order per victim/class;
-- attack seeds `42, 123, 2024`;
-- p50, p75, and envelope-only boxes;
-- joint, timing-only, and padding-only modes;
-- search and random-feasible control;
-- 648 PrimAttack cells and no recorded failures.
+- runs: `FINAL_OUTPUTS/runs/`;
+- analysis: `FINAL_OUTPUTS/A_primary_baseline_comparison/`;
+- audit: `primattack_empty_packet_fix_report.md`;
+- three victims per dataset, four attack classes, 800 random clean-correct test rows per
+  victim/class, attack seeds `42, 2024, 2026`;
+- padding requires `Fwd Packet Length Min > 0`; every other padding-ineligible but
+  timing-capable flow is searched timing-only.
 
-In those artifacts, domain validity and primitive feasibility are both 100% in every
-PrimAttack cell. This is an **observed result for this campaign**, not a universal
-guarantee of the transform.
+The selected optimizer is Prim-PGD (Hybrid ties on valid targeted successes; fewer mean
+evaluations breaks the tie). Class-pooled untargeted results, `N=3,200` per victim and
+seed (all three seeds have the same success counts):
 
-Reference-seed (`42`) class-pooled results, `N=3,200` per victim:
+| Dataset | Victim | p75 Valid ASR | envelope-only Valid ASR |
+|---|---|---:|---:|
+| CICIDS2017 | MLP | 4.09% | 22.97% |
+| CICIDS2017 | CNN | 13.47% | 59.94% |
+| CICIDS2017 | FT-Transformer | 0.12% | 0.59% |
+| CICIDS2018 | MLP | 2.53% | 44.32% |
+| CICIDS2018 | CNN | 1.16% | 26.28% |
+| CICIDS2018 | FT-Transformer | 0.00% | 0.12% |
 
-| Victim | Condition | Valid targeted ASR | SP-ASR | True-IDSR |
-|---|---|---:|---:|---:|
-| MLP | search joint p50 | 4.19% | 4.09% | 0.00% |
-| MLP | search joint p75 | 6.28% | 6.19% | 0.00% |
-| MLP | search joint envelope-only | 23.22% | 18.38% | 0.00% |
-| CNN | search joint p50 | 12.31% | 7.56% | 0.03% |
-| CNN | search joint p75 | 34.91% | 10.97% | 0.06% |
-| CNN | search joint envelope-only | 57.66% | 24.78% | 0.09% |
-| FT-Transformer | search joint p50 | 5.03% | 0.22% | 0.00% |
-| FT-Transformer | search joint p75 | 5.19% | 0.22% | 0.00% |
-| FT-Transformer | search joint envelope-only | 5.44% | 0.22% | 0.00% |
+Every successful p75 flow is timing-only (`p=0`, `delay>0`) and validator-valid; no
+successful example fills an empty forward packet. Padding eligibility among the attacked
+flows is 0.03% (CICIDS2017) and 0.38% (CICIDS2018). The p75 timing cap is therefore the
+main attack restriction, and valid evasion remains strongly victim-dependent.
 
-At p75, the random-feasible valid targeted rates were 1.50% (MLP), 5.56% (CNN),
-and 3.69% (FT-Transformer), versus 6.28%, 34.91%, and 5.19% for search.
+The pre-capability-fix FINAL run reached 11.06% / 36.67% / 0.50% Valid ASR on
+CICIDS2017 by mostly padding empty packets. It is non-canonical and retained only as the
+`PrimAttack-relaxed-padding` sensitivity result in
+`FINAL_OUTPUTS/superseded_relaxed_padding/`. A fresh re-run was required: post-filtering
+the old flows gives only 0.15% / 2.31% / 0.03%, whereas timing-focused optimization
+recovers 4.09% / 13.47% / 0.12%.
 
-The replaced `(p, alpha)` Adam run in `outputs/full_adv_eval` produced p75 joint valid
-targeted rates of 0.16%, 1.19%, and 4.66% at the same reference seed. The paired report
-is `PRIMATTACK_V2_OPTIMIZER_COMPARISON.md`. Interpret joint/timing differences as a
-combined optimizer-and-timing-model change; use padding-only rows for the clean
-optimizer comparison.
+### Historical, pre-capability campaigns (not current headline results)
 
-The substantive result is not “PrimAttack always works.” Valid evasion is strongly
-victim- and class-dependent, and almost every successful flow is outside the
-val-anchored per-class VAE IDR gate. PrimAttack v2 is therefore evidence for
-**validity-constrained robustness evaluation**, not an in-distribution evasion claim.
+`outputs/full_adv_eval_primattack_v2` used first-800 selection, seeds `42,123,2024`,
+the relaxed payload-only padding capability, and the pre-policy IDR/True-IDSR metrics.
+At reference seed 42 its joint-p75 valid-targeted rates were 6.28% / 34.91% / 5.19%
+(MLP/CNN/FT). `outputs/full_adv_eval` used the replaced `(p, alpha)` Adam optimizer and
+reported 0.16% / 1.19% / 4.66%. These artifacts remain provenance/history only; their
+selection, optimizer, capability model and metrics differ from the FINAL suite.
+
+The substantive result is not “PrimAttack always works.” It is evidence for
+validity-constrained robustness evaluation under a conservative flow-level primitive
+abstraction, not packet-level or in-distribution realizability.
 
 ## 2.13 Verified invariants
 
@@ -758,8 +770,10 @@ levels and prohibited-input provenance.
 
 1. Forward uniform padding and forward delay allocation are meaningful attacker
    operations for the evaluated flows.
-2. Positive forward payload and a non-zero forward-IAT sequence are sufficient evidence
-   to enable the corresponding aggregate primitive.
+2. Positive forward payload with no zero-length forward packet, and a non-zero
+   forward-IAT sequence, are sufficient evidence to enable the corresponding aggregate
+   primitive. The empty-packet condition is conservative: it also forgoes legitimate
+   padding of data packets in flows that contain an empty packet.
 3. The conservative duration/Flow-IAT-Max construction is acceptable for a flow-level
    proxy.
 4. Training p99 envelopes and class quantiles are defensible evaluation bounds for this

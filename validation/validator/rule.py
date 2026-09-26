@@ -18,6 +18,10 @@ masks: ``satisfied`` and ``eligible``. A sample **violates** a rule iff it is
 eligible and not satisfied; an ineligible sample (e.g. a conditional rule whose
 antecedent does not hold, or a ratio whose denominator is ~0) is never a
 violation.
+
+*Transition* rules (``TRANSITION_TYPES``) relate a perturbed flow to its unperturbed
+source flow and need the source matrix; without one the flow is its own source, so the
+rule is ineligible (an unperturbed flow cannot violate a transition).
 """
 from __future__ import annotations
 
@@ -36,7 +40,9 @@ APPROXIMATE_TYPES = {
     "sum_equality", "difference_equality", "product_equality", "ratio_equality",
     "constant",
 }
-RULE_TYPES = APPROXIMATE_TYPES | {
+# Source-conditioned rules: evaluated on (adversarial, source) pairs.
+TRANSITION_TYPES = {"zero_preserved"}
+RULE_TYPES = APPROXIMATE_TYPES | TRANSITION_TYPES | {
     "finite", "integer", "binary", "nonnegative", "nonpositive", "categorical",
     "le", "ge", "monotone_chain", "implication_zero", "implication_pos",
 }
@@ -65,23 +71,34 @@ class Rule:
             self.tolerance = Tolerance.from_dict(self.tolerance)
 
     # ---- evaluation -------------------------------------------------------
-    def evaluate(self, X: np.ndarray, idx: dict[str, int]) -> tuple[np.ndarray, np.ndarray]:
+    def evaluate(self, X: np.ndarray, idx: dict[str, int],
+                 source: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
         """Return ``(satisfied, eligible)`` per-sample boolean masks.
 
         ``X`` is ``(N, F)`` raw features; ``idx`` maps feature name -> column.
-        Missing features make the rule inapplicable (all-eligible-False).
+        ``source`` is the ``(N, F)`` unperturbed source of each row (transition rules only;
+        ``None`` = the rows are unperturbed flows). Missing features make the rule
+        inapplicable (all-eligible-False).
         """
         n = X.shape[0]
         all_true = np.ones(n, dtype=bool)
-        try:
-            g = lambda f: X[:, idx[f]].astype(np.float64)  # noqa: E731
-        except KeyError:
+        if any(feature not in idx for feature in self.features):
             return all_true, np.zeros(n, dtype=bool)
+        g = lambda f: X[:, idx[f]].astype(np.float64)  # noqa: E731
 
         at, rt = self.tolerance.absolute, self.tolerance.relative
         t = self.rule_type
         p = self.params
 
+        if t == "zero_preserved":
+            # a feature that is 0 in the source flow must still be 0 in the perturbed flow
+            if source is None:
+                return all_true, np.zeros(n, dtype=bool)
+            if source.shape != X.shape:
+                raise ValueError(f"{self.id}: source shape {source.shape} != {X.shape}")
+            col = idx[p["feature"]]
+            ante = is_close(source[:, col].astype(np.float64), 0.0, at, 0.0)
+            return is_close(g(p["feature"]), 0.0, at, 0.0), ante
         if t == "finite":
             return np.isfinite(g(p["feature"])), all_true
         if t == "integer":
@@ -223,4 +240,6 @@ class Rule:
             return f"{p['antecedent']} == 0  =>  {p['consequent']} == 0"
         if t == "implication_pos":
             return f"{p['antecedent']} > 0  =>  {p['consequent']} >= 0"
+        if t == "zero_preserved":
+            return f"source {p['feature']} == 0  =>  {p['feature']} == 0"
         return f"<{t}>"

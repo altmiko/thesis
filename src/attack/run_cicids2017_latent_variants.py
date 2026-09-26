@@ -74,7 +74,8 @@ def evaluate_variant(*, rmask, victim, base_vae, raw, adv_raw, center, scale,
         evasion = adv_pred != class_id
         benign = adv_pred == 0
 
-        mined = torch.tensor(structural_masks(adv_raw.detach().cpu().numpy())["hybrid_valid"],
+        mined = torch.tensor(structural_masks(adv_raw.detach().cpu().numpy(),
+                                              source_raw=raw.detach().cpu().numpy())["hybrid_valid"],
                              device=raw.device)
         in_dist = _idr_mask(base_vae, x_adv, idr_path)
         frozen_ok = ~rmask.frozen_violation_mask(adv_raw, raw, atol=SCALER_ATOL, rtol=1e-4)

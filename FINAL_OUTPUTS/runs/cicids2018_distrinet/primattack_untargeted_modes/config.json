@@ -1,0 +1,99 @@
+{
+  "dataset": "cicids2018_distrinet",
+  "modes": [
+    "timing-only",
+    "padding-only"
+  ],
+  "objective": "untargeted",
+  "padding_capability": "Nf >= 1 AND Total Length of Fwd Packet > 0 AND Fwd Packet Length Mean > 0 AND Fwd Packet Length Min > 0",
+  "timing_capability": "Nf >= 2 AND Fwd IAT Total > 0",
+  "methods": [
+    "pgd"
+  ],
+  "method_configs": {
+    "hybrid": {
+      "steps": 40,
+      "learning_rate": 0.1,
+      "restarts": null,
+      "canonical_restarts": 2,
+      "momentum": 0.75,
+      "checkpoint_interval": 10,
+      "stall_factor": 0.5
+    },
+    "pgd": {
+      "steps": 42,
+      "step_size": 0.05,
+      "restarts": 3,
+      "momentum": 0.75
+    },
+    "cw": {
+      "steps": 42,
+      "learning_rate": 0.5,
+      "stages": 3,
+      "c_init": 1.0,
+      "kappa": 0.0,
+      "betas": [
+        0.9,
+        0.999
+      ]
+    }
+  },
+  "eval_budget_per_flow": 256,
+  "evaluation_unit": "one victim forward pass on one flow (realized quantized flow or continuous surrogate); gradient steps additionally cost one backward",
+  "success": "victim argmax != true source class on the realized flow AND validator_v2 hybrid_valid",
+  "incumbent": "success > failure; successes by normalized cost p/p_hi + delay/delay_hi (then margin); failures by margin source logit - max(non-source)",
+  "budgets": {
+    "maximum-evaluated": "p75"
+  },
+  "classes": [
+    "DoS",
+    "DDoS",
+    "Recon",
+    "BruteForce"
+  ],
+  "victims": {
+    "mlp-s42": {
+      "checkpoint": "E:\\Shameem\\thesis\\outputs\\cicids2018distrinet\\classifiers_multiseed\\runs\\seed_42\\models\\mlp_category.pt",
+      "checkpoint_sha256": "1ac1c5708dcbdfa594b554ae13650410cac17fbafcda00e3d2968af60ffe7348",
+      "arch": "mlp",
+      "train_seed": 42,
+      "attack_seeds": [
+        42,
+        2024,
+        2026
+      ]
+    },
+    "cnn-s42": {
+      "checkpoint": "E:\\Shameem\\thesis\\outputs\\cicids2018distrinet\\classifiers_multiseed\\runs\\seed_42\\models\\cnn_category.pt",
+      "checkpoint_sha256": "0550b76328d3d98e4d1e9591b279cd28134bd363f4ea263cf5a7093f23e0a762",
+      "arch": "cnn",
+      "train_seed": 42,
+      "attack_seeds": [
+        42,
+        2024,
+        2026
+      ]
+    },
+    "ft_transformer-s42": {
+      "checkpoint": "E:\\Shameem\\thesis\\outputs\\cicids2018distrinet\\classifiers_multiseed\\runs\\seed_42\\models\\ft_transformer_category.pt",
+      "checkpoint_sha256": "a5cbc18a93da1c3b1b651a1c3d051b7d740478a1162b13030368c2ece7078e76",
+      "arch": "ft_transformer",
+      "train_seed": 42,
+      "attack_seeds": [
+        42,
+        2024,
+        2026
+      ]
+    }
+  },
+  "split": "test",
+  "selection_from": "E:\\Shameem\\thesis\\FINAL_OUTPUTS\\runs\\cicids2018_distrinet\\baselines_untargeted\\selection.json",
+  "selection_sha256": "d8c1640dd66751dc832fbf7c4d12a1f10d3778612569f804970b1c751863e4bb",
+  "limit_rows": null,
+  "calibration": "E:\\Shameem\\thesis\\artifacts\\primattack\\budget_calibration_cicids2018.json",
+  "calibration_fit_split": "train",
+  "benign_id": 0,
+  "torch": "2.5.1+cu121",
+  "device": "cuda",
+  "python": "3.11.15"
+}

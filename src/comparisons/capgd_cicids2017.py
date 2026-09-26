@@ -491,7 +491,7 @@ def evaluate_capgd_output(
     )
     distance_ok = distance <= float(eps) + 1e-6
 
-    validated = resources.validator.validate_batch(adv)
+    validated = resources.validator.validate_batch(adv, clean)
     rejecting = validated.rules_rejecting_any()
     return {
         "internal_constraint_valid": internal,

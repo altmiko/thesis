@@ -223,7 +223,8 @@ def _evaluate(
     # the A0-A6 ablation ladder (ASR_L0 / ASR_L0_L1 / ASR_L0_L1_L2).
     v2_hybrid = torch.tensor(
         structural_masks(raw_adv.detach().cpu().numpy(),
-                         dataset=model.manifest.dataset_name)["hybrid_valid"],
+                         dataset=model.manifest.dataset_name,
+                         source_raw=raw_clean.detach().cpu().numpy())["hybrid_valid"],
         device=raw_adv.device)
     joint_valid = v2_hybrid
     eligible_cost = per_sample_cost[clean_correct]

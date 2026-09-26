@@ -86,21 +86,26 @@ victim-training seed replication.
 
 ## C. Substantive result boundaries
 
-11. **Budgeted PrimAttack: structurally valid evasion is victim-dependent, and in-distribution
-    evasion is ≈0.** The earlier conclusion ("essentially fails to evade", from the replaced
-    Adam/sigmoid `(p, α)` optimizer — `docs/primattack_budget_results.md`,
-    `outputs/full_adv_eval` `prim_opt_*`) was an optimizer artifact. With the v2 search
-    (`outputs/full_adv_eval_primattack_v2`, `PRIMATTACK_V2_OPTIMIZER_COMPARISON.md`; 800 frozen
-    clean-correct flows/class, reference seed 42, classes pooled within victim) joint p75
-    targeted ∧ hybrid_valid ∧ feasible is mlp 6.28%, cnn 34.91%, ft_transformer 5.19%
-    (old: 0.16%, 1.19%, 4.66%; McNemar Holm p ≤ 1.7e-4 for every victim). Joint p75
-    targeted ∧ valid ∧ feasible ∧ SP is mlp 6.19%, cnn 10.97%, ft 0.22%.
-    **True-IDSR (∧ in_distribution) remains 0–0.09% for every victim/budget/mode**: the
-    successful flows are structurally valid and within the calibrated box but lie outside
-    the per-class VAE IDR gate. Validity and primitive feasibility were observed at 100%
-    in every v2 PrimAttack cell; this is an empirical campaign result, not a construction guarantee.
-    Caveat: the frozen roster was inspected diagnostically before the v2 design, so the
-    old-vs-new contrast is post-hoc on the same rows.
+11. **Capability-aware PrimAttack: valid evasion is victim- and budget-dependent.** The FINAL
+    suite (`FINAL_OUTPUTS/`, amendment A2; 800 random clean-correct flows/class, attack seeds
+    42/2024/2026, one victim per architecture) forbids padding when
+    `Fwd Packet Length Min == 0`. At p75 the selected Prim-PGD untargeted Valid ASR is
+    CICIDS2017 MLP/CNN/FT = **4.09% / 13.47% / 0.12%** and CICIDS2018 =
+    **2.53% / 1.16% / 0.00%**; targeted-to-Benign is 4.09% / 13.25% / 0.12% and
+    0.78% / 0% / 0%. Every success is timing-only and has zero validity gap. The
+    envelope-only ("unbounded") timing box raises untargeted Valid ASR to
+    22.97% / 59.94% / 0.59% and 44.32% / 26.28% / 0.12%, so the p75 delay budget is
+    a first-order limitation. The pre-fix relaxed-padding result (11.06% / 36.67% /
+    0.50% on CICIDS2017) is non-canonical: it filled zero-length forward packets; it is
+    retained only in `FINAL_OUTPUTS/superseded_relaxed_padding/`. Fresh timing search
+    recovers substantially more than post-filtering that run. Audit:
+    `primattack_empty_packet_fix_report.md`.
+
+    Historical campaigns in `outputs/full_adv_eval_primattack_v2` (6.28% / 34.91% /
+    5.19% targeted-valid at p75) and `outputs/full_adv_eval` (0.16% / 1.19% / 4.66%)
+    predate the empty-packet capability rule and use different selections/optimizers; do not
+    use them as current thesis headline results. Their historical VAE IDR/True-IDSR fields are
+    also outside the current no-IDR policy.
 
 12. **Feature-space PGD/C&W: high raw ASR, zero valid ASR.**
     `outputs/cicids2017_baseline_pgd_cw/`: raw ASR ≈ 1.0 but domain-valid /

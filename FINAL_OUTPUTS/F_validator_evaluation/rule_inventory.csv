@@ -1,9 +1,9 @@
-dataset,source_type,layer,n_rules
-cicids2017_distrinet,SCHEMA,general flow consistency,133
-cicids2017_distrinet,EXTRACTOR,general flow consistency,7
-cicids2017_distrinet,PROTOCOL,general flow consistency,79
-cicids2017_distrinet,MINED,dataset-specific (train-mined),16
-cicids2018_distrinet,SCHEMA,general flow consistency,133
-cicids2018_distrinet,EXTRACTOR,general flow consistency,7
-cicids2018_distrinet,PROTOCOL,general flow consistency,77
-cicids2018_distrinet,MINED,dataset-specific (train-mined),10
+dataset,source_type,layer,n_rules,n_transition_rules
+cicids2017_distrinet,SCHEMA,general flow consistency,133,0
+cicids2017_distrinet,EXTRACTOR,general flow consistency,7,0
+cicids2017_distrinet,PROTOCOL,general flow consistency,80,1
+cicids2017_distrinet,MINED,dataset-specific (train-mined),16,0
+cicids2018_distrinet,SCHEMA,general flow consistency,133,0
+cicids2018_distrinet,EXTRACTOR,general flow consistency,7,0
+cicids2018_distrinet,PROTOCOL,general flow consistency,78,1
+cicids2018_distrinet,MINED,dataset-specific (train-mined),10,0

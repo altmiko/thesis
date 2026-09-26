@@ -59,7 +59,7 @@ def test_uniform_padding_shift_identities(setup):
     p = 37.0
     adv = model.generate(raw, _ctl(raw.shape[0], p, 0.0))
     nf = raw[:, i["Total Fwd Packet"]]
-    active = model.active_mask(raw, "p")  # semantic: fwd packets AND fwd payload present
+    active = model.active_mask(raw, "p")  # semantic: fwd payload AND no empty fwd packet
     tl0, tl1 = raw[:, i["Total Length of Fwd Packet"]], adv[:, i["Total Length of Fwd Packet"]]
     assert torch.allclose(tl1[active], tl0[active] + nf[active] * p, atol=1e-6)
     m0, m1 = raw[:, i["Fwd Packet Length Mean"]], adv[:, i["Fwd Packet Length Mean"]]
@@ -128,6 +128,87 @@ def test_no_forward_payload_disables_padding(setup):
     for f in ("Total Length of Fwd Packet", "Fwd Packet Length Max",
               "Fwd Packet Length Min", "Fwd Packet Length Mean"):
         assert torch.allclose(adv[no_payload, i[f]], raw[no_payload, i[f]], atol=1e-6)
+
+
+def _paddable_timing_rows(model, raw, i):
+    """Flows that satisfy every padding and timing condition (payload, no empty packet, IATs)."""
+    rows = ((raw[:, i["Total Length of Fwd Packet"]] > 0)
+            & (raw[:, i["Fwd Packet Length Mean"]] > 0)
+            & (raw[:, i["Fwd Packet Length Min"]] > 0)
+            & (raw[:, i["Total Fwd Packet"]] >= 2) & (raw[:, i["Fwd IAT Total"]] > 0))
+    assert bool(rows.any()), "sample needs paddable, timing-capable flows"
+    return raw[rows]
+
+
+def test_empty_forward_packet_disables_padding_but_not_timing(setup):
+    """Same flows, only Fwd Packet Length Min set to 0 (one empty forward packet): padding is no
+    longer admissible (reason EMPTY_FWD_PACKET), timing capability is unchanged."""
+    from attack.realizability.base import EMPTY_FWD_PACKET
+    model, _, raw, i = setup
+    src = _paddable_timing_rows(model, raw, i)
+    empty = src.clone()
+    empty[:, i["Fwd Packet Length Min"]] = 0.0
+    base, caps = model.infer_capabilities(src), model.infer_capabilities(empty)
+    assert bool(base.pad_allowed.all())
+    assert not bool(caps.pad_allowed.any())
+    assert set(caps.pad_reason) == {EMPTY_FWD_PACKET}
+    assert torch.equal(caps.timing_allowed, base.timing_allowed)
+    assert bool(caps.timing_allowed.all())
+
+
+def test_real_flows_with_an_empty_forward_packet_are_not_paddable(setup):
+    from attack.realizability.base import EMPTY_FWD_PACKET
+    model, _, raw, i = setup
+    rows = (raw[:, i["Fwd Packet Length Min"]] == 0) & (raw[:, i["Total Length of Fwd Packet"]] > 0)
+    assert bool(rows.any())
+    caps = model.infer_capabilities(raw)
+    assert not bool(caps.pad_allowed[rows].any())
+    assert {caps.pad_reason[k] for k in torch.nonzero(rows).flatten().tolist()} == {EMPTY_FWD_PACKET}
+
+
+def test_padding_stays_available_without_empty_forward_packets(setup):
+    """Payload present and Fwd Packet Length Min > 0: padding admissible, box = numeric cap."""
+    from attack.realizability.base import PAD_ALLOWED
+    model, _, raw, i = setup
+    src = _paddable_timing_rows(model, raw, i)
+    caps = model.infer_capabilities(src)
+    assert bool(caps.pad_allowed.all()) and set(caps.pad_reason) == {PAD_ALLOWED}
+    env = ("Fwd Packet Length Max", "Fwd Packet Length Min", "Fwd Packet Length Mean",
+           "Total Length of Fwd Packet", "Fwd IAT Total", "Fwd IAT Max", "Fwd IAT Std",
+           "Fwd IAT Mean", "Flow Duration")
+    cfg = {"p_max": 1460.0, "max_relative_duration_change": 10.0,
+           **{f"env_{n}": float(src[:, i[n]].max()) + 1e6 for n in env}}
+    b = model.per_flow_bounds(src, cfg, capabilities=caps)
+    assert bool((b["p"] >= 1.0).all()) and torch.equal(b["p"], b["p_numeric"])
+    adv = model.generate(src, _ctl(src.shape[0], 11.0, 0.0), quantize=True, capabilities=caps)
+    assert torch.allclose(adv[:, i["Fwd Packet Length Min"]], src[:, i["Fwd Packet Length Min"]] + 11.0)
+
+
+def test_empty_forward_packet_is_never_filled_by_any_request(setup):
+    """Recompute invariant: whatever (p, delay, shape) is requested, a source with an empty
+    forward packet leaves the primitive map with Fwd Packet Length Min == 0 and an unchanged
+    forward-length block; bounds and projection pin p to 0."""
+    model, _, raw, i = setup
+    rows = raw[:, i["Fwd Packet Length Min"]] == 0
+    src = raw[rows]
+    caps = model.infer_capabilities(src)
+    cfg = {"p_max": 1460.0, "max_relative_duration_change": 10.0,
+           **{f"env_{n}": float(raw[:, i[n]].max()) + 1e6 for n in (
+               "Fwd Packet Length Max", "Fwd Packet Length Min", "Fwd Packet Length Mean",
+               "Total Length of Fwd Packet", "Fwd IAT Total", "Fwd IAT Max", "Fwd IAT Std",
+               "Fwd IAT Mean", "Flow Duration")}}
+    b = model.per_flow_bounds(src, cfg, capabilities=caps)
+    assert bool((b["p"] == 0).all())
+    for p, delay, shape in ((1.0, 0.0, 0.0), (900.0, 0.0, 0.0), (500.0, 20000.0, 0.5)):
+        ctl = _ctl(src.shape[0], p, delay, shape)
+        proj = model.project_controls(src, ctl, b, capabilities=caps)
+        assert bool((proj["p"] == 0).all())
+        for adv in (model.generate(src, ctl, quantize=True, capabilities=caps),
+                    model.generate(src, proj, quantize=True, capabilities=caps)):
+            assert bool((adv[:, i["Fwd Packet Length Min"]] == 0).all())
+            for f in ("Total Length of Fwd Packet", "Fwd Packet Length Max",
+                      "Fwd Packet Length Mean", "Packet Length Min"):
+                assert torch.equal(adv[:, i[f]], src[:, i[f]]), f
 
 
 def test_bounds_gated_by_capabilities(setup):

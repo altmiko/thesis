@@ -119,7 +119,7 @@ documented in every fairness guide.
 * Stored `validator_pass` is recomputed from the stored final adversarial flow. A mismatch
   aborts the analysis.
 
-## 7. Amendment log (methodological bug fixes only)
+## 7. Amendment log (methodological fixes and requested additions)
 
 * **A1 — non-finite surrogate gradient at pinned PrimAttack controls.** The first Exp B run
   crashed on CICIDS2018 (`mlp-s42`/Recon/p75, Prim-C&W): `project_controls` received NaN
@@ -137,5 +137,34 @@ documented in every fairness guide.
   discarded, and Exp B was re-run from scratch on both
   datasets before the optimizer selection. The discarded logs are kept in
   `runs/_superseded_logs/`. The baseline stage does not use this code and was not re-run.
+  (These logs moved with the whole pre-A2 run to `superseded_relaxed_padding/runs/`.)
+* **A2 — empty-forward-packet padding capability (PrimAttack) and validator rule.** Padding
+  adds `p` bytes to every forward packet. The pre-A2 capability rule allowed it whenever the
+  flow had forward payload, including flows with `Fwd Packet Length Min = 0`, i.e. with at
+  least one zero-length forward packet; padding then filled an empty packet (payload
+  insertion). On CICIDS2017 1,464 of the 1,544 seed-42 valid PrimAttack successes (Exp A,
+  p75) did this; CICIDS2018 already rejected it through `MINED_0001`. Changes:
+  (1) `CICIDS2017PrimitiveModel.infer_capabilities` requires `Fwd Packet Length Min > 0` for
+  padding (reason `EMPTY_FWD_PACKET`), before optimization, so such flows are attacked
+  timing-only with the full per-flow budget (per-row search space recorded; Hybrid/Prim-PGD
+  step normalization uses free coordinates only);
+  (2) validator_v2 gains the source-conditioned PROTOCOL rule `PROTO_0080`
+  (`zero_preserved::Fwd Packet Length Min`: source 0 ⇒ perturbed 0) on **both** datasets,
+  applied to every attack's output; genuine flows are their own source, so Exp F acceptance
+  is unaffected;
+  (3) new stage `primattack_untargeted_modes`: the Exp A PrimAttack configuration restricted
+  to timing-only and padding-only (joint = the Exp A cell), reported descriptively (no new
+  test family).
+  Everything else is unchanged (source lists, victims, budgets and their train-only
+  calibration, the 23-feature support mask, seeds, objectives, metrics, statistical plan,
+  optimizer-selection rule). Because the validator changed, **every stage was re-run from
+  scratch** (baselines included) on both datasets, and the optimizer selection was re-applied
+  with the frozen rule. The pre-A2 run and reports are kept, non-canonical, in
+  `superseded_relaxed_padding/` and reported only as the `PrimAttack-relaxed-padding`
+  sensitivity result. Audit: `../primattack_empty_packet_fix_report.md`.
+* **A3 — native CAPGD as a descriptive Exp A row (requested).** `capgd_native` (TabularBench
+  CAPGD with its own configuration mask, L2 ε = 0.5, 10 steps, 2 restarts) runs in the
+  baseline stage on the same flows and seeds and is judged by the same validator. It is
+  reported (†) but is not part of Exp A's Cochran's Q or Holm family, which stay as locked.
 * **Realized sample counts.** Every (dataset, victim, class) had ≥ 800 clean-correct test flows,
   so every cell has exactly 800 flows (3,200 per victim and seed).
