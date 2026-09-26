@@ -1234,7 +1234,7 @@ Repository evidence:
 | F4.5 | 4.10.3 | PrimAttack primitive-to-feature recomputation graph | Show coupled 23-feature support | — | Yes | primitive model | Essential |
 | F4.6 | 4.10.8 | Detailed PrimAttack execution pipeline | Locate capability, projection, victim, validator, and incumbent | — | Yes | optimizer and runner | Essential |
 | F4.7 | 4.11 | Final A–F experimental design | Show reused paired cells and objectives | — | Yes | locked protocol | Essential |
-| F5.1 | 5.2 | Category-victim confusion matrices | Establish clean target quality | Classifier `plots/` directories | No, if existing plots are selected | classifier predictions | Useful |
+| F5.1 | 5.2 | Category-victim confusion matrices | Establish clean target quality | `outputs/cicids2017distrinet/plots/`, `outputs/cicids2017distrinet_ft/plots/`, `outputs/cicids2018distrinet/classifiers_multiseed/plots/` | No | classifier predictions | Useful |
 | F5.2 | 5.3 | Raw ASR by attack and victim | Show classifier-level attack success | `FINAL_OUTPUTS/A_primary_baseline_comparison/plots/A1_raw_asr_by_attack.png` | No | Exp A | Essential |
 | F5.3 | 5.3 | Valid ASR by attack and victim | Show ranking after validation | `FINAL_OUTPUTS/A_primary_baseline_comparison/plots/A2_valid_asr_by_attack.png` | No | Exp A | Essential |
 | F5.4 | 5.4 | Raw versus Valid ASR | Visualize validity gap | `FINAL_OUTPUTS/E_paired_validity_gap/plots/E1_raw_vs_valid_asr.png` | No | Exp E | Essential |
@@ -1264,19 +1264,19 @@ Repository evidence:
 | T4.12 | 4.10.5 | Dataset/class budget calibration | Document train-only p25/p50/p75 | — | Included in draft | calibration JSON | Essential |
 | T4.13 | 4.11 | Complete experimental matrix | Describe A–F | — | Included in draft | protocol | Essential |
 | T4.14 | 4.12 | Statistical questions and tests | Explain minimal test plan | — | Included in draft | protocol/analyzer | Essential |
-| T5.1 | 5.2 | Victim test performance | Establish target quality | Classifier summary CSVs | Included in draft | classifier outputs | Essential |
+| T5.1 | 5.2 | Victim test performance | Establish target quality | `outputs/cicids2017distrinet/classifier_metrics_summary.csv`; `outputs/cicids2017distrinet_ft/classifier_metrics_summary.csv`; `outputs/cicids2018distrinet/classifiers_multiseed/multiseed_summary.csv` | Included in draft | classifier outputs | Essential |
 | T5.2 | 5.3 | Experiment A—CICIDS2017 | Main comparison | `FINAL_OUTPUTS/A_primary_baseline_comparison/table_level.csv` | Included in draft | Exp A | Essential |
-| T5.3 | 5.3 | Experiment A—CICIDS2018 | Main comparison | same | Included in draft | Exp A | Essential |
-| T5.4 | 5.3.3 | CAPGD-PrimSupport versus PrimAttack | Explain matched support | `capability_fix/capgd_primsupport_fairness.csv` | Included in draft | Exp A | Essential |
-| T5.5 | 5.4 | Invalid successes by validator family | Explain gaps | `E_paired_validity_gap/rejection_categories_of_invalid_successes.csv` | Format subset | Exp E | Useful |
-| T5.6 | 5.5 | Primitive eligibility | Contextualize ablation | `capability_fix/eligibility.csv` | Included in draft | Exp A | Essential |
-| T5.7 | 5.5 | Primitive-mode ablation | Attribute success to timing/padding | `capability_fix/primitive_ablation.csv` | Included in draft | Exp A | Essential |
-| T5.8 | 5.6 | Budget sensitivity | Quantify budget/effectiveness trade-off | `C_budget_sensitivity/table_level.csv` | Included in draft | Exp C | Essential |
-| T5.9 | 5.7 | Optimizer comparison | Support selection | `B_optimizer_selection/table_level.csv` | Included in draft | Exp B | Useful |
-| T5.10 | 5.8 | Objective sensitivity | Distinguish evasion objectives | `D_objective_sensitivity/table_level.csv` | Included in draft | Exp D | Useful |
-| T5.11 | 5.9 | Padding capability before and after | Quantify correction | `capability_fix/relaxed_vs_capability_aware.csv` | Format concise subset | capability fix | Essential |
-| T5.12 | 5.10 | Statistical test results | Report N, discordance, effect, p | each experiment's `statistical_tests.csv` | Included representative rows; appendix full table | A–E | Essential |
-| T5.13 | 5.11 | Genuine-flow validator acceptance | Evaluate false rejection | `F_validator_evaluation/validator_acceptance.csv` | Included in draft | Exp F | Essential |
+| T5.3 | 5.3 | Experiment A—CICIDS2018 | Main comparison | `FINAL_OUTPUTS/A_primary_baseline_comparison/table_level.csv` | Included in draft | Exp A | Essential |
+| T5.4 | 5.3.3 | CAPGD-PrimSupport versus PrimAttack | Explain matched support | `FINAL_OUTPUTS/A_primary_baseline_comparison/capability_fix/capgd_primsupport_fairness.csv` | Included in draft | Exp A | Essential |
+| T5.5 | 5.4 | Invalid successes by validator family | Explain gaps | `FINAL_OUTPUTS/E_paired_validity_gap/rejection_categories_of_invalid_successes.csv` | Format subset | Exp E | Useful |
+| T5.6 | 5.5 | Primitive eligibility | Contextualize ablation | `FINAL_OUTPUTS/A_primary_baseline_comparison/capability_fix/eligibility.csv` | Included in draft | Exp A | Essential |
+| T5.7 | 5.5 | Primitive-mode ablation | Attribute success to timing/padding | `FINAL_OUTPUTS/A_primary_baseline_comparison/capability_fix/primitive_ablation.csv` | Included in draft | Exp A | Essential |
+| T5.8 | 5.6 | Budget sensitivity | Quantify budget/effectiveness trade-off | `FINAL_OUTPUTS/C_budget_sensitivity/table_level.csv` | Included in draft | Exp C | Essential |
+| T5.9 | 5.7 | Optimizer comparison | Support selection | `FINAL_OUTPUTS/B_optimizer_selection/table_level.csv` | Included in draft | Exp B | Useful |
+| T5.10 | 5.8 | Objective sensitivity | Distinguish evasion objectives | `FINAL_OUTPUTS/D_objective_sensitivity/table_level.csv` | Included in draft | Exp D | Useful |
+| T5.11 | 5.9 | Padding capability before and after | Quantify correction | `FINAL_OUTPUTS/A_primary_baseline_comparison/capability_fix/relaxed_vs_capability_aware.csv` | Format concise subset | capability fix | Essential |
+| T5.12 | 5.10 | Statistical test results | Report N, discordance, effect, p | `FINAL_OUTPUTS/A_primary_baseline_comparison/statistical_tests.csv`; `FINAL_OUTPUTS/B_optimizer_selection/statistical_tests.csv`; `FINAL_OUTPUTS/C_budget_sensitivity/statistical_tests.csv`; `FINAL_OUTPUTS/D_objective_sensitivity/statistical_tests.csv`; `FINAL_OUTPUTS/E_paired_validity_gap/statistical_tests.csv` | Included representative rows; appendix full table | A–E | Essential |
+| T5.13 | 5.11 | Genuine-flow validator acceptance | Evaluate false rejection | `FINAL_OUTPUTS/F_validator_evaluation/validator_acceptance.csv` | Included in draft | Exp F | Essential |
 | T5.14 | 5.12 | Cross-dataset summary | Synthesize external validity | — | Included in draft | A/C/F | Useful |
 
 <!--
