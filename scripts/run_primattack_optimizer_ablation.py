@@ -1,6 +1,7 @@
-"""Controlled PrimAttack optimizer runs: Hybrid (default) vs Prim-PGD vs Prim-C&W.
+"""Controlled PrimAttack optimizer runs: Hybrid (default) vs Prim-PGD vs Prim-C&W, plus the
+gradient-free Prim-Random null control (``--methods random``; never part of the defaults).
 
-Every method runs through ``attack.primitive_optimizer.RealizedSearch``, so all three share:
+Every method runs through ``attack.primitive_optimizer.RealizedSearch``, so all of them share:
 the frozen clean-correct source rows (read from a frozen ``selection.json`` and re-verified),
 the victims, the primitive controls ``(p, delay, shape)``, the calibrated per-flow hard box of
 each budget (p50 / p75 / envelope-only "unbounded"), the canonical feature recomputation with
@@ -47,7 +48,7 @@ from attack.primattack_budget import (  # noqa: E402
 )
 from attack.primitive_optimizer import (  # noqa: E402
     CANDIDATE_NAMES, AttackObjective, hybrid_valid_gate, optimize_primitive_candidates,
-    optimize_primitive_cw, optimize_primitive_pgd, row_primitive_modes,
+    optimize_primitive_cw, optimize_primitive_pgd, optimize_primitive_random, row_primitive_modes,
 )
 from attack.realizability.cicids2017 import (  # noqa: E402
     CICIDS2017PrimitiveModel, primattack_joint_feature_mask,
@@ -64,7 +65,9 @@ from run_full_adversarial_eval import (  # noqa: E402
 from src.classifiers.cicids2017d_victims import load_category_victim  # noqa: E402
 from vae.cicids2017_stage_a import ATTACK_CLASSES  # noqa: E402
 
-METHODS = ("hybrid", "pgd", "cw")
+OPTIMIZERS = ("hybrid", "pgd", "cw")
+# "random" = gradient-free null control (uniform random search, same box and query cap)
+METHODS = OPTIMIZERS + ("random",)
 PRIMITIVE_MODES = ("joint", "timing-only", "padding-only")
 
 
@@ -94,6 +97,8 @@ def method_configs(args) -> dict[str, dict]:
                 "momentum": args.pgd_momentum},
         "cw": {"steps": cw_steps, "learning_rate": args.cw_lr, "stages": args.cw_stages,
                "c_init": args.cw_c, "kappa": args.cw_kappa, "betas": [0.9, 0.999]},
+        "random": {"realized_candidates": b - 1, "distribution": "uniform in the normalized "
+                   "per-flow box (pinned coordinates 0)", "gradient": False},
     }
 
 
@@ -113,6 +118,9 @@ def run_method(method, cfg, args_tuple, *, seed, gate, budget, objective):
             stages=cfg["stages"], c_init=cfg["c_init"], kappa=cfg["kappa"],
             betas=tuple(cfg["betas"]), validity_fn=gate, eval_budget=budget,
             objective=objective)
+    if method == "random":
+        return optimize_primitive_random(
+            *args_tuple, seed=seed, validity_fn=gate, eval_budget=budget, objective=objective)
     raise KeyError(method)
 
 
@@ -143,7 +151,8 @@ def main() -> None:
     ap.add_argument("--victims", default=None)
     ap.add_argument("--classes", default=",".join(ATTACK_CLASSES))
     ap.add_argument("--budgets", default="intermediate,maximum-evaluated,unbounded")
-    ap.add_argument("--methods", default=",".join(METHODS))
+    ap.add_argument("--methods", default=",".join(OPTIMIZERS),
+                    help=f"comma-separated from {METHODS}")
     ap.add_argument("--modes", default="joint",
                     help=f"comma-separated primitive modes from {PRIMITIVE_MODES}")
     ap.add_argument("--eval-budget", type=int, default=256,

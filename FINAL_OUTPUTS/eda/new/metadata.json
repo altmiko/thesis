@@ -1,0 +1,182 @@
+{
+  "arguments": {
+    "pca_per_class": 5000,
+    "tsne_per_class": 1500,
+    "workers": 8
+  },
+  "cicids2018_reduction": {
+    "after": 833552,
+    "before": 62393756,
+    "by_class": [
+      {
+        "after": 250000,
+        "before": 59002315,
+        "category_label": "Benign",
+        "removed": 58752315,
+        "retained_pct": 0.42371218824210544
+      },
+      {
+        "after": 200000,
+        "before": 1833741,
+        "category_label": "DoS",
+        "removed": 1633741,
+        "retained_pct": 10.906665663253426
+      },
+      {
+        "after": 200000,
+        "before": 1374148,
+        "category_label": "DDoS",
+        "removed": 1174148,
+        "retained_pct": 14.55447302619514
+      },
+      {
+        "after": 89355,
+        "before": 89355,
+        "category_label": "Recon",
+        "removed": 0,
+        "retained_pct": 100.0
+      },
+      {
+        "after": 94197,
+        "before": 94197,
+        "category_label": "BruteForce",
+        "removed": 0,
+        "retained_pct": 100.0
+      }
+    ],
+    "retained_pct": 1.33595419387799,
+    "source": "data\\processed\\CSECICIDS_2018_Distrinet\\class_reduction_by_split.csv"
+  },
+  "datasets": {
+    "cicids2017": {
+      "after_preprocessing": {
+        "mapped_before_finite_filter_counts": {
+          "Benign": 1647759,
+          "BruteForce": 6947,
+          "DDoS": 95098,
+          "DoS": 171559,
+          "Recon": 159016
+        },
+        "pca_explained_variance_ratio": [
+          0.2968863142332269,
+          0.18361204062831216
+        ],
+        "population_counts": {
+          "Benign": 1647759,
+          "BruteForce": 6947,
+          "DDoS": 95098,
+          "DoS": 171559,
+          "Recon": 159016
+        },
+        "sample_counts": {
+          "Benign": 5000,
+          "BruteForce": 5000,
+          "DDoS": 5000,
+          "DoS": 5000,
+          "Recon": 5000
+        },
+        "tsne_kl_divergence": 0.6915436387062073,
+        "tsne_rows": 7500,
+        "visualization_transform": "asinh(production RobustScaler output), then sample-fitted StandardScaler"
+      },
+      "before_preprocessing": {
+        "mapped_before_finite_filter_counts": {
+          "Benign": 1666837,
+          "BruteForce": 6953,
+          "DDoS": 95123,
+          "DoS": 171779,
+          "Recon": 159151
+        },
+        "pca_explained_variance_ratio": [
+          0.4389495114076008,
+          0.1255229253363286
+        ],
+        "population_counts": {
+          "Benign": 1666172,
+          "BruteForce": 6953,
+          "DDoS": 95123,
+          "DoS": 171779,
+          "Recon": 159023
+        },
+        "sample_counts": {
+          "Benign": 5000,
+          "BruteForce": 5000,
+          "DDoS": 5000,
+          "DoS": 5000,
+          "Recon": 5000
+        },
+        "tsne_kl_divergence": 0.579181432723999,
+        "tsne_rows": 7500,
+        "visualization_transform": "signed_log1p(raw), then sample-fitted StandardScaler"
+      }
+    },
+    "cicids2018": {
+      "after_preprocessing": {
+        "mapped_before_finite_filter_counts": {
+          "Benign": 250000,
+          "BruteForce": 94197,
+          "DDoS": 200000,
+          "DoS": 200000,
+          "Recon": 89355
+        },
+        "pca_explained_variance_ratio": [
+          0.3170221329860199,
+          0.20564778081082685
+        ],
+        "population_counts": {
+          "Benign": 250000,
+          "BruteForce": 94197,
+          "DDoS": 200000,
+          "DoS": 200000,
+          "Recon": 89355
+        },
+        "sample_counts": {
+          "Benign": 5000,
+          "BruteForce": 5000,
+          "DDoS": 5000,
+          "DoS": 5000,
+          "Recon": 5000
+        },
+        "tsne_kl_divergence": 0.6180134415626526,
+        "tsne_rows": 7500,
+        "visualization_transform": "asinh(production RobustScaler output), then sample-fitted StandardScaler"
+      },
+      "before_preprocessing": {
+        "mapped_before_finite_filter_counts": {
+          "Benign": 59659723,
+          "BruteForce": 94197,
+          "DDoS": 1374148,
+          "DoS": 1834210,
+          "Recon": 89374
+        },
+        "pca_explained_variance_ratio": [
+          0.453259908644905,
+          0.1307185235907305
+        ],
+        "population_counts": {
+          "Benign": 59659666,
+          "BruteForce": 94197,
+          "DDoS": 1374148,
+          "DoS": 1834210,
+          "Recon": 89374
+        },
+        "sample_counts": {
+          "Benign": 5000,
+          "BruteForce": 5000,
+          "DDoS": 5000,
+          "DoS": 5000,
+          "Recon": 5000
+        },
+        "tsne_kl_divergence": 0.6961624622344971,
+        "tsne_rows": 7500,
+        "visualization_transform": "signed_log1p(raw), then sample-fitted StandardScaler"
+      }
+    }
+  },
+  "elapsed_seconds": 466.5,
+  "seed": 42,
+  "stage_definitions": {
+    "after_preprocessing": "final RobustScaler-transformed train+val+test arrays",
+    "before_preprocessing": "corrected raw CSV; five-category mapping and finite rows only"
+  }
+}

@@ -166,5 +166,24 @@ documented in every fairness guide.
   CAPGD with its own configuration mask, L2 ε = 0.5, 10 steps, 2 restarts) runs in the
   baseline stage on the same flows and seeds and is judged by the same validator. It is
   reported (†) but is not part of Exp A's Cochran's Q or Holm family, which stay as locked.
+* **A4 — post-run statistical evaluation of the Exp A PrimAttack cell (requested, not
+  pre-registered).** Added after all final results were seen, to test whether PrimAttack's
+  Raw/Valid ASR is luck: exact (Clopper–Pearson) and Wilson CIs plus a class-stratified
+  bootstrap over source flows; per-flow success agreement across the three attack seeds
+  (Cochran's Q over seeds, Fleiss' κ); a class-homogeneity permutation test; and a new
+  null-control stage `primattack_untargeted_random_null` (gradient-free uniform random search,
+  `attack/primitive_optimizer.py:optimize_primitive_random`, same flows, seeds, p75 box,
+  capability gates, quantization, validator gate and 256-evaluation cap). Its first candidate
+  gives the single-random-draw chance level. PrimAttack vs each null level = paired McNemar on
+  seed 42, Holm over the 6 (dataset, victim) tests of that comparison. Nothing locked above
+  changes (conditions, selection, Exp A tests). Analysis:
+  `scripts/analyze_expA_primattack_statistics.py` → `statistics/expA_primattack/`.
+* **A5 — Hybrid targeted vs untargeted Valid ASR (requested, added analysis).** New stages
+  `primattack_hybrid_objective_{untargeted,targeted}` run Hybrid Search with the locked
+  `PRIM_ARGS`, p75, joint mode, capability-aware padding, on the canonical source flows and
+  attack seeds 42/2024/2026. The targeted stage reproduces the Exp B Hybrid p75 cells
+  flow-for-flow. Test: paired McNemar on seed 42 per (dataset, victim), Holm over the six
+  comparisons. Exp D (selected optimizer, Prim-PGD) stays the pre-registered objective test.
+  Analysis: `scripts/analyze_hybrid_objective_comparison.py` → `hybrid_targeted_vs_untargeted/`.
 * **Realized sample counts.** Every (dataset, victim, class) had ≥ 800 clean-correct test flows,
   so every cell has exactly 800 flows (3,200 per victim and seed).

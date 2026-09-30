@@ -514,6 +514,8 @@ Cochran's Q across the five paired attacks per (dataset, victim). Only if it is 
 
 ## Plots
 
+Plots A1–A5 show the five inferential attacks only; CAPGD (native) † is reported in the tables above, not plotted.
+
 - `plots/A1_raw_asr_by_attack.png` — Raw ASR by attack
 - `plots/A2_valid_asr_by_attack.png` — Valid ASR by attack
 - `plots/A3_classwise_valid_asr.png` — class-wise Valid ASR

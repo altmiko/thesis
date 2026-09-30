@@ -1,0 +1,7 @@
+dataset,victim,prim_mean_realized_queries_movable,prim_mean_total_evals_movable,search_mean_realized_queries_movable,prim_median_cost_valid,search_median_cost_valid,prim_median_first_success_eval,search_median_first_success_eval
+cicids2017_distrinet,mlp,127.0,253.0,256.0,0.6000001430511475,0.5168300867080688,31.0,5.0
+cicids2017_distrinet,cnn,127.0,253.0,256.0,0.6242687106132507,0.4038010537624359,87.0,4.0
+cicids2017_distrinet,ft_transformer,127.0,253.0,256.0,0.27245138585567474,0.10156923905014992,12.0,2.5
+cicids2018_distrinet,mlp-s42,127.0,253.0,256.0,0.6000003218650818,0.4941534698009491,31.0,4.0
+cicids2018_distrinet,cnn-s42,127.0,253.0,256.0,0.8690468072891235,0.8381019234657288,41.0,37.0
+cicids2018_distrinet,ft_transformer-s42,127.0,253.0,256.0,,,,

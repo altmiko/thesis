@@ -1,0 +1,169 @@
+role,condition,dataset,victim,metric,source_class,n,n_movable,successes_seed42,rate_seed42,cp_lo,cp_hi,rate_seed2024,rate_seed2026
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,mlp,raw_asr,DoS,800,786,41,0.05125,0.037025445367988026,0.06888703814412966,0.05125,0.05125
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,mlp,raw_asr,DDoS,800,768,86,0.1075,0.08688906866709004,0.13105344327509114,0.1075,0.1075
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,mlp,raw_asr,Recon,800,9,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,mlp,raw_asr,BruteForce,800,800,4,0.005,0.0013639614748410887,0.012752119388453914,0.005,0.005
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,mlp,valid_asr,DoS,800,786,41,0.05125,0.037025445367988026,0.06888703814412966,0.05125,0.05125
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,mlp,valid_asr,DDoS,800,768,86,0.1075,0.08688906866709004,0.13105344327509114,0.1075,0.1075
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,mlp,valid_asr,Recon,800,9,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,mlp,valid_asr,BruteForce,800,800,4,0.005,0.0013639614748410887,0.012752119388453914,0.005,0.005
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,cnn,raw_asr,DoS,800,787,164,0.205,0.1775294042164212,0.2346636425633988,0.205,0.205
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,cnn,raw_asr,DDoS,800,768,257,0.32125,0.28897638006358983,0.3548474087648247,0.32125,0.32125
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,cnn,raw_asr,Recon,800,8,3,0.00375,0.000774008806022936,0.010919650879743961,0.00375,0.00375
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,cnn,raw_asr,BruteForce,800,800,7,0.00875,0.003524983435603276,0.017944799407170708,0.00875,0.00875
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,cnn,valid_asr,DoS,800,787,164,0.205,0.1775294042164212,0.2346636425633988,0.205,0.205
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,cnn,valid_asr,DDoS,800,768,257,0.32125,0.28897638006358983,0.3548474087648247,0.32125,0.32125
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,cnn,valid_asr,Recon,800,8,3,0.00375,0.000774008806022936,0.010919650879743961,0.00375,0.00375
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,cnn,valid_asr,BruteForce,800,800,7,0.00875,0.003524983435603276,0.017944799407170708,0.00875,0.00875
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,ft_transformer,raw_asr,DoS,800,787,1,0.00125,3.164675921111288e-05,0.006944687132371427,0.00125,0.00125
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,ft_transformer,raw_asr,DDoS,800,768,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,ft_transformer,raw_asr,Recon,800,9,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,ft_transformer,raw_asr,BruteForce,800,800,3,0.00375,0.000774008806022936,0.010919650879743961,0.00375,0.00375
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,ft_transformer,valid_asr,DoS,800,787,1,0.00125,3.164675921111288e-05,0.006944687132371427,0.00125,0.00125
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,ft_transformer,valid_asr,DDoS,800,768,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,ft_transformer,valid_asr,Recon,800,9,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,ft_transformer,valid_asr,BruteForce,800,800,3,0.00375,0.000774008806022936,0.010919650879743961,0.00375,0.00375
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,mlp-s42,raw_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,mlp-s42,raw_asr,DDoS,800,759,60,0.075,0.05771779244250855,0.09548836009637311,0.075,0.075
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,mlp-s42,raw_asr,Recon,800,97,21,0.02625,0.016320964329472214,0.03984708016865931,0.02625,0.02625
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,mlp-s42,raw_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,mlp-s42,valid_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,mlp-s42,valid_asr,DDoS,800,759,60,0.075,0.05771779244250855,0.09548836009637311,0.075,0.075
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,mlp-s42,valid_asr,Recon,800,97,21,0.02625,0.016320964329472214,0.03984708016865931,0.02625,0.02625
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,mlp-s42,valid_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,cnn-s42,raw_asr,DoS,800,742,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,cnn-s42,raw_asr,DDoS,800,759,37,0.04625,0.032770098741459926,0.06318876149180337,0.04625,0.04625
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,cnn-s42,raw_asr,Recon,800,97,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,cnn-s42,raw_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,cnn-s42,valid_asr,DoS,800,742,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,cnn-s42,valid_asr,DDoS,800,759,37,0.04625,0.032770098741459926,0.06318876149180337,0.04625,0.04625
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,cnn-s42,valid_asr,Recon,800,97,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,cnn-s42,valid_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,ft_transformer-s42,raw_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,ft_transformer-s42,raw_asr,DDoS,800,759,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,ft_transformer-s42,raw_asr,Recon,800,97,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,ft_transformer-s42,raw_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,ft_transformer-s42,valid_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,ft_transformer-s42,valid_asr,DDoS,800,759,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,ft_transformer-s42,valid_asr,Recon,800,97,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack,"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,ft_transformer-s42,valid_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+single,single uniform random draw in the p75 box,cicids2017_distrinet,mlp,valid_asr,DoS,800,786,5,0.00625,0.002032380070184134,0.014524710595897718,0.01125,0.015
+single,single uniform random draw in the p75 box,cicids2017_distrinet,mlp,valid_asr,DDoS,800,768,22,0.0275,0.017312596010147556,0.04134053467710691,0.0225,0.02125
+single,single uniform random draw in the p75 box,cicids2017_distrinet,mlp,valid_asr,Recon,800,9,0,0.0,0.0,0.00460048452074544,0.0,0.0
+single,single uniform random draw in the p75 box,cicids2017_distrinet,mlp,valid_asr,BruteForce,800,800,2,0.0025,0.00030290512152391936,0.009001418005072117,0.0025,0.0025
+single,single uniform random draw in the p75 box,cicids2017_distrinet,cnn,valid_asr,DoS,800,787,40,0.05,0.035957575913343316,0.06746636779390285,0.06125,0.03875
+single,single uniform random draw in the p75 box,cicids2017_distrinet,cnn,valid_asr,DDoS,800,768,87,0.10875,0.08802529217549826,0.13240731659971114,0.10375,0.10375
+single,single uniform random draw in the p75 box,cicids2017_distrinet,cnn,valid_asr,Recon,800,8,1,0.00125,3.164675921111288e-05,0.006944687132371427,0.0,0.0
+single,single uniform random draw in the p75 box,cicids2017_distrinet,cnn,valid_asr,BruteForce,800,800,4,0.005,0.0013639614748410887,0.012752119388453914,0.005,0.005
+single,single uniform random draw in the p75 box,cicids2017_distrinet,ft_transformer,valid_asr,DoS,800,787,1,0.00125,3.164675921111288e-05,0.006944687132371427,0.00125,0.00125
+single,single uniform random draw in the p75 box,cicids2017_distrinet,ft_transformer,valid_asr,DDoS,800,768,0,0.0,0.0,0.00460048452074544,0.0,0.0
+single,single uniform random draw in the p75 box,cicids2017_distrinet,ft_transformer,valid_asr,Recon,800,9,0,0.0,0.0,0.00460048452074544,0.0,0.0
+single,single uniform random draw in the p75 box,cicids2017_distrinet,ft_transformer,valid_asr,BruteForce,800,800,1,0.00125,3.164675921111288e-05,0.006944687132371427,0.0025,0.00375
+single,single uniform random draw in the p75 box,cicids2018_distrinet,mlp-s42,valid_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+single,single uniform random draw in the p75 box,cicids2018_distrinet,mlp-s42,valid_asr,DDoS,800,759,13,0.01625,0.008680077657860507,0.027627696114472192,0.0175,0.0175
+single,single uniform random draw in the p75 box,cicids2018_distrinet,mlp-s42,valid_asr,Recon,800,97,9,0.01125,0.005156763107544614,0.02124817672574151,0.00875,0.01125
+single,single uniform random draw in the p75 box,cicids2018_distrinet,mlp-s42,valid_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+single,single uniform random draw in the p75 box,cicids2018_distrinet,cnn-s42,valid_asr,DoS,800,742,0,0.0,0.0,0.00460048452074544,0.0,0.0
+single,single uniform random draw in the p75 box,cicids2018_distrinet,cnn-s42,valid_asr,DDoS,800,759,1,0.00125,3.164675921111288e-05,0.006944687132371427,0.0025,0.00375
+single,single uniform random draw in the p75 box,cicids2018_distrinet,cnn-s42,valid_asr,Recon,800,97,0,0.0,0.0,0.00460048452074544,0.0,0.0
+single,single uniform random draw in the p75 box,cicids2018_distrinet,cnn-s42,valid_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+single,single uniform random draw in the p75 box,cicids2018_distrinet,ft_transformer-s42,valid_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+single,single uniform random draw in the p75 box,cicids2018_distrinet,ft_transformer-s42,valid_asr,DDoS,800,759,0,0.0,0.0,0.00460048452074544,0.0,0.0
+single,single uniform random draw in the p75 box,cicids2018_distrinet,ft_transformer-s42,valid_asr,Recon,800,97,0,0.0,0.0,0.00460048452074544,0.0,0.0
+single,single uniform random draw in the p75 box,cicids2018_distrinet,ft_transformer-s42,valid_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,mlp,raw_asr,DoS,800,786,38,0.0475,0.03382980290773371,0.06461732348576008,0.0475,0.04875
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,mlp,raw_asr,DDoS,800,768,83,0.10375,0.08348592221296502,0.12698638049979388,0.105,0.10375
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,mlp,raw_asr,Recon,800,9,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,mlp,raw_asr,BruteForce,800,800,4,0.005,0.0013639614748410887,0.012752119388453914,0.005,0.005
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,mlp,valid_asr,DoS,800,786,38,0.0475,0.03382980290773371,0.06461732348576008,0.0475,0.04875
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,mlp,valid_asr,DDoS,800,768,83,0.10375,0.08348592221296502,0.12698638049979388,0.105,0.10375
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,mlp,valid_asr,Recon,800,9,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,mlp,valid_asr,BruteForce,800,800,4,0.005,0.0013639614748410887,0.012752119388453914,0.005,0.005
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,cnn,raw_asr,DoS,800,787,152,0.19,0.16337327087679474,0.21893316022860845,0.1925,0.18875
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,cnn,raw_asr,DDoS,800,768,237,0.29625,0.2647845050291731,0.32922526350059306,0.2975,0.2975
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,cnn,raw_asr,Recon,800,8,3,0.00375,0.000774008806022936,0.010919650879743961,0.00375,0.00375
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,cnn,raw_asr,BruteForce,800,800,7,0.00875,0.003524983435603276,0.017944799407170708,0.00875,0.00875
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,cnn,valid_asr,DoS,800,787,152,0.19,0.16337327087679474,0.21893316022860845,0.1925,0.18875
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,cnn,valid_asr,DDoS,800,768,237,0.29625,0.2647845050291731,0.32922526350059306,0.2975,0.2975
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,cnn,valid_asr,Recon,800,8,3,0.00375,0.000774008806022936,0.010919650879743961,0.00375,0.00375
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,cnn,valid_asr,BruteForce,800,800,7,0.00875,0.003524983435603276,0.017944799407170708,0.00875,0.00875
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,ft_transformer,raw_asr,DoS,800,787,1,0.00125,3.164675921111288e-05,0.006944687132371427,0.00125,0.00125
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,ft_transformer,raw_asr,DDoS,800,768,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,ft_transformer,raw_asr,Recon,800,9,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,ft_transformer,raw_asr,BruteForce,800,800,3,0.00375,0.000774008806022936,0.010919650879743961,0.00375,0.00375
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,ft_transformer,valid_asr,DoS,800,787,1,0.00125,3.164675921111288e-05,0.006944687132371427,0.00125,0.00125
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,ft_transformer,valid_asr,DDoS,800,768,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,ft_transformer,valid_asr,Recon,800,9,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,ft_transformer,valid_asr,BruteForce,800,800,3,0.00375,0.000774008806022936,0.010919650879743961,0.00375,0.00375
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,mlp-s42,raw_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,mlp-s42,raw_asr,DDoS,800,759,56,0.07,0.05330708154502259,0.08994113555048136,0.07125,0.06875
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,mlp-s42,raw_asr,Recon,800,97,20,0.025,0.01533600527536933,0.038347359451933814,0.025,0.025
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,mlp-s42,raw_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,mlp-s42,valid_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,mlp-s42,valid_asr,DDoS,800,759,56,0.07,0.05330708154502259,0.08994113555048136,0.07125,0.06875
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,mlp-s42,valid_asr,Recon,800,97,20,0.025,0.01533600527536933,0.038347359451933814,0.025,0.025
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,mlp-s42,valid_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,cnn-s42,raw_asr,DoS,800,742,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,cnn-s42,raw_asr,DDoS,800,759,29,0.03625,0.024409078930750498,0.05164807556514124,0.035,0.03625
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,cnn-s42,raw_asr,Recon,800,97,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,cnn-s42,raw_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,cnn-s42,valid_asr,DoS,800,742,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,cnn-s42,valid_asr,DDoS,800,759,29,0.03625,0.024409078930750498,0.05164807556514124,0.035,0.03625
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,cnn-s42,valid_asr,Recon,800,97,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,cnn-s42,valid_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,ft_transformer-s42,raw_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,ft_transformer-s42,raw_asr,DDoS,800,759,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,ft_transformer-s42,raw_asr,Recon,800,97,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,ft_transformer-s42,raw_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,ft_transformer-s42,valid_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,ft_transformer-s42,valid_asr,DDoS,800,759,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,ft_transformer-s42,valid_asr,Recon,800,97,0,0.0,0.0,0.00460048452074544,0.0,0.0
+search,"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,ft_transformer-s42,valid_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,mlp,raw_asr,DoS,800,786,500,0.625,0.5904163013546886,0.6586587732967775,0.625,0.625
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,mlp,raw_asr,DDoS,800,768,212,0.265,0.23470561457199082,0.29703721402727035,0.265,0.265
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,mlp,raw_asr,Recon,800,9,9,0.01125,0.005156763107544614,0.02124817672574151,0.01125,0.01125
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,mlp,raw_asr,BruteForce,800,800,14,0.0175,0.00959959966622366,0.02918785716741574,0.0175,0.0175
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,mlp,valid_asr,DoS,800,786,500,0.625,0.5904163013546886,0.6586587732967775,0.625,0.625
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,mlp,valid_asr,DDoS,800,768,212,0.265,0.23470561457199082,0.29703721402727035,0.265,0.265
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,mlp,valid_asr,Recon,800,9,9,0.01125,0.005156763107544614,0.02124817672574151,0.01125,0.01125
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,mlp,valid_asr,BruteForce,800,800,14,0.0175,0.00959959966622366,0.02918785716741574,0.0175,0.0175
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,cnn,raw_asr,DoS,800,787,733,0.91625,0.8948587635011768,0.9345075086765595,0.91625,0.91625
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,cnn,raw_asr,DDoS,800,768,377,0.47125,0.43619546597011566,0.5065171156171193,0.47125,0.47125
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,cnn,raw_asr,Recon,800,8,8,0.01,0.004326898078005284,0.019608473179241876,0.01,0.01
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,cnn,raw_asr,BruteForce,800,800,800,1.0,0.9953995154792545,1.0,1.0,1.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,cnn,valid_asr,DoS,800,787,733,0.91625,0.8948587635011768,0.9345075086765595,0.91625,0.91625
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,cnn,valid_asr,DDoS,800,768,377,0.47125,0.43619546597011566,0.5065171156171193,0.47125,0.47125
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,cnn,valid_asr,Recon,800,8,8,0.01,0.004326898078005284,0.019608473179241876,0.01,0.01
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,cnn,valid_asr,BruteForce,800,800,800,1.0,0.9953995154792545,1.0,1.0,1.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,ft_transformer,raw_asr,DoS,800,787,1,0.00125,3.164675921111288e-05,0.006944687132371427,0.00125,0.00125
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,ft_transformer,raw_asr,DDoS,800,768,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,ft_transformer,raw_asr,Recon,800,9,6,0.0075,0.0027571961846984926,0.016252406053849852,0.0075,0.0075
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,ft_transformer,raw_asr,BruteForce,800,800,12,0.015,0.007774106862554061,0.02605526113155325,0.015,0.015
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,ft_transformer,valid_asr,DoS,800,787,1,0.00125,3.164675921111288e-05,0.006944687132371427,0.00125,0.00125
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,ft_transformer,valid_asr,DDoS,800,768,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,ft_transformer,valid_asr,Recon,800,9,6,0.0075,0.0027571961846984926,0.016252406053849852,0.0075,0.0075
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2017_distrinet,ft_transformer,valid_asr,BruteForce,800,800,12,0.015,0.007774106862554061,0.02605526113155325,0.015,0.015
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,mlp-s42,raw_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,mlp-s42,raw_asr,DDoS,800,759,642,0.8025,0.7731939358184228,0.8295563786427941,0.8025,0.80375
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,mlp-s42,raw_asr,Recon,800,97,51,0.06375,0.047830796849664035,0.08297086757056586,0.06375,0.06375
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,mlp-s42,raw_asr,BruteForce,800,800,725,0.90625,0.8839016774839148,0.9255459056247036,0.90625,0.90625
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,mlp-s42,valid_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,mlp-s42,valid_asr,DDoS,800,759,642,0.8025,0.7731939358184228,0.8295563786427941,0.8025,0.80375
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,mlp-s42,valid_asr,Recon,800,97,51,0.06375,0.047830796849664035,0.08297086757056586,0.06375,0.06375
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,mlp-s42,valid_asr,BruteForce,800,800,725,0.90625,0.8839016774839148,0.9255459056247036,0.90625,0.90625
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,cnn-s42,raw_asr,DoS,800,742,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,cnn-s42,raw_asr,DDoS,800,759,8,0.01,0.004326898078005284,0.019608473179241876,0.01,0.01
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,cnn-s42,raw_asr,Recon,800,97,33,0.04125,0.028561823291918136,0.05744508151872887,0.04125,0.04125
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,cnn-s42,raw_asr,BruteForce,800,800,800,1.0,0.9953995154792545,1.0,1.0,1.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,cnn-s42,valid_asr,DoS,800,742,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,cnn-s42,valid_asr,DDoS,800,759,8,0.01,0.004326898078005284,0.019608473179241876,0.01,0.01
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,cnn-s42,valid_asr,Recon,800,97,33,0.04125,0.028561823291918136,0.05744508151872887,0.04125,0.04125
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,cnn-s42,valid_asr,BruteForce,800,800,800,1.0,0.9953995154792545,1.0,1.0,1.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,ft_transformer-s42,raw_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,ft_transformer-s42,raw_asr,DDoS,800,759,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,ft_transformer-s42,raw_asr,Recon,800,97,4,0.005,0.0013639614748410887,0.012752119388453914,0.005,0.005
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,ft_transformer-s42,raw_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,ft_transformer-s42,valid_asr,DoS,800,743,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,ft_transformer-s42,valid_asr,DDoS,800,759,0,0.0,0.0,0.00460048452074544,0.0,0.0
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,ft_transformer-s42,valid_asr,Recon,800,97,4,0.005,0.0013639614748410887,0.012752119388453914,0.005,0.005
+primattack_unbounded,"PrimAttack (Prim-PGD, unbounded)",cicids2018_distrinet,ft_transformer-s42,valid_asr,BruteForce,800,800,0,0.0,0.0,0.00460048452074544,0.0,0.0

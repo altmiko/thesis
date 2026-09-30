@@ -12,6 +12,16 @@ This directory contains the minimum paired inferential analysis for the canonica
 
 The analysis implementation is `scripts/analyze_minimum_final_statistics.py`.
 
+`expA_primattack/` holds the post-run "is it luck?" evaluation of the Exp A PrimAttack Raw/Valid
+ASR on both datasets (protocol amendment A4, not pre-registered): exact / Wilson / stratified
+bootstrap CIs, per-flow success agreement across attack seeds, a single-random-draw chance
+control and a matched random-search control (stage `primattack_untargeted_random_null`),
+Raw-vs-Valid McNemar, and a class-homogeneity test. Report
+`expA_primattack/expA_primattack_statistics.md`; implementation
+`scripts/analyze_expA_primattack_statistics.py` (reads stored artifacts only; the null-control
+stage is produced by `scripts/run_primattack_optimizer_ablation.py --methods random
+--objective untargeted --budgets maximum-evaluated`).
+
 ## Reproduce the analysis
 
 From the repository root in the `thesis` environment:

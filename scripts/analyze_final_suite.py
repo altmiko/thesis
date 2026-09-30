@@ -814,8 +814,8 @@ def experiment_a(store: Store, selection: dict, final: bool) -> dict:
                      ("validator_rule_impact", impact), ("capgd_primsupport_fairness", fairness)):
         df.to_csv(cap_dir / f"{name}.csv", index=False)
 
-    # plots (native CAPGD: descriptive series at the end)
-    plot_conds = conds + desc
+    # plots: inferential family only (native CAPGD stays in the tables, not the plots)
+    plot_conds = conds
     method_order = {d: [c.label for c in plot_conds] for d in DATASETS}
     vo = victims_order()
     vt_plot = vt[vt.condition.isin([c.key for c in plot_conds])]
@@ -1577,6 +1577,9 @@ def report_a(out: Path, table: pd.DataFrame, stats: pd.DataFrame, diag: pd.DataF
         md_table(cw_md),
         "",
         "## Plots",
+        "",
+        "Plots A1–A5 show the five inferential attacks only; CAPGD (native) † is reported in "
+        "the tables above, not plotted.",
         "",
         "- `plots/A1_raw_asr_by_attack.png` — Raw ASR by attack",
         "- `plots/A2_valid_asr_by_attack.png` — Valid ASR by attack",

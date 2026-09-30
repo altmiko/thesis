@@ -12,6 +12,7 @@ Bachelor's thesis: constrained adversarial attacks against NIDS classifiers. Thi
 | D — objective sensitivity | `D_objective_sensitivity/objective_sensitivity.md` |
 | E — paired validity gap | `E_paired_validity_gap/paired_validity_gap_analysis.md` |
 | F — validator evaluation | `F_validator_evaluation/validator_evaluation.md` |
+| Descriptive EDA — PCA/t-SNE before and after preprocessing | `eda/new/README.md` |
 
 ## Scope
 

@@ -27,6 +27,8 @@ Optimizers:
   objective margin over normalized controls, clean start + uniform random restarts.
 * :func:`optimize_primitive_cw` (Prim-C&W): projected Adam on
   ``cost(q) + c * max(margin + kappa, 0)`` with a per-flow binary search over ``c``.
+* :func:`optimize_primitive_random` (Prim-Random): gradient-free uniform random search in the
+  same box; the null control for "does the optimizer, not chance, produce the successes?".
 
 Gradients come from the continuous relaxation (``generate(..., quantize=False)``); incumbent
 selection only ever uses realized, quantized flows.
@@ -49,6 +51,7 @@ CANDIDATE_ADAPTIVE_RANDOM = 3
 CANDIDATE_PGD_CLEAN = 4
 CANDIDATE_PGD_RANDOM = 5
 CANDIDATE_CW = 6
+CANDIDATE_RANDOM_SEARCH = 7
 CANDIDATE_NAMES = {
     CANDIDATE_IDENTITY: "identity",
     CANDIDATE_EXACT_PADDING: "exact-padding",
@@ -57,6 +60,7 @@ CANDIDATE_NAMES = {
     CANDIDATE_PGD_CLEAN: "pgd-clean",
     CANDIDATE_PGD_RANDOM: "pgd-random",
     CANDIDATE_CW: "cw",
+    CANDIDATE_RANDOM_SEARCH: "random-search",
 }
 # Candidate rows per batched victim call during exact padding enumeration.
 _PADDING_CHUNK_ROWS = 4096
@@ -716,6 +720,64 @@ def optimize_primitive_pgd(
                 )
                 q[alive] = q_new
                 search.evaluate(rows, _controls_from_q(q_new, bounds_s), source)
+    return search.result()
+
+
+# ----------------------------------------------------------------------------------------
+# Prim-Random (null control)
+# ----------------------------------------------------------------------------------------
+def optimize_primitive_random(
+    model,
+    victim,
+    raw: torch.Tensor,
+    center: torch.Tensor,
+    scale: torch.Tensor,
+    bounds: dict[str, torch.Tensor],
+    caps: PrimitiveCapabilities,
+    *,
+    seed: int,
+    validity_fn: ValidityGate | None,
+    eval_budget: int,
+    objective: AttackObjective = TARGET_BENIGN,
+) -> PrimitiveOptimizationResult:
+    """Gradient-free uniform random search: the null control of the gradient optimizers.
+
+    Each movable row spends its whole evaluation budget (after the shared identity evaluation)
+    on realized candidates drawn i.i.d. uniformly from its normalized box; pinned coordinates
+    stay 0. No surrogate forward and no backward pass is charged, so the row gets more
+    realized, validator-gated queries than any gradient optimizer under the same budget. The
+    attack space, projection, quantization, validity gate, success predicate and incumbent are
+    the shared :class:`RealizedSearch`, so a gap to a gradient optimizer is attributable to the
+    search direction alone. Candidate ``j`` of a row is its evaluation ``j + 2``, hence
+    ``first_success_evaluation == 2`` marks rows that a single random draw already breaks.
+    """
+    if eval_budget is None or eval_budget < 2:
+        raise ValueError("Prim-Random needs eval_budget >= 2 (identity + one candidate)")
+    search = RealizedSearch(
+        model, victim, raw, center, scale, bounds, caps,
+        validity_fn=validity_fn, objective=objective, eval_budget=eval_budget,
+    )
+    active = _movable_rows(bounds)
+    m = active.numel()
+    if not m:
+        return search.result()
+    generator = torch.Generator(device=raw.device).manual_seed(seed)
+    per_call = max(1, _VICTIM_CHUNK_ROWS // m)
+    search.phase = 0
+    search.restarts = 1
+    while True:
+        remaining = search.remaining(active)
+        k = min(per_call, int(remaining.max().item()))
+        if k < 1:
+            break
+        # candidate-major order: every row's next candidate, then the one after
+        offsets = torch.arange(k, device=raw.device).repeat_interleave(m)
+        rows = active.repeat(k)
+        rows = rows[offsets < remaining.repeat(k)]
+        bounds_s = _subset_bounds(bounds, rows)
+        q = _random_q((rows.numel(), 3), bounds_s, generator, raw)
+        search.evaluate(rows, _controls_from_q(q, bounds_s), CANDIDATE_RANDOM_SEARCH)
+        search.iterations += k
     return search.result()
 
 

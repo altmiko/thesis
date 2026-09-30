@@ -1,0 +1,13 @@
+condition,dataset,victim,n,n_movable,valid_successes_seed42,valid_successes_seed2024,valid_successes_seed2026,success_all_3_seeds,success_any_seed,success_1_or_2_seeds,cochran_q_over_seeds,cochran_q_p,fleiss_kappa,jaccard_min,movable_flows_final_delay_differs,movable_flows_final_shape_differs,movable_flows_final_margin_differs,successes_from_random_start_seed42,successes_from_random_start_seed2024,successes_from_random_start_seed2026
+"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,mlp,3200,2363,131,131,131,131,131,0,0.0,1.0,1.0,1.0,127,135,148,81,79,79
+"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,cnn,3200,2363,431,431,431,431,431,0,0.0,1.0,1.0,1.0,428,360,428,376,384,377
+"PrimAttack (Prim-PGD, p75)",cicids2017_distrinet,ft_transformer,3200,2364,4,4,4,4,4,0,0.0,1.0,1.0,1.0,299,47,307,2,2,0
+"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,mlp-s42,3200,2399,81,81,81,81,81,0,0.0,1.0,1.0,1.0,284,132,346,54,48,52
+"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,cnn-s42,3200,2398,37,37,37,37,37,0,0.0,1.0,1.0,1.0,526,794,1016,29,30,31
+"PrimAttack (Prim-PGD, p75)",cicids2018_distrinet,ft_transformer-s42,3200,2399,0,0,0,0,0,0,0.0,1.0,,,332,270,529,0,0,0
+"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,mlp,3200,2363,125,126,126,124,128,4,0.5,0.7788007830714049,0.9889562220616157,0.9763779527559056,2354,2354,2356,0,0,0
+"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,cnn,3200,2363,399,402,399,386,413,27,0.6666666666666666,0.7165313105737892,0.9742857142857143,0.948905109489051,2359,2360,2359,0,0,0
+"Prim-Random search (255 uniform draws, p75)",cicids2017_distrinet,ft_transformer,3200,2364,4,4,4,4,4,0,0.0,1.0,1.0,1.0,2076,2076,2077,0,0,0
+"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,mlp-s42,3200,2399,76,77,75,74,78,4,1.5,0.4723665527410149,0.9820293371071698,0.9487179487179487,1842,1842,1846,0,0,0
+"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,cnn-s42,3200,2398,29,28,29,24,34,10,0.2,0.9048374180359595,0.8826698476174639,0.7575757575757576,1885,1885,1887,0,0,0
+"Prim-Random search (255 uniform draws, p75)",cicids2018_distrinet,ft_transformer-s42,3200,2399,0,0,0,0,0,0,0.0,1.0,,,2204,2204,2205,0,0,0

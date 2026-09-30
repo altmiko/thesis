@@ -17,6 +17,7 @@ from attack.primitive_optimizer import (
     optimize_primitive_candidates,
     optimize_primitive_cw,
     optimize_primitive_pgd,
+    optimize_primitive_random,
     row_primitive_modes,
     targeted_margin,
 )
@@ -74,12 +75,17 @@ def setup():
         "pgd_untargeted": optimize_primitive_pgd(
             *args, steps=10, step_size=0.05, restarts=3, seed=42, validity_fn=gate,
             eval_budget=BUDGET, objective=AttackObjective("untargeted", SOURCE)),
+        "random": optimize_primitive_random(
+            *args, seed=42, validity_fn=gate, eval_budget=BUDGET),
+        "random_untargeted": optimize_primitive_random(
+            *args, seed=42, validity_fn=gate, eval_budget=BUDGET,
+            objective=AttackObjective("untargeted", SOURCE)),
     }
     return model, victim, raw, center, scale, bounds, caps, gate, results
 
 
-METHODS = ("hybrid", "hybrid_budget", "pgd", "cw")
-UNTARGETED = ("hybrid_untargeted", "pgd_untargeted")
+METHODS = ("hybrid", "hybrid_budget", "pgd", "cw", "random")
+UNTARGETED = ("hybrid_untargeted", "pgd_untargeted", "random_untargeted")
 
 
 @pytest.mark.parametrize("method", UNTARGETED)
@@ -127,7 +133,7 @@ def test_projected_controls_stay_in_the_hard_integer_box(setup, method):
     assert bool((shape[delay == 0] == 0).all())
 
 
-@pytest.mark.parametrize("method", ("hybrid_budget", "pgd", "cw"))
+@pytest.mark.parametrize("method", ("hybrid_budget", "pgd", "cw", "random"))
 def test_per_flow_evaluation_budget_is_never_exceeded(setup, method):
     result = setup[-1][method]
     assert bool((result.total_evaluations <= BUDGET).all())
@@ -171,6 +177,22 @@ def test_timing_only_rows_spend_the_whole_budget_on_timing(setup):
     assert bool((result.total_evaluations[failed] >= BUDGET - 1).all())
     assert bool((result.surrogate_evaluations[failed] > 0).all())
     assert bool((result.projected["delay"][failed] > 0).any())
+
+
+def test_random_search_spends_the_whole_budget_on_realized_candidates(setup):
+    """The null control never takes a gradient: every movable row spends the full cap on
+    realized, validator-gated candidates, i.e. at least as many realized queries as any
+    gradient optimizer under the same cap."""
+    _, _, _, _, _, bounds, _, _, results = setup
+    result = results["random"]
+    movable = (bounds["p"] >= 1.0) | (bounds["delay"] >= 1.0)
+    assert bool(movable.any())
+    assert bool((result.surrogate_evaluations == 0).all())
+    assert bool((result.backward_evaluations == 0).all())
+    assert bool((result.realized_evaluations[movable] == BUDGET).all())
+    assert bool((result.realized_evaluations[~movable] == 1).all())
+    assert bool((result.realized_evaluations[movable]
+                 >= results["pgd"].realized_evaluations[movable]).all())
 
 
 class _DurationVictim(torch.nn.Module):

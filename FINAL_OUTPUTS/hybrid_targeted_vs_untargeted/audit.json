@@ -1,0 +1,13 @@
+{
+  "npz_files": 144,
+  "rows": 115200,
+  "validator_rechecked_rows": 115200,
+  "prediction_rechecked_rows": 115200,
+  "prediction_mismatches": 0,
+  "raw_success_recomputed_rows": 115200,
+  "stages": [
+    "primattack_hybrid_objective_untargeted",
+    "primattack_hybrid_objective_targeted"
+  ],
+  "targeted_rerun_reproduces_exp_b": true
+}
