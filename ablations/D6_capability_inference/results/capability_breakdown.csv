@@ -1,0 +1,13 @@
+dataset,victim,budget,flows,valid_successes,valid_success_capability_violation,valid_success_pad_violation,valid_success_timing_violation,valid_success_empty_packet_filled,valid_success_within_capability,valid_and_primitive_feasible,violating_hits,violating_hits_fail_schema,violating_hits_fail_extractor,violating_hits_fail_protocol,violating_hits_fail_mined
+cicids2017_distrinet,cnn,p75,9600,259,0,0,0,0,259,259,4452,0,0,4452,0
+cicids2017_distrinet,cnn,unb,9600,696,0,0,0,0,696,696,8727,0,0,8727,20
+cicids2017_distrinet,ft_transformer,p75,9600,3,0,0,0,0,3,3,2421,0,0,2421,21
+cicids2017_distrinet,ft_transformer,unb,9600,3,0,0,0,0,3,3,2463,0,0,2463,135
+cicids2017_distrinet,mlp,p75,9600,18,0,0,0,0,18,18,1323,0,0,1323,0
+cicids2017_distrinet,mlp,unb,9600,68,0,0,0,0,68,68,6904,0,0,6904,30
+cicids2018_distrinet,cnn-s42,p75,9600,3,0,0,0,0,3,3,1698,0,0,1698,1650
+cicids2018_distrinet,cnn-s42,unb,9600,468,25,0,25,0,443,468,6096,0,0,6071,6015
+cicids2018_distrinet,ft_transformer-s42,p75,9600,0,0,0,0,0,0,0,35,0,0,35,35
+cicids2018_distrinet,ft_transformer-s42,unb,9600,33,24,0,24,0,9,33,163,0,0,139,139
+cicids2018_distrinet,mlp-s42,p75,9600,21,2,0,2,0,19,21,3023,0,0,3021,3021
+cicids2018_distrinet,mlp-s42,unb,9600,3698,1461,0,1461,0,2237,3698,4158,0,0,2532,2669

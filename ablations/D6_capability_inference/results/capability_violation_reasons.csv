@@ -1,0 +1,5 @@
+dataset,victim,budget,primitive,source_reason,valid_successes
+cicids2018_distrinet,cnn-s42,unb,timing,SINGLE_FWD_PACKET,25
+cicids2018_distrinet,ft_transformer-s42,unb,timing,SINGLE_FWD_PACKET,24
+cicids2018_distrinet,mlp-s42,p75,timing,SINGLE_FWD_PACKET,2
+cicids2018_distrinet,mlp-s42,unb,timing,SINGLE_FWD_PACKET,1461

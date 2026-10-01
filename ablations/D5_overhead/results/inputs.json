@@ -1,0 +1,62 @@
+{
+  "final_runs": "FINAL_OUTPUTS/runs",
+  "arms": {
+    "untargeted_pgd": [
+      [
+        "primattack_untargeted",
+        "pgd",
+        "p75"
+      ],
+      [
+        "primattack_untargeted",
+        "pgd",
+        "unb"
+      ]
+    ],
+    "targeted_pgd": [
+      [
+        "primattack_targeted_budgets",
+        "pgd",
+        "p50"
+      ],
+      [
+        "primattack_targeted_optimizers",
+        "pgd",
+        "p75"
+      ],
+      [
+        "primattack_targeted_budgets",
+        "pgd",
+        "unb"
+      ]
+    ],
+    "targeted_hybrid": [
+      [
+        "primattack_targeted_budgets",
+        "hybrid",
+        "p50"
+      ],
+      [
+        "primattack_targeted_optimizers",
+        "hybrid",
+        "p75"
+      ],
+      [
+        "primattack_targeted_budgets",
+        "hybrid",
+        "unb"
+      ]
+    ]
+  },
+  "seeds": [
+    42,
+    2024,
+    2026
+  ],
+  "classes": [
+    "DoS",
+    "DDoS",
+    "Recon",
+    "BruteForce"
+  ]
+}

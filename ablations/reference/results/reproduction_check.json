@@ -1,0 +1,506 @@
+[
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "cnn__BruteForce__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "cnn__BruteForce__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "cnn__BruteForce__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "cnn__DDoS__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "cnn__DDoS__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "cnn__DDoS__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "cnn__DoS__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "cnn__DoS__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "cnn__DoS__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "cnn__Recon__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "cnn__Recon__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "cnn__Recon__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "ft_transformer__BruteForce__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "ft_transformer__BruteForce__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "ft_transformer__BruteForce__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "ft_transformer__DDoS__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "ft_transformer__DDoS__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "ft_transformer__DDoS__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "ft_transformer__DoS__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "ft_transformer__DoS__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "ft_transformer__DoS__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "ft_transformer__Recon__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "ft_transformer__Recon__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "ft_transformer__Recon__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "mlp__BruteForce__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "mlp__BruteForce__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "mlp__BruteForce__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "mlp__DDoS__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "mlp__DDoS__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "mlp__DDoS__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "mlp__DoS__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "mlp__DoS__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "mlp__DoS__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "mlp__Recon__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "mlp__Recon__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2017_distrinet",
+    "artifact": "mlp__Recon__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "cnn-s42__BruteForce__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "cnn-s42__BruteForce__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "cnn-s42__BruteForce__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "cnn-s42__DDoS__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "cnn-s42__DDoS__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "cnn-s42__DDoS__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "cnn-s42__DoS__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "cnn-s42__DoS__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "cnn-s42__DoS__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "cnn-s42__Recon__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "cnn-s42__Recon__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "cnn-s42__Recon__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "ft_transformer-s42__BruteForce__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "ft_transformer-s42__BruteForce__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "ft_transformer-s42__BruteForce__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "ft_transformer-s42__DDoS__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "ft_transformer-s42__DDoS__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "ft_transformer-s42__DDoS__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "ft_transformer-s42__DoS__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "ft_transformer-s42__DoS__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "ft_transformer-s42__DoS__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "ft_transformer-s42__Recon__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "ft_transformer-s42__Recon__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "ft_transformer-s42__Recon__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "mlp-s42__BruteForce__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "mlp-s42__BruteForce__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "mlp-s42__BruteForce__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "mlp-s42__DDoS__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "mlp-s42__DDoS__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "mlp-s42__DDoS__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "mlp-s42__DoS__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "mlp-s42__DoS__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "mlp-s42__DoS__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "mlp-s42__Recon__p75__reference__seed2024.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "mlp-s42__Recon__p75__reference__seed2026.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  },
+  {
+    "dataset": "cicids2018_distrinet",
+    "artifact": "mlp-s42__Recon__p75__reference__seed42.npz",
+    "flows": 800,
+    "adv_identical": 800,
+    "success_identical": 800
+  }
+]

@@ -1,0 +1,13 @@
+dataset,victim,budget,condition,outcome,seed,n,condition_asr,reference_asr,diff_pp,ci95_lo_pp,ci95_hi_pp,condition_only,reference_only,test,p_value,p_holm
+cicids2017_distrinet,cnn,p75,loss_mimicry,valid_success,42,3200,0.0509375,0.1346875,-8.375,-9.369844575301126,-7.439045123342988,0,268,asymptotic McNemar chi-square (continuity corrected),8.431449771983197e-60,8.431449771983196e-59
+cicids2017_distrinet,cnn,unb,loss_mimicry,valid_success,42,3200,0.390625,0.599375,-20.875,-22.273250176930556,-19.45593685599083,0,668,asymptotic McNemar chi-square (continuity corrected),7.398867530991326e-147,8.87864103718959e-146
+cicids2017_distrinet,ft_transformer,p75,loss_mimicry,valid_success,42,3200,0.00125,0.00125,0.0,-0.13435602132112592,0.13435602132112592,0,0,exact binomial McNemar,1.0,1.0
+cicids2017_distrinet,ft_transformer,unb,loss_mimicry,valid_success,42,3200,0.005625,0.005625,0.0,-0.15904570487758016,0.15904570487758016,1,1,exact binomial McNemar,1.0,1.0
+cicids2017_distrinet,mlp,p75,loss_mimicry,valid_success,42,3200,0.011875,0.0409375,-2.90625,-3.5433223445523265,-2.3561591119284264,0,93,asymptotic McNemar chi-square (continuity corrected),1.428934907198894e-21,1.1431479257591153e-20
+cicids2017_distrinet,mlp,unb,loss_mimicry,valid_success,42,3200,0.1584375,0.2296875,-7.124999999999998,-8.032150753599172,-6.240668138858093,0,228,asymptotic McNemar chi-square (continuity corrected),4.4335535603133485e-51,3.9901982042820136e-50
+cicids2018_distrinet,cnn-s42,p75,loss_mimicry,valid_success,42,3200,0.0009375,0.0115625,-1.0625,-1.4855755385306173,-0.737052624656102,0,34,asymptotic McNemar chi-square (continuity corrected),1.5185595523520037e-08,9.111357314112022e-08
+cicids2018_distrinet,cnn-s42,unb,loss_mimicry,valid_success,42,3200,0.2628125,0.2615625,0.1250000000000029,-0.16076627953914516,0.4116626753463904,12,8,exact binomial McNemar,0.5034446716308594,1.0
+cicids2018_distrinet,ft_transformer-s42,p75,loss_mimicry,valid_success,42,3200,0.0,0.0,0.0,-0.1199016515039459,0.1199016515039459,0,0,exact binomial McNemar,1.0,1.0
+cicids2018_distrinet,ft_transformer-s42,unb,loss_mimicry,valid_success,42,3200,0.0009375,0.00125,-0.03125000000000001,-0.18855104358402047,0.10580681111579297,0,1,exact binomial McNemar,1.0,1.0
+cicids2018_distrinet,mlp-s42,p75,loss_mimicry,valid_success,42,3200,0.01,0.0253125,-1.5312500000000002,-2.0146006933549114,-1.12971905736089,0,49,asymptotic McNemar chi-square (continuity corrected),7.025137193458291e-12,4.917596035420804e-11
+cicids2018_distrinet,mlp-s42,unb,loss_mimicry,valid_success,42,3200,0.3178125,0.4434375,-12.562499999999998,-13.709336051540632,-11.41009267295905,0,402,asymptotic McNemar chi-square (continuity corrected),5.500385665342767e-89,6.050424231877043e-88

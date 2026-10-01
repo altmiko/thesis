@@ -1,0 +1,246 @@
+{
+  "dataset": "cicids2018_distrinet",
+  "objective": "untargeted",
+  "mode": "joint",
+  "success": "victim argmax != true source class on the realized flow AND the condition's validator_v2 search gate",
+  "final_validity": "validator_v2 hybrid_valid = schema & extractor & protocol & mined, given the source flow (identical for every condition)",
+  "conditions": [
+    {
+      "name": "no_padding_sweep",
+      "description": "no exhaustive integer padding enumeration",
+      "hybrid": {
+        "steps": 40,
+        "learning_rate": 0.1,
+        "eval_budget": 256,
+        "restarts": null,
+        "padding_sweep": false,
+        "refinement": true,
+        "adaptive_step": true,
+        "momentum": 0.75,
+        "surrogate_floor": 0.001,
+        "validity_in_search": true,
+        "selection": "incumbent",
+        "fixed_shape": null,
+        "loss": "margin"
+      },
+      "gate_layers": [
+        "schema",
+        "extractor",
+        "protocol",
+        "mined"
+      ],
+      "capability_aware": true
+    },
+    {
+      "name": "no_refinement",
+      "description": "identity + padding enumeration only",
+      "hybrid": {
+        "steps": 40,
+        "learning_rate": 0.1,
+        "eval_budget": 256,
+        "restarts": null,
+        "padding_sweep": true,
+        "refinement": false,
+        "adaptive_step": true,
+        "momentum": 0.75,
+        "surrogate_floor": 0.001,
+        "validity_in_search": true,
+        "selection": "incumbent",
+        "fixed_shape": null,
+        "loss": "margin"
+      },
+      "gate_layers": [
+        "schema",
+        "extractor",
+        "protocol",
+        "mined"
+      ],
+      "capability_aware": true
+    },
+    {
+      "name": "no_random_restarts",
+      "description": "clean-start refinement only (restarts=1)",
+      "hybrid": {
+        "steps": 40,
+        "learning_rate": 0.1,
+        "eval_budget": 256,
+        "restarts": 1,
+        "padding_sweep": true,
+        "refinement": true,
+        "adaptive_step": true,
+        "momentum": 0.75,
+        "surrogate_floor": 0.001,
+        "validity_in_search": true,
+        "selection": "incumbent",
+        "fixed_shape": null,
+        "loss": "margin"
+      },
+      "gate_layers": [
+        "schema",
+        "extractor",
+        "protocol",
+        "mined"
+      ],
+      "capability_aware": true
+    },
+    {
+      "name": "fixed_step",
+      "description": "no stall-triggered step halving / reset",
+      "hybrid": {
+        "steps": 40,
+        "learning_rate": 0.1,
+        "eval_budget": 256,
+        "restarts": null,
+        "padding_sweep": true,
+        "refinement": true,
+        "adaptive_step": false,
+        "momentum": 0.75,
+        "surrogate_floor": 0.001,
+        "validity_in_search": true,
+        "selection": "incumbent",
+        "fixed_shape": null,
+        "loss": "margin"
+      },
+      "gate_layers": [
+        "schema",
+        "extractor",
+        "protocol",
+        "mined"
+      ],
+      "capability_aware": true
+    },
+    {
+      "name": "no_momentum",
+      "description": "momentum 0",
+      "hybrid": {
+        "steps": 40,
+        "learning_rate": 0.1,
+        "eval_budget": 256,
+        "restarts": null,
+        "padding_sweep": true,
+        "refinement": true,
+        "adaptive_step": true,
+        "momentum": 0.0,
+        "surrogate_floor": 0.001,
+        "validity_in_search": true,
+        "selection": "incumbent",
+        "fixed_shape": null,
+        "loss": "margin"
+      },
+      "gate_layers": [
+        "schema",
+        "extractor",
+        "protocol",
+        "mined"
+      ],
+      "capability_aware": true
+    },
+    {
+      "name": "no_surrogate_floor",
+      "description": "no straight-through surrogate floor",
+      "hybrid": {
+        "steps": 40,
+        "learning_rate": 0.1,
+        "eval_budget": 256,
+        "restarts": null,
+        "padding_sweep": true,
+        "refinement": true,
+        "adaptive_step": true,
+        "momentum": 0.75,
+        "surrogate_floor": 0.0,
+        "validity_in_search": true,
+        "selection": "incumbent",
+        "fixed_shape": null,
+        "loss": "margin"
+      },
+      "gate_layers": [
+        "schema",
+        "extractor",
+        "protocol",
+        "mined"
+      ],
+      "capability_aware": true
+    },
+    {
+      "name": "validator_post_hoc",
+      "description": "validator_v2 not in the search success predicate",
+      "hybrid": {
+        "steps": 40,
+        "learning_rate": 0.1,
+        "eval_budget": 256,
+        "restarts": null,
+        "padding_sweep": true,
+        "refinement": true,
+        "adaptive_step": true,
+        "momentum": 0.75,
+        "surrogate_floor": 0.001,
+        "validity_in_search": false,
+        "selection": "incumbent",
+        "fixed_shape": null,
+        "loss": "margin"
+      },
+      "gate_layers": [
+        "schema",
+        "extractor",
+        "protocol",
+        "mined"
+      ],
+      "capability_aware": true
+    },
+    {
+      "name": "last_iterate",
+      "description": "return the last evaluated candidate, not the incumbent",
+      "hybrid": {
+        "steps": 40,
+        "learning_rate": 0.1,
+        "eval_budget": 256,
+        "restarts": null,
+        "padding_sweep": true,
+        "refinement": true,
+        "adaptive_step": true,
+        "momentum": 0.75,
+        "surrogate_floor": 0.001,
+        "validity_in_search": true,
+        "selection": "last",
+        "fixed_shape": null,
+        "loss": "margin"
+      },
+      "gate_layers": [
+        "schema",
+        "extractor",
+        "protocol",
+        "mined"
+      ],
+      "capability_aware": true
+    }
+  ],
+  "budgets": {
+    "maximum-evaluated": "p75",
+    "unbounded": "unb"
+  },
+  "classes": [
+    "DoS",
+    "DDoS",
+    "Recon",
+    "BruteForce"
+  ],
+  "seeds": [
+    42,
+    2024,
+    2026
+  ],
+  "victims": [
+    "mlp-s42",
+    "cnn-s42",
+    "ft_transformer-s42"
+  ],
+  "selection_from": "FINAL_OUTPUTS/runs/cicids2018_distrinet/baselines_untargeted/selection.json",
+  "selection_sha256": "d8c1640dd66751dc832fbf7c4d12a1f10d3778612569f804970b1c751863e4bb",
+  "limit_rows": null,
+  "calibration": "artifacts/primattack/budget_calibration_cicids2018.json",
+  "calibration_sha256": "f5dfe24180fc6591fde18faa6f165899035fdba5e2f5c3253f52d354402d142e",
+  "benign_anchor_pool": null,
+  "torch": "2.5.1+cu121",
+  "device": "cuda",
+  "python": "3.11.15"
+}
