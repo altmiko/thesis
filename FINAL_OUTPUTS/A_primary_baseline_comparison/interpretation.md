@@ -34,8 +34,8 @@ CICIDS2018, with a Validity Gap of 0.00 pp everywhere. Its successes come from D
 targeted successes in 57,600 attempts, with identical per-victim success sets. The capability
 rule removes Hybrid's distinctive exact-padding phase from almost every row; on timing-only rows
 both methods reduce to projected sign-momentum updates over `(delay, shape)`, with momentum 0.75,
-a clean start, random restarts, the same realized-flow scoring and the same validator-aware
-incumbent. Their trajectories and final primitive costs need not be identical, but this
+a clean start, random restarts, the same realized-flow scoring and the same incumbent
+rule. Their trajectories and final primitive costs need not be identical, but this
 low-dimensional timing boundary is crossed by the same flows. Prim-PGD is used here because the
 pre-registered tie-break favors its lower mean evaluation count (188.5 vs 189.6). Only Prim-PGD
 was rerun for the untargeted Exp A arm, so the exact targeted tie should not be misreported as a
@@ -68,11 +68,16 @@ comparison. `PROTO_0080` removes 131 / 260 / 29 of its CICIDS2017 valid successe
 31 ms on CICIDS2018), not the search, limits p75 success.
 
 **How to read these differences.** The highest Raw ASR (PGD) belongs to the least constrained
-threat model, and none of its evasions is a valid flow. PrimAttack's search includes validator_v2
-in its success predicate; the baselines never query it, and C-PGD sees only a differentiable
-subset. PrimAttack's advantage over CAPGD-PrimSupport therefore reflects the primitive
-parameterization together with this validity-aware search, and it is limited to the victims
-where timing alone moves the decision. Matched support does not give CAPGD/C-PGD packet-level
-realizability, and PrimAttack's results are flow-level proxies (no PCAP is modified). Valid
-evasion is strongly victim-dependent: FT-Transformer resists every validity-preserving attack
-(≤ 0.18% Valid ASR at p75 across the inferential attacks).
+threat model, and none of its evasions is a valid flow. The final PrimAttack runs included
+validator_v2 in the search's success predicate, but amendment A6 (validity-gate ablation) shows
+that this changed no final flow: validator_v2 judges PrimAttack and the baselines alike, post hoc,
+and C-PGD optimizes only a differentiable subset of the flow relations. A6 therefore rules out
+validator access as the source of PrimAttack's advantage over CAPGD-PrimSupport. Experiment A
+does not equalize the parameterization, the capability-aware box, the query budget (256 victim
+evaluations per flow against CAPGD's 10 steps × 2 restarts), the objective or the
+representation, and the advantage is limited to the victims where timing alone moves the
+decision. It does not hold on FT-Transformer (0.12% vs 0.18% on CICIDS2017, Holm p = 1; both 0%
+on CICIDS2018). Matched support does not give CAPGD/C-PGD packet-level realizability, and
+PrimAttack's results are flow-level proxies (no PCAP is modified). Valid evasion is strongly
+victim-dependent: FT-Transformer resists every validity-preserving attack (≤ 0.18% Valid ASR at
+p75 across the inferential attacks).

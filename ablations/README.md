@@ -1,10 +1,10 @@
 # PrimAttack ablations
 
-Ablation experiments for PrimAttack. Each design is taken from published work (sources are
-cited in each experiment's `run.py` docstring and `README.md`). Every experiment has its own
-folder with `run.py`, `README.md` (design and results) and `results/` (`report.md`,
-`summary.csv`, `tests.csv`, extra tables, `<dataset>/cells.json`, `<dataset>/config.json`).
-The per-row npz artifacts (`results/<dataset>/artifacts/`) are git-ignored.
+Ablation and sensitivity experiments for PrimAttack. Component ablations cite their
+published design sources in each experiment's `run.py` docstring and `README.md`.
+Each experiment has its own folder with `run.py`, `README.md` and `results/`
+(`report.md`, `summary.csv`, `tests.csv`, extra tables and per-dataset artifacts).
+The per-row npz artifacts are git-ignored but retained locally.
 
 | Folder | Question | New attack runs |
 |---|---|---|
@@ -17,6 +17,24 @@ The per-row npz artifacts (`results/<dataset>/artifacts/`) are git-ignored.
 | `B5_validator_layers/` | Valid ASR when one validator_v2 layer (SCHEMA, EXTRACTOR, PROTOCOL, MINED) is removed | yes |
 | `D5_overhead/` | Bytes and time the attacker pays per valid success (cost curves) | no (FINAL artifacts) |
 | `D6_capability_inference/` | `u = M(x) ⊙ (p, D, s)` vs `u = (p, D, s)`, both judged by the same validator_v2 | yes |
+| `V1_single_fwd_packet_rule/` | Toggle-able validator rule `Total Fwd Packet ≤ 1 ⇒ forward IAT = 0` (closes the D6 gap), on capability-aware and capability-ablated PrimAttack | yes |
+| `seeded_rows/` | How does random clean-correct row selection change p75 and unbounded Prim-PGD Valid ASR? | yes (new cohorts for seeds 2024/2026; seed 42 copied from FINAL) |
+
+## Key results
+
+| Experiment | Result |
+|---|---|
+| reference | Reproduces all 72 FINAL p75 Hybrid cells flow-for-flow (57,600 flows) |
+| A1 | The gradient refinement is the whole attack (Valid ASR 0 without it). Random restarts matter for 2017 CNN (13.47% → 4.50% at p75). Padding sweep, momentum, adaptive step, surrogate floor and the in-search validator change nothing. The reference covers every arm's successes except ≤ 4 flows per cell. |
+| A2 | Proportional delay (shape 0) almost never evades at p75 (≤ 0.06%). Uniform delay matches the learned shape at p75 but loses 8.9 pp on 2018 MLP unbounded. Learning `shape` matters. |
+| A3 | CE equals the margin loss; DLR is never better. Margin/CE have 0 zero-gradient steps on every victim, including FT-Transformer (no gradient masking). |
+| A4 | Benign mimicry loses 1.0–20.8 pp in 7 of 12 cells and finds a subset of the reference's successes. Victim guidance matters. |
+| B1 | 2–4× steps/restarts/queries add ≤ 0.09 pp (n.s.). The attack has converged. |
+| B5 | Dropping any validator_v2 layer changes nothing (0 discordant flows in 48 comparisons). For capability-aware PrimAttack the validator never binds. |
+| D5 | No valid success adds a byte. Median time overhead of MLP/CNN successes is 0.31–0.55 at p75 and ≥ 0.86 unbounded. Valid ASR at TO ≤ 0.10 is ≤ 1.18%. |
+| D6 | Removing M(x) lowers Valid ASR in 10 of 12 cells (e.g. 2017 CNN unbounded 59.94% → 7.25%) while Raw ASR rises up to 98%. validator_v2 misses delay added to single-forward-packet flows: 1,512 such "valid" successes on CICIDS2018. |
+| V1 | The rule `Total Fwd Packet ≤ 1 ⇒ forward IAT = 0` accepts all 2.91 M genuine flows and never binds for capability-aware PrimAttack (identical Valid ASR in all 12 cells). It removes all 1,512 single-packet timing successes of the capability-ablated attack (2018 MLP unbounded 38.52% → 23.30%). |
+| seeded_rows | New seed-specific random cohorts change Valid ASR (2017 CNN p75: 13.47%, 12.47%, 12.88%; 2018 MLP p75: 2.53%, 2.25%, 1.88%). Paired p75 vs unbounded Valid ASR differs in 5/6 victims after Holm on seed 42; this is not a cross-method or cross-seed paired test. |
 
 ## Shared protocol
 
@@ -68,6 +86,8 @@ python ablations/reference/run.py --device cuda          # first: the shared ref
 python ablations/A1_hybrid_components/run.py --device cuda
 ...                                                       # A2, A3, A4, B1, B5, D6 likewise
 python ablations/D5_overhead/run.py                      # analysis of FINAL artifacts only
+python ablations/seeded_rows/run.py --device cuda  # new random row cohort per seed
+python ablations/seeded_rows/analyze.py --device cuda
 ```
 
 Options: `--datasets`, `--budgets`, `--seeds`, `--victims`, `--classes`, `--conditions`,

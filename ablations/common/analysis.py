@@ -69,11 +69,16 @@ def compare_to_reference(
     outcome: str = "valid_success",
     secondary: tuple[str, ...] = ("raw_success",),
     reference_dir_for: dict[str, Path] | None = None,
+    baseline: str = REFERENCE.name,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Summary (one row per group x condition, reference included) and McNemar tests."""
+    """Summary (one row per group x condition, baseline included) and McNemar tests.
+
+    ``baseline`` is the comparison arm, read from ``reference_dir`` (default: the shared
+    reference arm).
+    """
     summary, tests = [], []
     for g in _groups(results_dir, reference_dir, conditions):
-        arms = [Source(reference_dir, REFERENCE.name)] + [
+        arms = [Source(reference_dir, baseline)] + [
             Source((reference_dir_for or {}).get(c, results_dir), c) for c in conditions]
         per_arm = {}
         for src in arms:
@@ -84,7 +89,7 @@ def compare_to_reference(
                 if rows is not None:
                     per_seed[seed] = rows
             per_arm[src.condition] = per_seed
-        ref = per_arm[REFERENCE.name]
+        ref = per_arm[baseline]
         for src in arms:
             per_seed = per_arm[src.condition]
             seeds = sorted(set(per_seed) & set(ref))
@@ -101,7 +106,7 @@ def compare_to_reference(
             for f in secondary:
                 row[f"{f}_mean"] = float(np.mean([per_seed[s][f].mean() for s in seeds]))
             summary.append(row)
-            if src.condition == REFERENCE.name or REF_SEED not in seeds:
+            if src.condition == baseline or REF_SEED not in seeds:
                 continue
             a, b = per_seed[REF_SEED], ref[REF_SEED]
             if not np.array_equal(a["sample_id"], b["sample_id"]):
@@ -138,7 +143,8 @@ def pct(x: float) -> str:
 
 
 def summary_markdown(summary: pd.DataFrame, tests: pd.DataFrame, *, outcome: str,
-                     outcome_label: str, secondary_labels: dict[str, str] | None = None) -> str:
+                     outcome_label: str, secondary_labels: dict[str, str] | None = None,
+                     baseline: str = REFERENCE.name) -> str:
     """One table per dataset: ASR mean (seed range), delta vs reference, seed-42 McNemar."""
     secondary_labels = secondary_labels or {}
     lines = []
@@ -158,7 +164,7 @@ def summary_markdown(summary: pd.DataFrame, tests: pd.DataFrame, *, outcome: str
             sec = "".join(f"{pct(getattr(r, f'{k}_mean'))} | " for k in secondary_labels)
             test = ("-" if t is None else f"{t.condition_only} / {t.reference_only}")
             p = "-" if t is None else f"{t.p_holm:.3g}"
-            delta = "-" if r.condition == REFERENCE.name else f"{r.delta_pp_vs_reference:+.2f}"
+            delta = "-" if r.condition == baseline else f"{r.delta_pp_vs_reference:+.2f}"
             lines.append(f"| {r.victim} | {r.budget} | {r.condition} | {cell} | {delta} | "
                          f"{sec}{test} | {p} |")
         lines.append("")

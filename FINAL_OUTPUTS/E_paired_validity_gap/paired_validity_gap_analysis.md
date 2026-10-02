@@ -111,8 +111,9 @@ Prim-PGD have identical targeted success masks: 1,752 valid successes each and n
 flow. Nearly all rows are timing-only, so Hybrid skips exact padding enumeration and both reduce
 to closely related sign-momentum timing searches. Their two zero-gap rows are retained because
 the optimizer comparison was pre-registered; they must not be treated as two independent pieces
-of evidence for validator performance. Prim-C&W follows the same validity gate but finds fewer
-CICIDS2017 CNN successes because its cost-penalized trajectory differs.
+of evidence for validator performance. Prim-C&W shares the same realized-flow search and
+incumbent rule but finds fewer CICIDS2017 CNN successes because its cost-penalized trajectory
+differs.
 
 **Why raw successes are rejected.** PGD and C&W examples fail every validator category (SCHEMA,
 EXTRACTOR and PROTOCOL for 100% of them; MINED for ≥ 98.5%). The matched-support attacks never
@@ -126,10 +127,12 @@ usually also violate EXTRACTOR or MINED rules, and only 16 / 6 CAPGD-PrimSupport
 (CICIDS2017 MLP / CNN, three seeds) were lost to it alone.
 
 **Why PrimAttack has no gap.** It constructs every candidate through the canonical recomputation
-φ (identities hold by construction), keeps only validator-accepted incumbents in its search, and
-under the capability rule never pads a flow with an empty forward packet. Before amendment A2 the
-relaxed PrimAttack had a 0.33–15.28 pp gap on CICIDS2018, entirely from `MINED_0001` rejecting
-padded flows; that source of invalidity is now excluded before optimization.
+φ (identities hold by construction), applies integer rounding and quantization, stays inside the
+train-calibrated per-flow box, and under the capability rule never pads a flow with an empty
+forward packet. The final runs also required validator_v2 acceptance inside the search;
+amendment A6 (validity-gate ablation) shows that this changed no final flow. Before amendment A2
+the relaxed PrimAttack had a 0.33–15.28 pp gap on CICIDS2018, entirely from `MINED_0001`
+rejecting padded flows; that source of invalidity is now excluded before optimization.
 
 **Reading (Contribution 3).** A high Raw ASR says little about constrained evasion: the attacks
 with the highest raw success produce no valid flow, and matched feature support alone does not

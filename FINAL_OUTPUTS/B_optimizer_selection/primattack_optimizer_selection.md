@@ -1,6 +1,6 @@
 # Final Experiment B — PrimAttack optimizer selection (targeted → Benign, p75)
 
-Three optimizers over the identical PrimAttack attack space (`RealizedSearch`: the same primitive parameterization, joint mode, per-class p75 box, recomputation φ, integer rounding, victim, validator_v2 gate and success predicate; every reported candidate is a realized, quantized, recomputed flow; per-flow incumbent: success > failure, cheapest success, best-margin failure). Matched per-flow cap of 256 victim evaluations. Success = prediction == Benign. Valid success additionally requires validator_v2 `hybrid_valid`. Mean ± SD over seeds 42/2024/2026.
+Three optimizers over the identical PrimAttack attack space (`RealizedSearch`: the same primitive parameterization, joint mode, per-class p75 box, recomputation φ, integer rounding, victim and success predicate; every reported candidate is a realized, quantized, recomputed flow; per-flow incumbent: success > failure, cheapest success, best-margin failure). Matched per-flow cap of 256 victim evaluations. Success = prediction == Benign. Valid success additionally requires validator_v2 `hybrid_valid`, applied after the search. The final runs also included validator_v2 in the search's success predicate, and amendment A6 (`../00_PROTOCOL.md` §7) shows that this changed no final flow. Mean ± SD over seeds 42/2024/2026.
 
 | Optimizer | Hyperparameters (frozen; Prim-PGD/C&W tuned on the CICIDS2017 validation split) |
 |---|---|
@@ -188,8 +188,10 @@ within 0.03 pp (CICIDS2018 MLP 0.75% vs 0.78%; Cochran's Q p = 0.368). Cochran's
 significant, or not computable because all three are identical, on the other five victims.
 
 **Validity.** Every targeted raw success of every optimizer is valid (Validity Gap 0.00 pp in all
-18 cells): the realized-flow search keeps only validator-accepted incumbents, and the timing-only
-flows cannot trigger the empty-packet rule. The optimizers spend a similar per-flow budget
+18 cells): every candidate is a realized flow recomputed through φ with integer rounding and
+quantization, and the timing-only flows cannot trigger the empty-packet rule. The final runs also
+required validator_v2 acceptance inside the search; amendment A6 (validity-gate ablation) shows
+that this changed no final flow. The optimizers spend a similar per-flow budget
 (187–191 victim evaluations) because flows without primitive headroom stop at the identity.
 
 **Reading.** After the fix, the optimizer choice matters little: timing is a low-dimensional

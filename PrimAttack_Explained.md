@@ -31,7 +31,8 @@ independently, so they can reach combinations that no padding or delay could pro
 forward direction: it can make its own packets larger and send them later. It cannot remove
 bytes, add or remove packets, change flags, ports or protocol, or touch the backward
 (server-to-client) direction. Success is measured on the realized flow, i.e. after integer
-rounding, and the flow must pass validator_v2.
+rounding. validator_v2 judges validity afterwards, in the post-attack evaluation, exactly as for
+the baselines.
 
 ---
 
@@ -48,13 +49,10 @@ flowchart TD
     E -->|continuous relaxation<br/>gradient of margin| E
     E --> F[RealizedSearch candidate:<br/>project -> integer round -> phi with quantize]
     F --> G[Victim prediction<br/>on realized flow]
-    F --> H[validator_v2 hybrid_valid<br/>of realized flow given source]
-    G --> I{objective met<br/>AND valid?}
-    H --> I
-    I --> J[Incumbent update<br/>success > failure,<br/>then cost / margin]
+    G -->|hit flag, margin| J[Incumbent update<br/>hit > non-hit<br/>hits by cost, then margin<br/>non-hits by margin]
     J -->|budget left| E
     J -->|256 evals used| K[Final adversarial flow]
-    K --> L[Post-attack evaluation:<br/>validator_v2, realizability,<br/>semantic checks, metrics]
+    K --> L[Post-attack evaluation:<br/>validator_v2 hybrid_valid given source,<br/>realizability, semantic checks, metrics]
 ```
 
 The attack runs once for each (dataset, victim, source class, budget, primitive mode, attack
@@ -283,9 +281,7 @@ masked to 0.
    $s = 0$ if $D = 0$.
 2. **Realize**: $x' = \varphi(x; \text{projected}, \texttt{quantize=True})$.
 3. **Predict**: victim logits on $(x' - \text{median}) / \text{IQR}$.
-4. **Gate**: $V = \texttt{hybrid\_valid}(x' \mid x)$ from validator_v2 (`hybrid_valid_gate`).
-   This includes the source-conditioned rule `PROTO_0080`.
-5. **Success** = objective met on the realized flow **and** $V$.
+4. **Success** = a hit: the objective is met on the realized flow.
 
 **Objective and margin** (lower is better; negative means the objective is met):
 
@@ -295,10 +291,30 @@ masked to 0.
 **Incumbent (the best candidate kept per flow)**
 (`_candidate_take`):
 
-1. A success always replaces a failure.
-2. Among successes, keep the one with the lowest normalised primitive cost
+1. A hit always replaces a non-hit.
+2. Among hits, keep the one with the lowest normalised primitive cost
    $p/p^{hi} + D/D^{hi}$; ties go to the lower margin.
-3. Among failures, keep the one with the lowest margin.
+3. Among non-hits, keep the one with the lowest margin.
+
+**validator_v2 and the FINAL runs.** validator_v2 `hybrid_valid(x' | x)` (SCHEMA ∧ EXTRACTOR ∧
+PROTOCOL ∧ MINED, including the source-conditioned rule `PROTO_0080`) is applied after the
+search, in `evaluate_cell` (§10), exactly as for the baselines. The executed FINAL configuration
+(`FINAL_OUTPUTS/00_PROTOCOL.md` §4) also used it inside the search: a candidate counted as a
+success only if it met the objective on the realized flow and `hybrid_valid` accepted it.
+Protocol amendment A6 (non-canonical, outputs outside `FINAL_OUTPUTS/`) reran every FINAL
+PrimAttack configuration (Hybrid, Prim-PGD, Prim-C&W and the Prim-Random null; targeted and
+untargeted; p50, p75 and unbounded; joint, timing-only and padding-only; both datasets; attack
+seeds 42/2024/2026) with `--no-validity-gate`, on the same frozen flows, victims,
+hyperparameters and environment. In this rerun a search success is the objective hit only. In all
+806,400 flow attacks the final adversarial flows are bit-identical to the FINAL runs, the
+ungated search never kept an invalid hit, every Raw and Valid ASR is unchanged, and McNemar
+finds 0 vs 0 discordant flows on every victim (`outputs/primattack_nogate_ablation/`, report
+`gate_ablation_report.md`, analysis `scripts/analyze_gate_ablation.py`). An earlier untargeted
+Prim-PGD-only check (`scripts/run_primattack_no_validator_gate.py` →
+`outputs/primattack_no_validator_gate/`) found identical Raw and Valid ASR and no discordant
+rows. The runner keeps the in-search check
+unless `--no-validity-gate` is passed, as the locked protocol requires; `RealizedSearch` with
+`validity_fn=None` scores the objective hit only.
 
 **Evaluation budget.** Every victim forward pass counts, whether on a realized flow or on the
 surrogate. The per-flow cap is $B = 256$. The identity (unmodified) flow is scored first, at a
@@ -386,8 +402,9 @@ evaluations (188.5 vs 189.6 mean per flow).
 
 ## 10. Step 7: post-attack evaluation
 
-The incumbent adversarial flow is re-evaluated independently of the search
-(`evaluate_cell` + `FlowSemanticValidator.evaluate`).
+The incumbent adversarial flow is evaluated independently of the search
+(`evaluate_cell` + `FlowSemanticValidator.evaluate`). validator_v2 judges PrimAttack here, in
+the same way as it judges the baselines.
 
 | Gate | Checker | What it checks |
 |---|---|---|
@@ -420,9 +437,11 @@ It follows from the class rules that SP-ASR is 0 by construction for Recon and B
 - an empty forward packet was filled.
 
 It also records for every row whether the search's own success flag agrees with the recomputed
-final success (`incumbent_final_mismatch`). Per-row `.npz` files store the final adversarial raw
-flow, the controls, the box, costs, evaluation counts, candidate source, failure reason
-(`success` / `invalid` / `exhausted` / `no_headroom`) and the capability reason codes. The
+final success, hit ∧ `hybrid_valid` (`incumbent_final_mismatch`); without the in-search check a
+mismatch is a kept invalid hit. Per-row `.npz` files store the final adversarial raw flow, the
+controls, the box, costs, evaluation counts, candidate source, failure reason (`success` /
+`invalid` / `exhausted` / `no_headroom`; `invalid` marks a flow that hit the objective but ended
+without a valid success) and the capability reason codes. The
 analyzer later recomputes validator_v2 and the victim predictions from the stored flows and
 aborts on any mismatch.
 
@@ -450,7 +469,8 @@ Prim-PGD, p75:
 | CNN | 13.47% | 1.16% |
 | FT-Transformer | 0.12% | 0.00% |
 
-- **Validity gap.** Raw ASR equals Valid ASR in every cell with successes. This contrasts with PGD/C&W
+- **Validity gap.** Raw ASR equals Valid ASR in every cell with successes, also with validator_v2
+  removed from the search (amendment A6, §8). This contrasts with PGD/C&W
   (53.59–100% raw → 0% valid) and CAPGD/C-PGD-PrimSupport (large raw, little or no valid).
 - **Budget sensitivity (Exp C).** Valid Targeted ASR never decreases as the budget grows. The
   unbounded timing box raises it, for example from 4.09% to 22.94% (CICIDS2017 MLP) and from
@@ -471,10 +491,20 @@ Prim-PGD, p75:
 | Discreteness | integer bytes and µs; realized flow quantized | ignored | integer truncation at the end |
 | Per-flow capability | padding only where physically meaningful | none | none |
 | Budget | train-calibrated per class + p99 envelope + rate floor | $\varepsilon$-ball | $\varepsilon$-ball + train box |
-| Sees validator_v2 during search | **yes** (part of the success predicate) | no | no |
+| validator_v2 | post-attack evaluation (§10) | post-attack evaluation | post-attack evaluation |
 
-The last row is a deliberate threat-model difference and is documented in the protocol.
-PrimAttack is a validity-aware search; the baselines are evaluated for validity only afterwards.
+The FINAL PrimAttack runs also had validator_v2 in the search's success predicate, and
+amendment A6 shows it changed no final flow or outcome (§8), so all methods in effect receive the
+same post-hoc validator treatment. PrimAttack's validity comes from $\varphi$ (every dependent
+feature recomputed), integer rounding and quantization, capability gating and the
+train-calibrated per-flow box. A6 rules out validator access as the source of PrimAttack's
+valid-success advantage over CAPGD/C-PGD-PrimSupport. The comparison does not equalize the
+parameterization, the capability-aware box, the query budget (256 victim evaluations per flow
+for PrimAttack; 10 steps × 2 restarts for CAPGD, 40 steps for C-PGD), the objective or the
+representation, so the advantage cannot be assigned to any one of them. It holds only on the
+victims where timing alone moves the decision: on the CICIDS2017 FT-Transformer PrimAttack
+reaches 0.12% against 0.18% for CAPGD-PrimSupport (not significant, Holm p = 1), and on the
+CICIDS2018 FT-Transformer both reach 0%.
 
 ---
 
@@ -507,6 +537,8 @@ PrimAttack is a validity-aware search; the baselines are evaluated for validity 
 | Primitive modes, cell evaluation | `src/attack/run_cicids2017_primitive_attack.py` (`_apply_primitive_mode`, `evaluate_cell`) |
 | Internal realizability checks | `src/attack/realizability/validator.py` |
 | Semantic and primitive-feasibility checks | `src/attack/flow_semantics.py` |
-| validator_v2 gate | `validation/attack_interface.py:structural_masks`, `primitive_optimizer.py:hybrid_valid_gate` |
+| validator_v2 (post-attack) | `validation/attack_interface.py:structural_masks`, called by `evaluate_cell` |
+| FINAL in-search validity check (changed no final flow or outcome, amendment A6) | `primitive_optimizer.py:hybrid_valid_gate`, passed as `RealizedSearch(validity_fn=...)`; dropped by `--no-validity-gate` |
+| Gate ablation analysis | `scripts/analyze_gate_ablation.py` → `outputs/primattack_nogate_ablation/gate_ablation_report.md` |
 | FINAL runner | `scripts/run_primattack_optimizer_ablation.py` (driven by `scripts/run_final_suite.py`) |
 | Analysis | `scripts/analyze_final_suite.py` → `FINAL_OUTPUTS/` |

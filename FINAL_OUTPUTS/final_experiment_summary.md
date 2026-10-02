@@ -137,11 +137,16 @@ recomputation. No PCAP is edited, replayed or re-extracted; aggregate features d
 individual payload packets; complete malicious functionality and packet-level realizability are
 not established. The conservative `Fwd Packet Length Min > 0` condition sacrifices possible
 legitimate data-packet padding on mixed empty/data flows. Seeds are attack seeds on one frozen
-victim per architecture, not victim-training seeds. PrimAttack queries validator_v2 during
-search; baselines do not.
+victim per architecture, not victim-training seeds. The final PrimAttack runs also required
+validator_v2 acceptance in the search predicate; amendment A6 (validity-gate ablation) shows
+this changed no final flow, so PrimAttack and the baselines are in effect judged by the same
+post-hoc validator.
 
 **Amendments.** A1 fixed non-finite gradients at pinned controls before optimizer selection. A2
 added capability-aware padding and `PROTO_0080`, preserved the old run as
 `superseded_relaxed_padding/`, and reran every stage from scratch. A3 adds native CAPGD only as a
-descriptive row; the locked five-method inferential family is unchanged. See `00_PROTOCOL.md` §7
+descriptive row; the locked five-method inferential family is unchanged. A6, a descriptive
+validity-gate ablation, reran every final PrimAttack configuration without the in-search
+validator_v2 check; no final flow or reported number changed, and its non-canonical outputs stay
+outside `FINAL_OUTPUTS/` (`../outputs/primattack_nogate_ablation/`). See `00_PROTOCOL.md` §7
 and `../primattack_empty_packet_fix_report.md`.

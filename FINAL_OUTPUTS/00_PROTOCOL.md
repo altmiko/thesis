@@ -85,8 +85,10 @@ CICIDS2017 **validation** split (`primattack_optimizer_ablation.md` §3.4). The 
 reused on CICIDS2018 without re-tuning. All PrimAttack variants share `RealizedSearch`: the same
 parameterization, budgets, recomputation, rounding, victim, validator gate and success predicate.
 PrimAttack's search success predicate includes validator_v2 (validity-aware search). The
-baselines optimize without the validator. This is part of the threat-model difference and is
-documented in every fairness guide.
+baselines optimize without the validator. This is part of the threat-model difference and was
+documented in every fairness guide until amendment A6. Amendment A6 (validity-gate ablation,
+§7) reran every PrimAttack configuration without this gate: no final adversarial flow changed,
+so in effect PrimAttack and the baselines receive the same post-hoc validator treatment.
 
 ## 5. Experiment design decisions not fixed by the master prompt
 
@@ -185,5 +187,41 @@ documented in every fairness guide.
   flow-for-flow. Test: paired McNemar on seed 42 per (dataset, victim), Holm over the six
   comparisons. Exp D (selected optimizer, Prim-PGD) stays the pre-registered objective test.
   Analysis: `scripts/analyze_hybrid_objective_comparison.py` → `hybrid_targeted_vs_untargeted/`.
+* **A6 — validity-gate ablation (post hoc, descriptive).** In the executed final configuration
+  (§4), `RealizedSearch` counted a candidate as a search success only if it met the objective
+  on the realized flow and validator_v2 `hybrid_valid(x′ | x)` accepted it; PGD, C&W, CAPGD and
+  C-PGD never query validator_v2. Added after all final results were seen, the ablation reran
+  every final PrimAttack configuration with
+  `scripts/run_primattack_optimizer_ablation.py --no-validity-gate` (search success = objective
+  hit only): Hybrid, Prim-PGD, Prim-C&W and the Prim-Random null; targeted and untargeted; p50,
+  p75 and unbounded; joint, timing-only and padding-only; both datasets; attack seeds
+  42/2024/2026; the same frozen flows, victims, hyperparameters and environment. In all 806,400
+  flow attacks the final adversarial flow is bit-identical to the final run, the ungated search
+  never kept an invalid hit, every Raw and Valid ASR is unchanged, and McNemar finds 0 vs 0
+  discordant flows on every victim. An earlier untargeted Prim-PGD-only check
+  (`scripts/run_primattack_no_validator_gate.py` → `../outputs/primattack_no_validator_gate/`)
+  found identical Raw/Valid ASR and no discordant rows. PrimAttack's search is therefore
+  described by its success test alone: the objective hit on the realized flow x′ (after integer
+  rounding and φ with quantize=True). A hit replaces a non-hit; among hits the incumbent is the
+  lowest cost p/p^hi + D/D^hi (ties → lower margin), among non-hits the lowest margin.
+  validator_v2 `hybrid_valid(x′ | x)` (SCHEMA ∧ EXTRACTOR ∧ PROTOCOL ∧ MINED, including the
+  source-conditioned `PROTO_0080`) is applied after the search in `evaluate_cell`, exactly as for
+  the baselines. PrimAttack's validity comes from φ (every dependent feature recomputed), integer
+  rounding/quantization, capability gating and the train-calibrated per-flow box. In effect
+  PrimAttack and the baselines receive the same post-hoc validator treatment, so the
+  validity-aware-search and validator-access reading of §4 and of the fairness guides is
+  retired. A6 rules out validator access as the source of PrimAttack's valid-success advantage
+  over CAPGD/C-PGD-PrimSupport. The comparison does not equalize parameterization,
+  capability-aware box, query budget (256 victim evaluations per flow vs CAPGD 10 steps × 2
+  restarts and C-PGD 40 steps), objective or representation, and the advantage holds only on
+  the victims where timing alone moves the decision (on the CICIDS2017 FT-Transformer PrimAttack
+  reaches 0.12% and CAPGD-PrimSupport 0.18%, Holm p = 1; on the CICIDS2018 FT-Transformer both
+  reach 0%).
+  The code default is unchanged (`run_primattack_optimizer_ablation.py` keeps the gate unless
+  `--no-validity-gate` is passed; `RealizedSearch` with `validity_fn=None` tests the hit only).
+  Nothing locked above changes and no reported number changes; the ablation outputs are
+  non-canonical and stay outside `FINAL_OUTPUTS/`. Report:
+  `../outputs/primattack_nogate_ablation/gate_ablation_report.md`; analysis:
+  `scripts/analyze_gate_ablation.py`.
 * **Realized sample counts.** Every (dataset, victim, class) had ≥ 800 clean-correct test flows,
   so every cell has exactly 800 flows (3,200 per victim and seed).

@@ -58,9 +58,11 @@ An $\varepsilon = 0.5$ therefore means different things for different attacks:
   Success means $f(x') \neq y$.
 - **Validity is checked afterwards.** None of these four attacks sees validator_v2 while
   optimising. Every final $x'$ is gated afterwards by
-  $V = \texttt{hybrid\_valid}(x' \mid x)$. This asymmetry is part of the threat-model
-  difference to PrimAttack, whose search success predicate does include validator_v2
-  (`00_PROTOCOL.md` §4).
+  $V = \texttt{hybrid\_valid}(x' \mid x)$. PrimAttack is evaluated the same way. Its FINAL
+  runs also put validator_v2 in the search success predicate (`00_PROTOCOL.md` §4).
+  Amendment A6 reran every FINAL PrimAttack configuration with `--no-validity-gate` and
+  obtained bit-identical final flows in all 806,400 flow attacks, so the in-search check
+  changed no final flow or outcome (`outputs/primattack_nogate_ablation/gate_ablation_report.md`).
 - **Metrics.** $\mathrm{ASR}_{\text{raw}} = \frac{1}{N}\sum_i S_i$ and
   $\mathrm{ASR}_{\text{valid}} = \frac{1}{N}\sum_i S_i V_i$, both over the $N$ attempted
   clean-correct flows.
@@ -422,8 +424,8 @@ $\varphi$, has Raw ASR = Valid ASR in every cell. It pays for this with a much l
   packet capture is edited or replayed. A valid success means validator_v2 accepts the flow
   as structurally consistent. It does not mean the flow is realisable as packets.
 - None of the four baselines optimises against validator_v2. Their Valid ASR measures how
-  often their own constraint handling happens to produce validator-consistent flows, not the
-  best a validator-aware attacker could achieve.
+  often their own constraint handling happens to produce validator-consistent flows; it does
+  not bound what a validator-aware attacker could achieve.
 - The $\varepsilon$ values are not comparable across the attack spaces (§0.2). Compare Valid
   ASR at the locked configurations, not perturbation sizes across methods.
 - The C&W implementation is a simplified fixed-constant variant (§2). The CAPGD-PrimSupport

@@ -1,6 +1,6 @@
 # Final Experiment C — PrimAttack budget sensitivity (targeted → Benign)
 
-Budgets are train-only per-class calibrations (`artifacts/primattack/budget_calibration*.json`, `fit_split = train`): **p50** (intermediate) and **p75** (maximum-evaluated) cap padding bytes and relative duration change at the class's train percentiles. **unbounded** removes those caps and keeps only the train-p99 feature envelope and the DoS/DDoS min-rate floor. All other settings are identical (joint mode, 256 evaluations/flow, same flows, seeds, victims, validator, success predicate). Optimizers: the top two of the Exp B ranking (Prim-PGD, Hybrid Search). Their p75 cells are the Exp B cells.
+Budgets are train-only per-class calibrations (`artifacts/primattack/budget_calibration*.json`, `fit_split = train`): **p50** (intermediate) and **p75** (maximum-evaluated) cap padding bytes and relative duration change at the class's train percentiles. **unbounded** removes those caps and keeps only the train-p99 feature envelope and the DoS/DDoS min-rate floor. All other settings are identical (joint mode, 256 evaluations/flow, same flows, seeds, victims, success predicate and post-hoc validator). Optimizers: the top two of the Exp B ranking (Prim-PGD, Hybrid Search). Their p75 cells are the Exp B cells.
 
 ## Valid / Raw ASR by budget (side by side per optimizer)
 

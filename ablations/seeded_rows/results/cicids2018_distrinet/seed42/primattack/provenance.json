@@ -1,0 +1,8 @@
+{
+  "source": "E:\\Shameem\\thesis\\FINAL_OUTPUTS\\runs\\cicids2018_distrinet\\primattack_untargeted",
+  "selection": "E:\\Shameem\\thesis\\FINAL_OUTPUTS\\runs\\cicids2018_distrinet\\baselines_untargeted\\selection.json",
+  "source_config_sha256": "c3b6993caeedd1a3e9732acec1ef847d934b5b3e017f717ae60cc75bbe5dff3a",
+  "source_cells_sha256": "3a0cc9e725a4bfbde6e2478b93e2a75182dd10d72a3783a404e33d732670ce22",
+  "copied_cells": 24,
+  "copied_artifacts": 24
+}

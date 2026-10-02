@@ -19,8 +19,15 @@ def experiment_main(
     conditions: list[Condition],
     analyze: Callable[[Path, Path], None] | None,
     doc: str,
+    *,
+    add_arguments: Callable[[argparse.ArgumentParser], None] | None = None,
+    select: Callable[[argparse.Namespace, list[Condition]], list[Condition]] | None = None,
 ) -> None:
-    """``analyze(results_dir, reference_results_dir)`` writes the experiment's tables."""
+    """``analyze(results_dir, reference_results_dir)`` writes the experiment's tables.
+
+    ``add_arguments`` adds experiment-specific options (e.g. a toggle); ``select`` maps the
+    parsed options to the conditions to run (applied before ``--conditions``).
+    """
     ap = argparse.ArgumentParser(description=doc,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--device", default="cuda")
@@ -35,15 +42,17 @@ def experiment_main(
     ap.add_argument("--reference-results", type=Path, default=REFERENCE_DIR / "results")
     ap.add_argument("--skip-run", action="store_true", help="only (re)write the analysis")
     ap.add_argument("--skip-analysis", action="store_true")
+    if add_arguments is not None:
+        add_arguments(ap)
     args = ap.parse_args()
 
-    selected = conditions
+    selected = select(args, conditions) if select is not None else conditions
     if args.conditions:
         wanted = set(_csv(args.conditions))
         unknown = wanted - {c.name for c in conditions}
         if unknown:
             raise ValueError(f"unknown conditions {sorted(unknown)}")
-        selected = [c for c in conditions if c.name in wanted]
+        selected = [c for c in selected if c.name in wanted]
     if not args.skip_run and selected:
         run_conditions(
             args.results_dir, selected, datasets=_csv(args.datasets),

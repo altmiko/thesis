@@ -1435,11 +1435,13 @@ def fairness_guide_a() -> str:
         "",
         "† descriptive row (amendment A3), not part of Cochran's Q / Holm.",
         "",
-        "**Validator in the loop.** PrimAttack's search success predicate includes validator_v2 "
-        "(it keeps the cheapest *valid* success). PGD, C&W and CAPGD optimize without the "
+        "**Validator applied post hoc.** The final PrimAttack runs also included validator_v2 "
+        "in the search's success predicate. Amendment A6 (validity-gate ablation, "
+        "`../00_PROTOCOL.md` §7) reran every PrimAttack configuration without it, and no final "
+        "adversarial flow changed, so in effect validator_v2 judges PrimAttack and the baselines "
+        "the same way: post hoc, on the final flow. PGD, C&W and CAPGD optimize without the "
         "validator; C-PGD optimizes a differentiable subset of flow relations (penalty), not the "
-        "validator. Validator access is part of the PrimAttack threat model, not a shared "
-        "setting.",
+        "validator.",
         "",
         "**Matched support is not matched feasibility.** CAPGD/C-PGD may move any of the 23 "
         "coordinates independently within their norm ball. PrimAttack reaches the same coordinates "
@@ -1708,11 +1710,13 @@ def report_b(out: Path, table: pd.DataFrame, stats: pd.DataFrame, selection: dic
         "",
         "Three optimizers over the identical PrimAttack attack space (`RealizedSearch`: the same "
         "primitive parameterization, joint mode, per-class p75 box, recomputation φ, integer "
-        "rounding, victim, validator_v2 gate and success predicate; every reported candidate is a "
+        "rounding, victim and success predicate; every reported candidate is a "
         "realized, quantized, recomputed flow; per-flow incumbent: success > failure, cheapest "
         "success, best-margin failure). Matched per-flow cap of 256 victim evaluations. Success = "
-        "prediction == Benign. Valid success additionally requires validator_v2 `hybrid_valid`. "
-        "Mean ± SD over seeds 42/2024/2026.",
+        "prediction == Benign. Valid success additionally requires validator_v2 `hybrid_valid`, "
+        "applied after the search. The final runs also included validator_v2 in the search's "
+        "success predicate, and amendment A6 (`../00_PROTOCOL.md` §7) shows that this changed no "
+        "final flow. Mean ± SD over seeds 42/2024/2026.",
         "",
         "| Optimizer | Hyperparameters (frozen; Prim-PGD/C&W tuned on the CICIDS2017 validation split) |",
         "|---|---|",
@@ -1871,7 +1875,8 @@ def report_c(out: Path, table: pd.DataFrame, stats: pd.DataFrame, opts: list[str
         "bytes and relative duration change at the class's train percentiles. **unbounded** "
         "removes those caps and keeps only the train-p99 feature envelope and the DoS/DDoS "
         "min-rate floor. All other settings are identical (joint mode, 256 evaluations/flow, same "
-        "flows, seeds, victims, validator, success predicate). Optimizers: the top two of the Exp B "
+        "flows, seeds, victims, success predicate and post-hoc validator). "
+        "Optimizers: the top two of the Exp B "
         f"ranking ({', '.join(OPT_LABEL[m] for m in opts)}). Their p75 cells are the Exp B cells.",
         "",
         "## Valid / Raw ASR by budget (side by side per optimizer)",
@@ -1962,8 +1967,9 @@ def experiment_d(store: Store, selection: dict, final: bool) -> dict:
         "",
         f"PrimAttack with the selected optimizer ({OPT_LABEL[sel]}), joint mode, p75 budget, on "
         "identical flows and seeds. Targeted success = prediction == Benign. Untargeted success "
-        "= prediction ≠ source class. Both arms use the same validator gate and the same "
-        "incumbent rule. Only the objective margin differs. The targeted arm is the Exp B cell and "
+        "= prediction ≠ source class. Both arms use the same realized-flow search, the same "
+        "incumbent rule and the same post-hoc validator. Only the objective margin differs. "
+        "The targeted arm is the Exp B cell and "
         "the untargeted arm is the Exp A PrimAttack cell.",
         "",
         "## Results",
@@ -2348,6 +2354,7 @@ def write_summary(store: Store, selection: dict, a: dict, b: dict, c: dict, d: d
         "| D — objective sensitivity | `D_objective_sensitivity/objective_sensitivity.md` |",
         "| E — paired validity gap | `E_paired_validity_gap/paired_validity_gap_analysis.md` |",
         "| F — validator evaluation | `F_validator_evaluation/validator_evaluation.md` |",
+        "| Descriptive EDA — PCA/t-SNE before and after preprocessing | `eda/new/README.md` |",
         "",
         "## Scope",
         "",

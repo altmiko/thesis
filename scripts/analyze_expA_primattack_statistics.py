@@ -384,8 +384,11 @@ def report(est: pd.DataFrame, cls: pd.DataFrame, seeds: pd.DataFrame, tst: pd.Da
         + " Most of the effect is therefore carried by the primitive attack space (flows that "
         "an in-box timing change evades); the gradient optimizer adds the remaining margin.",
         f"- **Raw vs Valid.** PrimAttack raw successes that fail the validator, summed over all "
-        f"victims and seeds: {raw_only_total}. Its Valid ASR equals its Raw ASR (validator in "
-        "the search loop); contrast the input-space baselines in `../statistical_summary.md` §3.",
+        f"victims and seeds: {raw_only_total}. Its Valid ASR equals its Raw ASR: every flow that "
+        "met the objective also passed validator_v2, in these runs and in the A6 ungated reruns. "
+        "The check covers successful flows only: some non-successful (budget-exhausted) final "
+        "CICIDS2018 flows fail validator_v2, and invalid intermediate search candidates were "
+        "not recorded. Contrast the input-space baselines in `../statistical_summary.md` §3.",
     ]
 
     head = []
@@ -577,7 +580,9 @@ def report(est: pd.DataFrame, cls: pd.DataFrame, seeds: pd.DataFrame, tst: pd.Da
         "normalized p75 box (pinned coordinates stay 0) after the shared identity evaluation; no "
         "gradient, no surrogate evaluation. Everything else is the shared `RealizedSearch` "
         "(projection, integer quantization, capability gates, validator_v2 gate, success "
-        "predicate, incumbent) on the same canonical flows and attack seeds.",
+        "predicate, incumbent) on the same canonical flows and attack seeds. The validator_v2 "
+        "gate changed no final flow or outcome: amendment A6 reran this null without it and every "
+        "final flow stayed bit-identical.",
         "",
         f"### 5a. Chance: {labels['single']}",
         "",
@@ -589,8 +594,8 @@ def report(est: pd.DataFrame, cls: pd.DataFrame, seeds: pd.DataFrame, tst: pd.Da
         f"### 5b. Optimizer value: {labels['search']}",
         "",
         "The best of 255 random candidates per flow. It spends nothing on surrogate/backward "
-        "passes, so it gets more realized, validator-gated queries per flow than PrimAttack: a "
-        "strong black-box baseline, not a chance level.",
+        "passes, so it gets more realized queries per flow than PrimAttack and serves as a "
+        "strong black-box baseline; §5a gives the chance level.",
         "",
         md_table(pd.DataFrame(null_rows(VS_SEARCH, "search"))),
         "",

@@ -27,8 +27,10 @@ within 0.03 pp (CICIDS2018 MLP 0.75% vs 0.78%; Cochran's Q p = 0.368). Cochran's
 significant, or not computable because all three are identical, on the other five victims.
 
 **Validity.** Every targeted raw success of every optimizer is valid (Validity Gap 0.00 pp in all
-18 cells): the realized-flow search keeps only validator-accepted incumbents, and the timing-only
-flows cannot trigger the empty-packet rule. The optimizers spend a similar per-flow budget
+18 cells): every candidate is a realized flow recomputed through φ with integer rounding and
+quantization, and the timing-only flows cannot trigger the empty-packet rule. The final runs also
+required validator_v2 acceptance inside the search; amendment A6 (validity-gate ablation) shows
+that this changed no final flow. The optimizers spend a similar per-flow budget
 (187–191 victim evaluations) because flows without primitive headroom stop at the identity.
 
 **Reading.** After the fix, the optimizer choice matters little: timing is a low-dimensional

@@ -37,6 +37,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import torch  # noqa: E402
 
+from ablations.common.extra_rules import EXTRA_RULES, extra_rule_masks  # noqa: E402
 from ablations.common.hybrid import HybridConfig, optimize_hybrid_ablation  # noqa: E402
 from attack.flow_semantics import FlowSemanticValidator, SemanticStatus  # noqa: E402
 from attack.primattack_budget import (  # noqa: E402
@@ -78,17 +79,23 @@ class Condition:
     hybrid: HybridConfig = field(default_factory=HybridConfig)
     gate_layers: tuple[str, ...] = LAYERS     # validator_v2 layers ANDed in the search gate
     capability_aware: bool = True             # source-dependent capability mask M(x)
+    extra_rules: tuple[str, ...] = ()         # candidate rules (extra_rules.py) toggled on
 
     def __post_init__(self) -> None:
         if not self.name or "__" in self.name:
             raise ValueError("condition names must be non-empty and must not contain '__'")
         if set(self.gate_layers) - set(LAYERS) or not self.gate_layers:
             raise ValueError(f"gate_layers must be a non-empty subset of {LAYERS}")
+        if set(self.extra_rules) - set(EXTRA_RULES):
+            raise ValueError(f"extra_rules must be a subset of {sorted(EXTRA_RULES)}")
 
     def to_dict(self) -> dict:
-        return {"name": self.name, "description": self.description,
-                "hybrid": self.hybrid.to_dict(), "gate_layers": list(self.gate_layers),
-                "capability_aware": self.capability_aware}
+        d = {"name": self.name, "description": self.description,
+             "hybrid": self.hybrid.to_dict(), "gate_layers": list(self.gate_layers),
+             "capability_aware": self.capability_aware}
+        if self.extra_rules:  # omitted when off: keeps earlier result configs comparable
+            d["extra_rules"] = list(self.extra_rules)
+        return d
 
 
 REFERENCE = Condition("reference", "FINAL-suite Hybrid Search (all components, full "
@@ -109,12 +116,17 @@ def layer_masks(adv_raw: np.ndarray, source_raw: np.ndarray, dataset: str) -> di
     return {layer: np.asarray(m[f"{layer}_valid"], dtype=bool) for layer in LAYERS}
 
 
-def layer_gate(dataset: str, layers: tuple[str, ...]):
-    """validator_v2 gate restricted to ``layers`` (all four = ``hybrid_valid``)."""
+def layer_gate(dataset: str, layers: tuple[str, ...], extra_rules: tuple[str, ...] = (),
+               index: dict[str, int] | None = None):
+    """validator_v2 gate restricted to ``layers`` (all four = ``hybrid_valid``), ANDed with the
+    toggled-on candidate ``extra_rules``."""
 
     def gate(adv_raw: torch.Tensor, source_raw: torch.Tensor) -> torch.Tensor:
-        m = layer_masks(adv_raw.detach().cpu().numpy(), source_raw.detach().cpu().numpy(), dataset)
+        adv = adv_raw.detach().cpu().numpy()
+        m = layer_masks(adv, source_raw.detach().cpu().numpy(), dataset)
         valid = np.logical_and.reduce([m[layer] for layer in layers])
+        for rule in extra_rules:
+            valid &= EXTRA_RULES[rule](adv, index)
         return torch.as_tensor(valid, dtype=torch.bool, device=adv_raw.device)
 
     return gate
@@ -300,7 +312,7 @@ def _run_dataset(out: Path, dataset: str, conditions, *, budgets, seeds, victims
                     bounds = model.per_flow_bounds(raw, ccfg.bounds_config(), capabilities=caps)
                     movable = ((bounds["p"] >= 1.0) | (bounds["delay"] >= 1.0)).cpu().numpy()
                     row_modes = np.asarray(row_primitive_modes(bounds))
-                    gate = layer_gate(dataset, cond.gate_layers)
+                    gate = layer_gate(dataset, cond.gate_layers, cond.extra_rules, model.i)
                     for seed in seeds:
                         key = (vname, cname, budget, cond.name, seed)
                         npz = art / artifact_name(vname, cname, budget, cond.name, seed)
@@ -356,7 +368,10 @@ def _evaluate_and_save(npz, cond, res, diag, elapsed, *, model, victim, realizab
     adv_np = np_(adv)
     layers = layer_masks(adv_np, raw_np, dataset)
     full_valid = np.logical_and.reduce([layers[k] for k in LAYERS])
-    gate_valid = np.logical_and.reduce([layers[k] for k in cond.gate_layers])
+    extra = extra_rule_masks(adv_np, model.i)
+    extended_valid = np.logical_and.reduce([full_valid, *extra.values()])
+    gate_valid = np.logical_and.reduce(
+        [layers[k] for k in cond.gate_layers] + [extra[r] for r in cond.extra_rules])
     realizable = torch.as_tensor(realizability.validate(adv, raw).valid).cpu().numpy().astype(bool)
     semantic = semantic_validator.evaluate(
         raw, adv, res.requested, res.projected, bounds, class_name=cname, budget=ccfg.budget,
@@ -386,6 +401,8 @@ def _evaluate_and_save(npz, cond, res, diag, elapsed, *, model, victim, realizab
         npz, sample_id=sids, positional_idx=idx, true_class=labels, adv_pred=adv_pred,
         raw_success=hit, valid_success=valid_success, gate_success=gate_success,
         search_success=search_success, validator_pass=full_valid, gate_pass=gate_valid,
+        extended_valid_success=hit & extended_valid, extended_validator_pass=extended_valid,
+        **{f"rule_{k}_valid": v for k, v in extra.items()},
         schema_valid=layers["schema"], extractor_valid=layers["extractor"],
         protocol_valid=layers["protocol"], mined_valid=layers["mined"],
         realizable=realizable, primitive_feasible=prim_feasible, semantic_pass=sem_pass,
@@ -421,6 +438,8 @@ def _evaluate_and_save(npz, cond, res, diag, elapsed, *, model, victim, realizab
         "budget_label": BUDGET_LABEL[budget], "seed": seed, "condition": cond.name, "n": n,
         "asr_valid": float(s.mean()), "valid_successes": int(s.sum()),
         "asr_gate": float(gate_success.mean()), "gate_successes": int(gate_success.sum()),
+        "asr_extended_valid": float((hit & extended_valid).mean()),
+        **{f"valid_success_failing_{k}": int((s & ~v).sum()) for k, v in extra.items()},
         "asr_raw": float(hit.mean()), "raw_successes": int(hit.sum()),
         "validator_pass_rate": float(full_valid.mean()),
         **{f"{k}_pass_rate": float(v.mean()) for k, v in layers.items()},

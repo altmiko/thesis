@@ -1,0 +1,1172 @@
+{
+  "artifact_count": 144,
+  "audited_rows": 115200,
+  "validator_rechecked_rows": 115200,
+  "prediction_rechecked_rows": 115200,
+  "seed42_exact_final_selection": true,
+  "cross_seed_overlap": [
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "mlp",
+      "source_class": "DoS",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 19,
+      "jaccard": 0.012017710309930424
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "mlp",
+      "source_class": "DoS",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 24,
+      "jaccard": 0.015228426395939087
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "mlp",
+      "source_class": "DoS",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 31,
+      "jaccard": 0.019757807520713832
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "mlp",
+      "source_class": "DDoS",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 36,
+      "jaccard": 0.023017902813299233
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "mlp",
+      "source_class": "DDoS",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 48,
+      "jaccard": 0.030927835051546393
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "mlp",
+      "source_class": "DDoS",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 47,
+      "jaccard": 0.030264005151320026
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "mlp",
+      "source_class": "Recon",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 29,
+      "jaccard": 0.018459579885423297
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "mlp",
+      "source_class": "Recon",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 21,
+      "jaccard": 0.013299556681443952
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "mlp",
+      "source_class": "Recon",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 28,
+      "jaccard": 0.017811704834605598
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "mlp",
+      "source_class": "BruteForce",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 621,
+      "jaccard": 0.634320735444331
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "mlp",
+      "source_class": "BruteForce",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 629,
+      "jaccard": 0.6477857878475798
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "mlp",
+      "source_class": "BruteForce",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 624,
+      "jaccard": 0.639344262295082
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "cnn",
+      "source_class": "DoS",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 19,
+      "jaccard": 0.012017710309930424
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "cnn",
+      "source_class": "DoS",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 24,
+      "jaccard": 0.015228426395939087
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "cnn",
+      "source_class": "DoS",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 31,
+      "jaccard": 0.019757807520713832
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "cnn",
+      "source_class": "DDoS",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 36,
+      "jaccard": 0.023017902813299233
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "cnn",
+      "source_class": "DDoS",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 48,
+      "jaccard": 0.030927835051546393
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "cnn",
+      "source_class": "DDoS",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 47,
+      "jaccard": 0.030264005151320026
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "cnn",
+      "source_class": "Recon",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 29,
+      "jaccard": 0.018459579885423297
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "cnn",
+      "source_class": "Recon",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 21,
+      "jaccard": 0.013299556681443952
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "cnn",
+      "source_class": "Recon",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 29,
+      "jaccard": 0.018459579885423297
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "cnn",
+      "source_class": "BruteForce",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 624,
+      "jaccard": 0.639344262295082
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "cnn",
+      "source_class": "BruteForce",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 631,
+      "jaccard": 0.651186790505676
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "cnn",
+      "source_class": "BruteForce",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 628,
+      "jaccard": 0.6460905349794238
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "ft_transformer",
+      "source_class": "DoS",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 19,
+      "jaccard": 0.012017710309930424
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "ft_transformer",
+      "source_class": "DoS",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 24,
+      "jaccard": 0.015228426395939087
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "ft_transformer",
+      "source_class": "DoS",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 31,
+      "jaccard": 0.019757807520713832
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "ft_transformer",
+      "source_class": "DDoS",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 36,
+      "jaccard": 0.023017902813299233
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "ft_transformer",
+      "source_class": "DDoS",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 48,
+      "jaccard": 0.030927835051546393
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "ft_transformer",
+      "source_class": "DDoS",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 47,
+      "jaccard": 0.030264005151320026
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "ft_transformer",
+      "source_class": "Recon",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 29,
+      "jaccard": 0.018459579885423297
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "ft_transformer",
+      "source_class": "Recon",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 21,
+      "jaccard": 0.013299556681443952
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "ft_transformer",
+      "source_class": "Recon",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 28,
+      "jaccard": 0.017811704834605598
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "ft_transformer",
+      "source_class": "BruteForce",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 619,
+      "jaccard": 0.6309887869520897
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "ft_transformer",
+      "source_class": "BruteForce",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 627,
+      "jaccard": 0.644398766700925
+    },
+    {
+      "dataset": "cicids2017_distrinet",
+      "victim": "ft_transformer",
+      "source_class": "BruteForce",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 622,
+      "jaccard": 0.6359918200408998
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "mlp-s42",
+      "source_class": "DoS",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 13,
+      "jaccard": 0.008191556395715185
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "mlp-s42",
+      "source_class": "DoS",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 20,
+      "jaccard": 0.012658227848101266
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "mlp-s42",
+      "source_class": "DoS",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 25,
+      "jaccard": 0.015873015873015872
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "mlp-s42",
+      "source_class": "DDoS",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 19,
+      "jaccard": 0.012017710309930424
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "mlp-s42",
+      "source_class": "DDoS",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 31,
+      "jaccard": 0.019757807520713832
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "mlp-s42",
+      "source_class": "DDoS",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 20,
+      "jaccard": 0.012658227848101266
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "mlp-s42",
+      "source_class": "Recon",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 54,
+      "jaccard": 0.03492884864165589
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "mlp-s42",
+      "source_class": "Recon",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 53,
+      "jaccard": 0.03425985778926956
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "mlp-s42",
+      "source_class": "Recon",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 47,
+      "jaccard": 0.030264005151320026
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "mlp-s42",
+      "source_class": "BruteForce",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 43,
+      "jaccard": 0.027617212588310854
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "mlp-s42",
+      "source_class": "BruteForce",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 42,
+      "jaccard": 0.026957637997432605
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "mlp-s42",
+      "source_class": "BruteForce",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 48,
+      "jaccard": 0.030927835051546393
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "cnn-s42",
+      "source_class": "DoS",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 13,
+      "jaccard": 0.008191556395715185
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "cnn-s42",
+      "source_class": "DoS",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 20,
+      "jaccard": 0.012658227848101266
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "cnn-s42",
+      "source_class": "DoS",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 25,
+      "jaccard": 0.015873015873015872
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "cnn-s42",
+      "source_class": "DDoS",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 18,
+      "jaccard": 0.011378002528445006
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "cnn-s42",
+      "source_class": "DDoS",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 31,
+      "jaccard": 0.019757807520713832
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "cnn-s42",
+      "source_class": "DDoS",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 19,
+      "jaccard": 0.012017710309930424
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "cnn-s42",
+      "source_class": "Recon",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 54,
+      "jaccard": 0.03492884864165589
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "cnn-s42",
+      "source_class": "Recon",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 53,
+      "jaccard": 0.03425985778926956
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "cnn-s42",
+      "source_class": "Recon",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 47,
+      "jaccard": 0.030264005151320026
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "cnn-s42",
+      "source_class": "BruteForce",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 43,
+      "jaccard": 0.027617212588310854
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "cnn-s42",
+      "source_class": "BruteForce",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 42,
+      "jaccard": 0.026957637997432605
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "cnn-s42",
+      "source_class": "BruteForce",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 48,
+      "jaccard": 0.030927835051546393
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "ft_transformer-s42",
+      "source_class": "DoS",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 13,
+      "jaccard": 0.008191556395715185
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "ft_transformer-s42",
+      "source_class": "DoS",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 20,
+      "jaccard": 0.012658227848101266
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "ft_transformer-s42",
+      "source_class": "DoS",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 25,
+      "jaccard": 0.015873015873015872
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "ft_transformer-s42",
+      "source_class": "DDoS",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 18,
+      "jaccard": 0.011378002528445006
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "ft_transformer-s42",
+      "source_class": "DDoS",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 31,
+      "jaccard": 0.019757807520713832
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "ft_transformer-s42",
+      "source_class": "DDoS",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 18,
+      "jaccard": 0.011378002528445006
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "ft_transformer-s42",
+      "source_class": "Recon",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 54,
+      "jaccard": 0.03492884864165589
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "ft_transformer-s42",
+      "source_class": "Recon",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 53,
+      "jaccard": 0.03425985778926956
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "ft_transformer-s42",
+      "source_class": "Recon",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 46,
+      "jaccard": 0.029601029601029602
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "ft_transformer-s42",
+      "source_class": "BruteForce",
+      "seed_a": 42,
+      "seed_b": 2024,
+      "n_each": 800,
+      "intersection": 43,
+      "jaccard": 0.027617212588310854
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "ft_transformer-s42",
+      "source_class": "BruteForce",
+      "seed_a": 42,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 42,
+      "jaccard": 0.026957637997432605
+    },
+    {
+      "dataset": "cicids2018_distrinet",
+      "victim": "ft_transformer-s42",
+      "source_class": "BruteForce",
+      "seed_a": 2024,
+      "seed_b": 2026,
+      "n_each": 800,
+      "intersection": 48,
+      "jaccard": 0.030927835051546393
+    }
+  ],
+  "selection": {
+    "cicids2017_distrinet/mlp/DoS/seed42": {
+      "n": 800,
+      "n_eligible_total": 25583,
+      "sha256_sample_ids": "16a204c6c36de013f816a2644e99eaef41a1567440f8c7fcc8c3465197851bb1",
+      "clean_raw_sha256": "4f615d3d8b78464bf9e09c973e65ad3cd1050d96077ffd75b941112b78724b18"
+    },
+    "cicids2017_distrinet/mlp/DDoS/seed42": {
+      "n": 800,
+      "n_eligible_total": 14243,
+      "sha256_sample_ids": "1c60fdfb9b6eba4f38d4e4320db99cd4e4e00afb1ead63d07c686f6a606b61c6",
+      "clean_raw_sha256": "bebb56e8a5907fd01cf2fda04129ed4ce8cba1d6850e172c8b624e5a84baabd8"
+    },
+    "cicids2017_distrinet/mlp/Recon/seed42": {
+      "n": 800,
+      "n_eligible_total": 23771,
+      "sha256_sample_ids": "12a92dde983b22e47397388fd41d6ed4dc8cfaf452b64e084889406cad22a831",
+      "clean_raw_sha256": "1537a46e4f6b28bc57fb7f34d4bf0354a32ecbb62f823e77ee13d7e756aec5ad"
+    },
+    "cicids2017_distrinet/mlp/BruteForce/seed42": {
+      "n": 800,
+      "n_eligible_total": 1022,
+      "sha256_sample_ids": "c186fe4626a0629195deeb8ad39c7c517487b103ce21911d4e30efe8ffe4eb74",
+      "clean_raw_sha256": "63d55736e73a5b90c25f82458d021e61ddcd7d2ea81b3c4a417504d6f8f08114"
+    },
+    "cicids2017_distrinet/mlp/DoS/seed2024": {
+      "n": 800,
+      "n_eligible_total": 25583,
+      "sha256_sample_ids": "821dfef11c6162147908b0abef94c126360e87215dd3bfec684fb91618824cef",
+      "clean_raw_sha256": "414bb648aa2239feaafabd13cde799e315ef0c56d6cdafe18089a0bd251a0378"
+    },
+    "cicids2017_distrinet/mlp/DDoS/seed2024": {
+      "n": 800,
+      "n_eligible_total": 14243,
+      "sha256_sample_ids": "163ee811b1bfb1fe29cee592981a607c9cfd050604fe300d7e1751258cf41657",
+      "clean_raw_sha256": "3089bc585df21bf44ce260715925c5482cf513a47f592b4d735ef3885ad11037"
+    },
+    "cicids2017_distrinet/mlp/Recon/seed2024": {
+      "n": 800,
+      "n_eligible_total": 23771,
+      "sha256_sample_ids": "c031803f83d658069c5cfae97f89a43670dd823be3d25edbd0533f8c484dc3fd",
+      "clean_raw_sha256": "1f095fc126636b9b983d7f2c34eea1c97596ce768c2280c49211214123619114"
+    },
+    "cicids2017_distrinet/mlp/BruteForce/seed2024": {
+      "n": 800,
+      "n_eligible_total": 1022,
+      "sha256_sample_ids": "04af3deb9ab015162bf9522ca5dda568be1007ebe472102e40f7dc095230f0c0",
+      "clean_raw_sha256": "b02856610d6e70cd1c402335f7189921a473ebeaf8cd418ac6e9a4f0c4314b78"
+    },
+    "cicids2017_distrinet/mlp/DoS/seed2026": {
+      "n": 800,
+      "n_eligible_total": 25583,
+      "sha256_sample_ids": "941b2ee67e068da4687364d16f7a0485fe121c1ac0e6c795e3a311678210396d",
+      "clean_raw_sha256": "a0d6e4b82ecff741c09c924b43050cb94e879c3b870f253475dad7c7344372c8"
+    },
+    "cicids2017_distrinet/mlp/DDoS/seed2026": {
+      "n": 800,
+      "n_eligible_total": 14243,
+      "sha256_sample_ids": "ff6f09855e598768c39b3e0e26793951ffc154f66b4d0c0ea7ad0993214b6065",
+      "clean_raw_sha256": "243b47a9ca83c402b46c4e095c0eb482abfcc182231080cc2bd73074d809f44a"
+    },
+    "cicids2017_distrinet/mlp/Recon/seed2026": {
+      "n": 800,
+      "n_eligible_total": 23771,
+      "sha256_sample_ids": "5d6bf69aae690214f061ccf005cccff6d460985f545516a64c2f5799fa6fdc27",
+      "clean_raw_sha256": "22e1e746a3ce69e51002c61af6d27ac7204e87abcad791f28bf2d00be9663a0c"
+    },
+    "cicids2017_distrinet/mlp/BruteForce/seed2026": {
+      "n": 800,
+      "n_eligible_total": 1022,
+      "sha256_sample_ids": "e9fcfd3cf25167a2599bb841f0f609b102bcee25943f057bec87ee5a184ed387",
+      "clean_raw_sha256": "3345e541d9ae6508abebac13328c7635e3a5254c0aea2be89cae68c481d715ec"
+    },
+    "cicids2017_distrinet/cnn/DoS/seed42": {
+      "n": 800,
+      "n_eligible_total": 25540,
+      "sha256_sample_ids": "af5264f28b138754dd5f14a958081545f174f7795296956a519271fc49267ce9",
+      "clean_raw_sha256": "291c265bde8d3dbf1849dce2c5a2c61802ef09c108ac4f8b54790fd710c9ac73"
+    },
+    "cicids2017_distrinet/cnn/DDoS/seed42": {
+      "n": 800,
+      "n_eligible_total": 14244,
+      "sha256_sample_ids": "1c60fdfb9b6eba4f38d4e4320db99cd4e4e00afb1ead63d07c686f6a606b61c6",
+      "clean_raw_sha256": "bebb56e8a5907fd01cf2fda04129ed4ce8cba1d6850e172c8b624e5a84baabd8"
+    },
+    "cicids2017_distrinet/cnn/Recon/seed42": {
+      "n": 800,
+      "n_eligible_total": 23760,
+      "sha256_sample_ids": "67289c38b4aa6c22ad9b0ba503bec4c09c3f3cda14c66a3f0ebffb8d09b3cf27",
+      "clean_raw_sha256": "3ac757282cf4a152e9b239dc5e4a9e00b71c1315db977a5b12135186ac733e74"
+    },
+    "cicids2017_distrinet/cnn/BruteForce/seed42": {
+      "n": 800,
+      "n_eligible_total": 1018,
+      "sha256_sample_ids": "fcf61b83e286efddaf9f0c6abc9c0b0cac6d99a590e16a304439ec40816b7184",
+      "clean_raw_sha256": "22826ab87b65c1541b1f23acfde3d4113adcc257bc67fe2693690149cc5a2da3"
+    },
+    "cicids2017_distrinet/cnn/DoS/seed2024": {
+      "n": 800,
+      "n_eligible_total": 25540,
+      "sha256_sample_ids": "0348a12fe89c24e1c033ea1e1680946cc5edd1e7e3d082ab2605fa4bae88da38",
+      "clean_raw_sha256": "81d10b11dba68caed6334f8578ccc921ac864eaafb04c4a87811326deb89f620"
+    },
+    "cicids2017_distrinet/cnn/DDoS/seed2024": {
+      "n": 800,
+      "n_eligible_total": 14244,
+      "sha256_sample_ids": "163ee811b1bfb1fe29cee592981a607c9cfd050604fe300d7e1751258cf41657",
+      "clean_raw_sha256": "3089bc585df21bf44ce260715925c5482cf513a47f592b4d735ef3885ad11037"
+    },
+    "cicids2017_distrinet/cnn/Recon/seed2024": {
+      "n": 800,
+      "n_eligible_total": 23760,
+      "sha256_sample_ids": "705d303ca5b326c8494d1c7e6f209112f6626636ec919b38432374ab7612a3f3",
+      "clean_raw_sha256": "9ec73ba11a2f2011f43fbd91823901a315c71740599fd57f859af915d6dfd7d3"
+    },
+    "cicids2017_distrinet/cnn/BruteForce/seed2024": {
+      "n": 800,
+      "n_eligible_total": 1018,
+      "sha256_sample_ids": "2040919e6a1ecbe6e43eb0a004d1e4556ecf140b8a2ba7ea356536f8246c67d5",
+      "clean_raw_sha256": "74c9b0cacd5c2c87f9244beea027963b5b7e2962fa8c905a9d962eb61503cc23"
+    },
+    "cicids2017_distrinet/cnn/DoS/seed2026": {
+      "n": 800,
+      "n_eligible_total": 25540,
+      "sha256_sample_ids": "77d695f056907629e3ba3290081b031867a9f0a5f7a4bc8a3dd13b64ea5ebdc4",
+      "clean_raw_sha256": "0a23c851e8ba7e32e9bfa5e0f7340f2b1763c43083d350b89703100a40511387"
+    },
+    "cicids2017_distrinet/cnn/DDoS/seed2026": {
+      "n": 800,
+      "n_eligible_total": 14244,
+      "sha256_sample_ids": "ff6f09855e598768c39b3e0e26793951ffc154f66b4d0c0ea7ad0993214b6065",
+      "clean_raw_sha256": "243b47a9ca83c402b46c4e095c0eb482abfcc182231080cc2bd73074d809f44a"
+    },
+    "cicids2017_distrinet/cnn/Recon/seed2026": {
+      "n": 800,
+      "n_eligible_total": 23760,
+      "sha256_sample_ids": "5d6bf69aae690214f061ccf005cccff6d460985f545516a64c2f5799fa6fdc27",
+      "clean_raw_sha256": "22e1e746a3ce69e51002c61af6d27ac7204e87abcad791f28bf2d00be9663a0c"
+    },
+    "cicids2017_distrinet/cnn/BruteForce/seed2026": {
+      "n": 800,
+      "n_eligible_total": 1018,
+      "sha256_sample_ids": "d00e094c7df5ae54af129ec778643f4fbd0029c8e8342be5e030250732ce2ae8",
+      "clean_raw_sha256": "0d0d8beabc9bcb4c51e0d8936f2fcbe1ae34ea4dc3c6efd32bfafd9416af4df3"
+    },
+    "cicids2017_distrinet/ft_transformer/DoS/seed42": {
+      "n": 800,
+      "n_eligible_total": 25522,
+      "sha256_sample_ids": "a8f4165545f501ad5458bb3ad7f65c4f46c1efb283e4b2392e761911ff666741",
+      "clean_raw_sha256": "339c36676b76e7ade91d55fab52289bf7db7123a3c9d55e87ff87996104e282c"
+    },
+    "cicids2017_distrinet/ft_transformer/DDoS/seed42": {
+      "n": 800,
+      "n_eligible_total": 14257,
+      "sha256_sample_ids": "1c60fdfb9b6eba4f38d4e4320db99cd4e4e00afb1ead63d07c686f6a606b61c6",
+      "clean_raw_sha256": "bebb56e8a5907fd01cf2fda04129ed4ce8cba1d6850e172c8b624e5a84baabd8"
+    },
+    "cicids2017_distrinet/ft_transformer/Recon/seed42": {
+      "n": 800,
+      "n_eligible_total": 23788,
+      "sha256_sample_ids": "0fb4a70c1c95d84ec9cb54b23ca8934d534bbb2c2030d50e103e725e234a9776",
+      "clean_raw_sha256": "5257f94b1389dcf32d14862dd050941f398d687f13607c60a00cfb38697658c6"
+    },
+    "cicids2017_distrinet/ft_transformer/BruteForce/seed42": {
+      "n": 800,
+      "n_eligible_total": 1026,
+      "sha256_sample_ids": "ee9dc844c59bcfb49261b77c3126a6e53913a4566f6ae9af02fbf3a361173bcb",
+      "clean_raw_sha256": "400dd35fde85673fd8a318fbd9f5a998e2e0009a28dde0dca390be07d4be9f8b"
+    },
+    "cicids2017_distrinet/ft_transformer/DoS/seed2024": {
+      "n": 800,
+      "n_eligible_total": 25522,
+      "sha256_sample_ids": "44b7c39b25fe3e705db397fe6b59f7a2447138cc47a06883629dfabb3e3ac313",
+      "clean_raw_sha256": "7bb34e242e24ebc85dba4b9286a1c36a59305bc8728ce4113089c19d45882395"
+    },
+    "cicids2017_distrinet/ft_transformer/DDoS/seed2024": {
+      "n": 800,
+      "n_eligible_total": 14257,
+      "sha256_sample_ids": "d1312fb2f08e6e88a953ddbe9cd950a24f01353a7172f6b0d682da2202759d35",
+      "clean_raw_sha256": "a4ee1206419b28a38a0eaaf2d7f3cc34f232515530d6356d42884eb0e0f8431c"
+    },
+    "cicids2017_distrinet/ft_transformer/Recon/seed2024": {
+      "n": 800,
+      "n_eligible_total": 23788,
+      "sha256_sample_ids": "c031803f83d658069c5cfae97f89a43670dd823be3d25edbd0533f8c484dc3fd",
+      "clean_raw_sha256": "1f095fc126636b9b983d7f2c34eea1c97596ce768c2280c49211214123619114"
+    },
+    "cicids2017_distrinet/ft_transformer/BruteForce/seed2024": {
+      "n": 800,
+      "n_eligible_total": 1026,
+      "sha256_sample_ids": "4d32fe6a70086d4429dcd0b917931059b6a03f5ab2a30f01718bee210017c2c9",
+      "clean_raw_sha256": "ad499bf9824d8684c7ee2b0b5aa0e30c5625bc3bcdd9efd8cab57d66f92031eb"
+    },
+    "cicids2017_distrinet/ft_transformer/DoS/seed2026": {
+      "n": 800,
+      "n_eligible_total": 25522,
+      "sha256_sample_ids": "68a7d435835103758d43447c3de8b3f935285203196bcd15352689146c667f57",
+      "clean_raw_sha256": "40881fcfc7b5dca4b012260e82990fec894c7630d1df94404b8762077a1a5fe6"
+    },
+    "cicids2017_distrinet/ft_transformer/DDoS/seed2026": {
+      "n": 800,
+      "n_eligible_total": 14257,
+      "sha256_sample_ids": "b9007df7f3329ad37a0317cbf5418875f3ba1d7a2d05bd7d69b3794505e6d81b",
+      "clean_raw_sha256": "6d9c43030c57c5bfd196bab6271961162cface1fbb5754d9f296261c34148162"
+    },
+    "cicids2017_distrinet/ft_transformer/Recon/seed2026": {
+      "n": 800,
+      "n_eligible_total": 23788,
+      "sha256_sample_ids": "5d6bf69aae690214f061ccf005cccff6d460985f545516a64c2f5799fa6fdc27",
+      "clean_raw_sha256": "22e1e746a3ce69e51002c61af6d27ac7204e87abcad791f28bf2d00be9663a0c"
+    },
+    "cicids2017_distrinet/ft_transformer/BruteForce/seed2026": {
+      "n": 800,
+      "n_eligible_total": 1026,
+      "sha256_sample_ids": "8392a3902056287b350ac0c5296bfa5b7cee92ffbbcc01275a94e58e7802579e",
+      "clean_raw_sha256": "345839f1b3dfaaa8a08ee0c927a13d46f7a172f26507e625b3f55c8e65c7caf9"
+    },
+    "cicids2018_distrinet/mlp-s42/DoS/seed42": {
+      "n": 800,
+      "n_eligible_total": 29967,
+      "sha256_sample_ids": "2e1d80cf65a9a5b1aa863e7c71d62c3304075059189c7530e13e8d49416b8b6a",
+      "clean_raw_sha256": "2a16e6fd905ba942a4ef94a1ed45c5190d2a44e8be9b4ca8b33c31d30117fe1a"
+    },
+    "cicids2018_distrinet/mlp-s42/DDoS/seed42": {
+      "n": 800,
+      "n_eligible_total": 29828,
+      "sha256_sample_ids": "1805c54ea82855d49a241d1707df9d98d674dbedda216e1032b04dd8396aec26",
+      "clean_raw_sha256": "89fcb8ba2c12dd274c60aa2873a4df289ffae8f91f9a00079be6b816b1502fc7"
+    },
+    "cicids2018_distrinet/mlp-s42/Recon/seed42": {
+      "n": 800,
+      "n_eligible_total": 13383,
+      "sha256_sample_ids": "baa1e40a693524d4e936e6cbe0cefeed9004cb5375df531812affbdfb41a4c25",
+      "clean_raw_sha256": "67c533a01f3247f49dea01cc6b744ed32471938ec7daa5f76f975cfb5c4ac697"
+    },
+    "cicids2018_distrinet/mlp-s42/BruteForce/seed42": {
+      "n": 800,
+      "n_eligible_total": 14129,
+      "sha256_sample_ids": "2abeaa96b9feb9fe716e06ab7c045c682fa3913a1776908152a6ce0f2f131667",
+      "clean_raw_sha256": "dceb9363969d22dc0b06fcc6896503b9587898aba7ca0810db8f56de7327198d"
+    },
+    "cicids2018_distrinet/mlp-s42/DoS/seed2024": {
+      "n": 800,
+      "n_eligible_total": 29967,
+      "sha256_sample_ids": "2a478fbf2f28a16de25e05c27f5cf1f7c13b5b111b79e4dba1f5632190fb279b",
+      "clean_raw_sha256": "2bca2b8d9e047960c60ac179a0f53908647272c4a6a799da764e93ad9022330f"
+    },
+    "cicids2018_distrinet/mlp-s42/DDoS/seed2024": {
+      "n": 800,
+      "n_eligible_total": 29828,
+      "sha256_sample_ids": "d1bb8f8d6c2dfc0cc2bb6ee4d2d6e0cd3e3b2d8391f4528acc645a9f707e4c86",
+      "clean_raw_sha256": "2eb730863ceed8ff7e0b03a62c06752ec52e7d28dca3d3fac42d4e1e8e0f70d6"
+    },
+    "cicids2018_distrinet/mlp-s42/Recon/seed2024": {
+      "n": 800,
+      "n_eligible_total": 13383,
+      "sha256_sample_ids": "24f5be65bc6a6316e7d03e5d14d8844756bead913491c92d34d263650ef84939",
+      "clean_raw_sha256": "cfcf2d971f9525a6c51670b00b2489d9d67bc30903395e1506645aa53da3beee"
+    },
+    "cicids2018_distrinet/mlp-s42/BruteForce/seed2024": {
+      "n": 800,
+      "n_eligible_total": 14129,
+      "sha256_sample_ids": "e795bdd606909328314bd2b9a1595d5fd1f3a5ee7fdc81afff187b097ae163fb",
+      "clean_raw_sha256": "5e4076d66d2513c859f1c4339561688e7cb2417b432718af6184b3e03cdadbb0"
+    },
+    "cicids2018_distrinet/mlp-s42/DoS/seed2026": {
+      "n": 800,
+      "n_eligible_total": 29967,
+      "sha256_sample_ids": "a62494a21776640baf54ede8400a6eeefc91e1557e3d0d7d4573bba7c57c6b90",
+      "clean_raw_sha256": "382d54395326fa424f204e5f53d3daa3ba24954371d45a95fdea6fac9c307794"
+    },
+    "cicids2018_distrinet/mlp-s42/DDoS/seed2026": {
+      "n": 800,
+      "n_eligible_total": 29828,
+      "sha256_sample_ids": "91395d8c2c86b2034ece3c90940f0cadf9d78bcf7ebcb2c09c8d77fc54bd3baa",
+      "clean_raw_sha256": "8fd408024c6ae22878b1823c775dfc80591baa13e43117bbf6ada159b68e5d2b"
+    },
+    "cicids2018_distrinet/mlp-s42/Recon/seed2026": {
+      "n": 800,
+      "n_eligible_total": 13383,
+      "sha256_sample_ids": "7f6c5c19faaa8ec2ca75898d03f924b1269a9f3b077f0a6e4a2fa6b2a6ce9de1",
+      "clean_raw_sha256": "3b5d04f19532c19485b5c0f7d0f697f225df55cde36d2ae47b449e4c98a5a249"
+    },
+    "cicids2018_distrinet/mlp-s42/BruteForce/seed2026": {
+      "n": 800,
+      "n_eligible_total": 14129,
+      "sha256_sample_ids": "584b65198b7cc03bf74bac7a7cfed4b23d69c7100d596add18db678e80b72cf6",
+      "clean_raw_sha256": "52169f2b91c1dad8585c5133e6fda274e68fe73787c5a90b2f668bb8af6206ef"
+    },
+    "cicids2018_distrinet/cnn-s42/DoS/seed42": {
+      "n": 800,
+      "n_eligible_total": 29978,
+      "sha256_sample_ids": "f49559df1466ab8699caf696121da28056380a28c0886fd4d1cf37ca4a214eae",
+      "clean_raw_sha256": "6acf36369000980fd9359fc6d1869f53e26d39915d118731e771be4d0102771c"
+    },
+    "cicids2018_distrinet/cnn-s42/DDoS/seed42": {
+      "n": 800,
+      "n_eligible_total": 29949,
+      "sha256_sample_ids": "316d17e348696142ae891ce56e882f2f2537a406ef3d0458ca78bf280e673415",
+      "clean_raw_sha256": "708813726e1fcc4361e115883dfd890221497079bb669379d659e6df5a43c710"
+    },
+    "cicids2018_distrinet/cnn-s42/Recon/seed42": {
+      "n": 800,
+      "n_eligible_total": 13377,
+      "sha256_sample_ids": "baa1e40a693524d4e936e6cbe0cefeed9004cb5375df531812affbdfb41a4c25",
+      "clean_raw_sha256": "67c533a01f3247f49dea01cc6b744ed32471938ec7daa5f76f975cfb5c4ac697"
+    },
+    "cicids2018_distrinet/cnn-s42/BruteForce/seed42": {
+      "n": 800,
+      "n_eligible_total": 14129,
+      "sha256_sample_ids": "2abeaa96b9feb9fe716e06ab7c045c682fa3913a1776908152a6ce0f2f131667",
+      "clean_raw_sha256": "dceb9363969d22dc0b06fcc6896503b9587898aba7ca0810db8f56de7327198d"
+    },
+    "cicids2018_distrinet/cnn-s42/DoS/seed2024": {
+      "n": 800,
+      "n_eligible_total": 29978,
+      "sha256_sample_ids": "232c8a020dac838babc8c81a69eda2509c0c2f2f9b1096da71a1ed015cf1b6c3",
+      "clean_raw_sha256": "44307f647f4adc5838c5933036f8162439a2945e5589aebc9d0ad727f6584722"
+    },
+    "cicids2018_distrinet/cnn-s42/DDoS/seed2024": {
+      "n": 800,
+      "n_eligible_total": 29949,
+      "sha256_sample_ids": "d696f84bdf7a93bc88a0b23d9eb8eb77b9cf9d63be00467f619c3b82ebecf3ab",
+      "clean_raw_sha256": "a8dfa1f29e47d2cee655db1e639556abb673d033eabc17c1581865c47fb45021"
+    },
+    "cicids2018_distrinet/cnn-s42/Recon/seed2024": {
+      "n": 800,
+      "n_eligible_total": 13377,
+      "sha256_sample_ids": "24f5be65bc6a6316e7d03e5d14d8844756bead913491c92d34d263650ef84939",
+      "clean_raw_sha256": "cfcf2d971f9525a6c51670b00b2489d9d67bc30903395e1506645aa53da3beee"
+    },
+    "cicids2018_distrinet/cnn-s42/BruteForce/seed2024": {
+      "n": 800,
+      "n_eligible_total": 14129,
+      "sha256_sample_ids": "e795bdd606909328314bd2b9a1595d5fd1f3a5ee7fdc81afff187b097ae163fb",
+      "clean_raw_sha256": "5e4076d66d2513c859f1c4339561688e7cb2417b432718af6184b3e03cdadbb0"
+    },
+    "cicids2018_distrinet/cnn-s42/DoS/seed2026": {
+      "n": 800,
+      "n_eligible_total": 29978,
+      "sha256_sample_ids": "a62494a21776640baf54ede8400a6eeefc91e1557e3d0d7d4573bba7c57c6b90",
+      "clean_raw_sha256": "382d54395326fa424f204e5f53d3daa3ba24954371d45a95fdea6fac9c307794"
+    },
+    "cicids2018_distrinet/cnn-s42/DDoS/seed2026": {
+      "n": 800,
+      "n_eligible_total": 29949,
+      "sha256_sample_ids": "a25c90fff2f38e38bfd9bb65496b17b6c86670d057e6976f1e3a613dd2ca0cca",
+      "clean_raw_sha256": "c940e9fdc7a72cfd0c9f4b0cbc96c5a86a48cb856566f0db24969c0ed2c313e7"
+    },
+    "cicids2018_distrinet/cnn-s42/Recon/seed2026": {
+      "n": 800,
+      "n_eligible_total": 13377,
+      "sha256_sample_ids": "7f6c5c19faaa8ec2ca75898d03f924b1269a9f3b077f0a6e4a2fa6b2a6ce9de1",
+      "clean_raw_sha256": "3b5d04f19532c19485b5c0f7d0f697f225df55cde36d2ae47b449e4c98a5a249"
+    },
+    "cicids2018_distrinet/cnn-s42/BruteForce/seed2026": {
+      "n": 800,
+      "n_eligible_total": 14129,
+      "sha256_sample_ids": "584b65198b7cc03bf74bac7a7cfed4b23d69c7100d596add18db678e80b72cf6",
+      "clean_raw_sha256": "52169f2b91c1dad8585c5133e6fda274e68fe73787c5a90b2f668bb8af6206ef"
+    },
+    "cicids2018_distrinet/ft_transformer-s42/DoS/seed42": {
+      "n": 800,
+      "n_eligible_total": 29963,
+      "sha256_sample_ids": "2e1d80cf65a9a5b1aa863e7c71d62c3304075059189c7530e13e8d49416b8b6a",
+      "clean_raw_sha256": "2a16e6fd905ba942a4ef94a1ed45c5190d2a44e8be9b4ca8b33c31d30117fe1a"
+    },
+    "cicids2018_distrinet/ft_transformer-s42/DDoS/seed42": {
+      "n": 800,
+      "n_eligible_total": 29995,
+      "sha256_sample_ids": "1f476595c567eb07dabc53e215c0064a2355c5972091c46010e89425aa50e075",
+      "clean_raw_sha256": "421a080b486e84cb70fbc628444054ae2b5a8ea9f0ec4de24ca0e3921ee88c7e"
+    },
+    "cicids2018_distrinet/ft_transformer-s42/Recon/seed42": {
+      "n": 800,
+      "n_eligible_total": 13403,
+      "sha256_sample_ids": "baa1e40a693524d4e936e6cbe0cefeed9004cb5375df531812affbdfb41a4c25",
+      "clean_raw_sha256": "67c533a01f3247f49dea01cc6b744ed32471938ec7daa5f76f975cfb5c4ac697"
+    },
+    "cicids2018_distrinet/ft_transformer-s42/BruteForce/seed42": {
+      "n": 800,
+      "n_eligible_total": 14129,
+      "sha256_sample_ids": "2abeaa96b9feb9fe716e06ab7c045c682fa3913a1776908152a6ce0f2f131667",
+      "clean_raw_sha256": "dceb9363969d22dc0b06fcc6896503b9587898aba7ca0810db8f56de7327198d"
+    },
+    "cicids2018_distrinet/ft_transformer-s42/DoS/seed2024": {
+      "n": 800,
+      "n_eligible_total": 29963,
+      "sha256_sample_ids": "2a478fbf2f28a16de25e05c27f5cf1f7c13b5b111b79e4dba1f5632190fb279b",
+      "clean_raw_sha256": "2bca2b8d9e047960c60ac179a0f53908647272c4a6a799da764e93ad9022330f"
+    },
+    "cicids2018_distrinet/ft_transformer-s42/DDoS/seed2024": {
+      "n": 800,
+      "n_eligible_total": 29995,
+      "sha256_sample_ids": "91287d39f5b67986602d195b74e8034dfaecc193ea4b2126b3aa02a27f55a28b",
+      "clean_raw_sha256": "ec520ca25c69bf69ff98deee69cb7b8413fbdb2317c3ed8752719e049879a608"
+    },
+    "cicids2018_distrinet/ft_transformer-s42/Recon/seed2024": {
+      "n": 800,
+      "n_eligible_total": 13403,
+      "sha256_sample_ids": "aa467ce5384a5c1d9ac1a5535fb7552ac04b0ee481924f6e98c2055bffbd6932",
+      "clean_raw_sha256": "f54e66d547c425e0512ded65ab3c1688fa7cd2e853b36977f2522a3eb41165ea"
+    },
+    "cicids2018_distrinet/ft_transformer-s42/BruteForce/seed2024": {
+      "n": 800,
+      "n_eligible_total": 14129,
+      "sha256_sample_ids": "e795bdd606909328314bd2b9a1595d5fd1f3a5ee7fdc81afff187b097ae163fb",
+      "clean_raw_sha256": "5e4076d66d2513c859f1c4339561688e7cb2417b432718af6184b3e03cdadbb0"
+    },
+    "cicids2018_distrinet/ft_transformer-s42/DoS/seed2026": {
+      "n": 800,
+      "n_eligible_total": 29963,
+      "sha256_sample_ids": "a62494a21776640baf54ede8400a6eeefc91e1557e3d0d7d4573bba7c57c6b90",
+      "clean_raw_sha256": "382d54395326fa424f204e5f53d3daa3ba24954371d45a95fdea6fac9c307794"
+    },
+    "cicids2018_distrinet/ft_transformer-s42/DDoS/seed2026": {
+      "n": 800,
+      "n_eligible_total": 29995,
+      "sha256_sample_ids": "8caf499eff3e0bfe22c44b6d21fd81637da3a6a22b628f9ebe805738a0bc123f",
+      "clean_raw_sha256": "8d26413da43214b182d8771c2595ef596fce8d42f30008c3050ad71a3d5dec49"
+    },
+    "cicids2018_distrinet/ft_transformer-s42/Recon/seed2026": {
+      "n": 800,
+      "n_eligible_total": 13403,
+      "sha256_sample_ids": "20ac2fbabb8b7168ed27775cc00cf3a4b5e1964e33d2416d810a53e4f8d8f80a",
+      "clean_raw_sha256": "1ea573ab3cc9ed1b37e84f65dcfe6d66df87f2d31a5fa289d3809be8201ec74b"
+    },
+    "cicids2018_distrinet/ft_transformer-s42/BruteForce/seed2026": {
+      "n": 800,
+      "n_eligible_total": 14129,
+      "sha256_sample_ids": "584b65198b7cc03bf74bac7a7cfed4b23d69c7100d596add18db678e80b72cf6",
+      "clean_raw_sha256": "52169f2b91c1dad8585c5133e6fda274e68fe73787c5a90b2f668bb8af6206ef"
+    }
+  },
+  "checkpoint_sha256": {
+    "cicids2017_distrinet/mlp": "a896ffccf88bac84f962c618f4fe7ee2e5bfb4a7066d93f32b175eaae987ff52",
+    "cicids2017_distrinet/cnn": "51849974ae7bcd53bba49fa7c89ffc6b178f3e7ff9e6677b80df8f863cfd2a3f",
+    "cicids2017_distrinet/ft_transformer": "1afad63e3ec6cca76f54986e75daefdbc4b5b5e9d16b9ca98d512ed483129e86",
+    "cicids2018_distrinet/mlp-s42": "1ac1c5708dcbdfa594b554ae13650410cac17fbafcda00e3d2968af60ffe7348",
+    "cicids2018_distrinet/cnn-s42": "0550b76328d3d98e4d1e9591b279cd28134bd363f4ea263cf5a7093f23e0a762",
+    "cicids2018_distrinet/ft_transformer-s42": "a5cbc18a93da1c3b1b651a1c3d051b7d740478a1162b13030368c2ece7078e76"
+  },
+  "historical_source": "E:\\Shameem\\thesis\\outputs\\expA_primattack_full_pool\\row_resampling.json"
+}

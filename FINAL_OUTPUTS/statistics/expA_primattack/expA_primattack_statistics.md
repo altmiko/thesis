@@ -8,7 +8,7 @@ Condition: **PrimAttack (Prim-PGD, p75)** (untargeted, p75, joint, capability-aw
 - **Attack-seed / initialization luck.** For 6 of 6 victims the *same flows* succeed under all three attack seeds (Cochran's Q over seeds = 0, p = 1), although the seeds changed the search: final delays differ across seeds on 127–526 movable flows per victim and 1624 of 2052 valid successes (all seeds) were reached from a random restart.
 - **Chance evasion (single random primitive draw in the same p75 box).** PrimAttack is significantly better after Holm for 4 of 6 victims (CICIDS2017 mlp, CICIDS2017 cnn, CICIDS2018 mlp-s42, CICIDS2018 cnn-s42).
 - **Value of the gradient optimizer over black-box random search** (255 uniform draws, same box / gates / validator / 256-evaluation cap). Δ Valid ASR ranges +0.00 to +1.00 pp; significant after Holm for 2 of 6 victims (CICIDS2017 cnn, CICIDS2018 cnn-s42). Random search reaches 78–100% of PrimAttack's valid successes, and flows evaded by random search but not by PrimAttack, summed over all victims and seeds: 0 (PrimAttack's success set contains the random-search success set on every seed). Most of the effect is therefore carried by the primitive attack space (flows that an in-box timing change evades); the gradient optimizer adds the remaining margin.
-- **Raw vs Valid.** PrimAttack raw successes that fail the validator, summed over all victims and seeds: 0. Its Valid ASR equals its Raw ASR (validator in the search loop); contrast the input-space baselines in `../statistical_summary.md` §3.
+- **Raw vs Valid.** PrimAttack raw successes that fail the validator, summed over all victims and seeds: 0. Its Valid ASR equals its Raw ASR: every flow that met the objective also passed validator_v2, in these runs and in the A6 ungated reruns. The check covers successful flows only: some non-successful (budget-exhausted) final CICIDS2018 flows fail validator_v2, and invalid intermediate search candidates were not recorded. Contrast the input-space baselines in `../statistical_summary.md` §3.
 
 | Dataset | Victim | Valid ASR seed 42 (k) | Exact 95% CI | 3-seed mean ± SD | Same flows on all 3 seeds | Single random draw | Δ vs single draw (Holm p) | Random search (255) | Δ vs random search (Holm p) |
 |---|---|---|---|---|---|---|---|---|---|
@@ -74,7 +74,7 @@ Cochran's Q tests whether the per-flow Valid success probability differs between
 
 ## 5. Null controls (Prim-Random)
 
-Stage `primattack_untargeted_random_null`: per flow, 255 candidates drawn i.i.d. uniformly in the flow's normalized p75 box (pinned coordinates stay 0) after the shared identity evaluation; no gradient, no surrogate evaluation. Everything else is the shared `RealizedSearch` (projection, integer quantization, capability gates, validator_v2 gate, success predicate, incumbent) on the same canonical flows and attack seeds.
+Stage `primattack_untargeted_random_null`: per flow, 255 candidates drawn i.i.d. uniformly in the flow's normalized p75 box (pinned coordinates stay 0) after the shared identity evaluation; no gradient, no surrogate evaluation. Everything else is the shared `RealizedSearch` (projection, integer quantization, capability gates, validator_v2 gate, success predicate, incumbent) on the same canonical flows and attack seeds. The validator_v2 gate changed no final flow or outcome: amendment A6 reran this null without it and every final flow stayed bit-identical.
 
 ### 5a. Chance: single uniform random draw in the p75 box
 
@@ -91,7 +91,7 @@ Success of the *first* random candidate only (evaluation 2): the probability tha
 
 ### 5b. Optimizer value: Prim-Random search (255 uniform draws, p75)
 
-The best of 255 random candidates per flow. It spends nothing on surrogate/backward passes, so it gets more realized, validator-gated queries per flow than PrimAttack: a strong black-box baseline, not a chance level.
+The best of 255 random candidates per flow. It spends nothing on surrogate/backward passes, so it gets more realized queries per flow than PrimAttack and serves as a strong black-box baseline; §5a gives the chance level.
 
 | Dataset | Victim | PrimAttack Valid | Null Valid seed 42 [exact 95%] | Null 3-seed mean ± SD | Prim-only / null-only (seed 42) | Prim-only / null-only (2024; 2026) | Δ [Newcombe 95% CI] | McNemar p (Holm over 6) |
 |---|---|---|---|---|---|---|---|---|

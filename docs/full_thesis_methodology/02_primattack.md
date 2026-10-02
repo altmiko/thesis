@@ -66,7 +66,9 @@ CICIDS2017-DistriNet campaign.
 ## 2.3 Threat model and attack goal
 
 - **Knowledge:** white-box access to the frozen category victim, preprocessing
-  transform, primitive map, train-fitted calibration, and validation rules.
+  transform, primitive map, and train-fitted calibration. The FINAL runs also included
+  validator_v2 in the search predicate; amendment A6 shows it changed no final flow or
+  outcome (§2.8).
 - **Source rows:** malicious test flows from `DoS`, `DDoS`, `Recon`, and
   `BruteForce`.
 - **Eligibility:** the victim must classify the clean row as its true malicious
@@ -368,12 +370,15 @@ $$
 m(x)=\max_{k\ne0} z_k(x)-z_0(x).
 $$
 
-Lower is better. Actual success is tested on the realized flow as
-`argmax(logits) == 0` **and** the injected validity gate (every runner passes
-`hybrid_valid_gate(dataset)`, i.e. validator_v2 `hybrid_valid`) — the same predicate as the
-reported valid ASR. Before this fix, selection used `argmax == 0` alone, so a
-validator-invalid padding "success" could stop the padding sweep and block timing
-refinement (material on CICIDS2018, where padding breaks the mined
+Lower is better. Search success is the objective hit on the realized flow `x′` (after
+integer rounding and φ with `quantize=True`): `argmax(logits) == 0`. `RealizedSearch` also
+takes an optional `validity_fn`; with `validity_fn=None` a hit is a success. The runners
+pass `hybrid_valid_gate(dataset)` (validator_v2 `hybrid_valid(x′ | x)`) by default, so the
+executed FINAL runs counted a hit as a success only when validator_v2 also accepted it;
+`scripts/run_primattack_optimizer_ablation.py --no-validity-gate` passes `validity_fn=None`.
+The gate predates amendment A2: under the relaxed pre-A2 padding capability, selection on
+`argmax == 0` alone let a validator-invalid padding "success" stop the padding sweep and
+block timing refinement (material on CICIDS2018, where padding breaks the mined
 `Fwd Packet Length Min == Packet Length Min` rule).
 
 ### Untargeted objective
@@ -384,7 +389,8 @@ $$
 m(x)=z_y(x)-\max_{k\ne y} z_k(x)
 $$
 
-and the realized-flow success test with `argmax(logits) != y` **and** the same validity gate.
+and the realized-flow hit test with `argmax(logits) != y`; the optional validity gate applies
+in the same way.
 Everything else (projection, quantized realization, incumbent ordering, evaluation budget) is
 unchanged; all three optimizers accept `objective=`. The default objective is
 `AttackObjective("targeted", 0)` (Benign). `scripts/run_primattack_optimizer_ablation.py
@@ -393,13 +399,43 @@ unchanged; all three optimizers accept `objective=`. The default objective is
 There is no cost term in the gradient objective. Hard bounds define feasibility.
 Per-row candidate selection is lexicographic:
 
-1. a (valid, targeted) success replaces any failure;
+1. a search success (as defined above) replaces any failure;
 2. among successes, minimize
    `p/p_hi + delay/delay_hi`;
 3. if success costs tie, use lower margin;
 4. among failures, use lower margin.
 
 `shape` has no direct cost because it reallocates a fixed total delay.
+
+### Validity-gate ablation (amendment A6)
+
+Amendment A6 reran every FINAL PrimAttack configuration with `--no-validity-gate`: Hybrid,
+Prim-PGD, Prim-C&W and the Prim-Random null; targeted and untargeted; p50, p75 and
+unbounded; joint, timing-only and padding-only; both datasets; attack seeds
+`42, 2024, 2026`; the same frozen flows, victims, hyperparameters and environment. In all
+806,400 flow attacks the final adversarial flow is bit-identical to the FINAL run. The
+ungated search kept no invalid hit, every Raw and Valid ASR is unchanged, and McNemar finds
+0 vs 0 discordant flows on every victim. The runs are non-canonical; their outputs are in
+`outputs/primattack_nogate_ablation/` (report `gate_ablation_report.md`, analysis
+`scripts/analyze_gate_ablation.py`), outside `FINAL_OUTPUTS`. An earlier untargeted
+Prim-PGD-only check (`scripts/run_primattack_no_validator_gate.py` →
+`outputs/primattack_no_validator_gate/`) found identical Raw and Valid ASR and no discordant
+rows.
+
+In effect the search is a hit-only search: a hit replaces a non-hit, and the selection order
+above applies with hits in place of successes. validator_v2 `hybrid_valid(x′ | x)`
+(SCHEMA ∧ EXTRACTOR ∧ PROTOCOL ∧ MINED, including the source-conditioned `PROTO_0080`)
+judges PrimAttack after the search, in the post-attack evaluation (`evaluate_cell`), exactly
+as it judges PGD, C&W, CAPGD and C-PGD, which never query it. PrimAttack's validity comes
+from φ recomputing every dependent feature, integer rounding/quantization, capability
+gating and the train-calibrated per-flow box. A6 rules out validator access as the source of
+PrimAttack's valid-success advantage over CAPGD/C-PGD-PrimSupport. The comparison does not
+equalize the parameterization, the capability-aware box, the query budget (256 victim
+evaluations per flow for PrimAttack; 10 steps × 2 restarts for CAPGD, 40 steps for C-PGD),
+the objective or the representation, so the advantage cannot be assigned to any one of them.
+It holds only on the victims where timing alone moves the decision: on the CICIDS2017
+FT-Transformer PrimAttack reaches 0.12% against 0.18% for CAPGD-PrimSupport (not significant,
+Holm p = 1), and on the CICIDS2018 FT-Transformer both reach 0%.
 
 ### Stage 1: identity
 
@@ -418,8 +454,8 @@ $$
 Values are evaluated in increasing cost order. For `m` currently unresolved rows, the
 implementation batches `k=max(1,min(values_remaining,4096//m))` consecutive padding
 values into one victim call. In the completed campaign (`m <= 800`) this caps each
-call at 4096 candidate rows. A row leaves the sweep after its first (valid, targeted)
-success or after exhausting its cap; the batched values after a row's first success are
+call at 4096 candidate rows. A row leaves the sweep after its first search success or
+after exhausting its cap; the batched values after a row's first success are
 discarded and not charged, so the per-flow evaluation count equals sequential scoring.
 This yields the minimum-padding successful padding-only
 attack wherever one exists; otherwise it retains the padding value with the lowest
@@ -816,6 +852,8 @@ levels and prohibited-input provenance.
 - complete CICFlowMeter re-extraction equivalence;
 - preserved malicious functionality or deployment behavior;
 - in-distribution evasion when True-IDSR is approximately zero;
+- a validity-aware search, validator access, or a validator-related threat-model asymmetry
+  as the source of PrimAttack's valid-success advantage (amendment A6, §2.8);
 - an unconstrained primitive attack: even `unbounded` retains the train-p99 envelope,
   capability gates, integer projection, and DoS/DDoS rate floor; or
 - universal robustness/generalization from one dataset split, one frozen source roster,

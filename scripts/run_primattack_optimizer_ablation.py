@@ -15,7 +15,10 @@ joint / timing-only / padding-only / no-primitive space (recorded per row).
 
 ``--objective targeted`` (default): success = realized flow classified Benign AND
 ``hybrid_valid``. ``--objective untargeted``: success = realized flow NOT classified as its
-true source class AND ``hybrid_valid``.
+true source class AND ``hybrid_valid``. ``--no-validity-gate`` drops ``hybrid_valid`` from the
+search's success predicate (search success = objective hit only; gate ablation). The post-attack
+evaluation still computes validator_v2 independently, so ``valid_success`` keeps its meaning and
+``incumbent_final_mismatch`` then counts final incumbents that are invalid hits.
 
 Per (victim, class, budget, seed, method) a per-row npz (including the final adversarial raw
 flow) and one ``cells.json`` entry are written under ``--output-dir`` (default
@@ -171,6 +174,9 @@ def main() -> None:
     ap.add_argument("--limit-rows", type=int, default=None, help="smoke tests only")
     ap.add_argument("--output-dir", type=Path, default=None)
     ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--no-validity-gate", action="store_true",
+                    help="gate ablation: search success = objective hit only (validator_v2 is "
+                         "still applied in the post-attack evaluation)")
     args = ap.parse_args()
 
     adapter = get_adapter(args.dataset)
@@ -206,7 +212,7 @@ def main() -> None:
     if calibration.get("dataset") != dataset or calibration.get("fit_split") != "train":
         raise ValueError("calibration must be the train-fit artifact of this dataset")
     semantic_validator = FlowSemanticValidator(model, calibration)
-    gate = hybrid_valid_gate(dataset)
+    gate = None if args.no_validity_gate else hybrid_valid_gate(dataset)
     groups_idx = {
         name: torch.tensor([model.i[c] for c in cols], device=device)
         for name, cols in (("padding", _LENGTH_COLS), ("timing", _TIMING_COLS),
@@ -279,10 +285,9 @@ def main() -> None:
                         "Dst IP": meta.iloc[idx]["Dst IP"].astype(str).to_numpy()},
             }
 
-    objective_rule = (
-        "victim argmax == Benign on the realized flow AND validator_v2 hybrid_valid"
-        if args.objective == "targeted" else
-        "victim argmax != true source class on the realized flow AND validator_v2 hybrid_valid")
+    hit_rule = ("victim argmax == Benign on the realized flow" if args.objective == "targeted"
+                else "victim argmax != true source class on the realized flow")
+    objective_rule = hit_rule if args.no_validity_gate else f"{hit_rule} AND validator_v2 hybrid_valid"
     margin_rule = ("max(non-Benign) - Benign" if args.objective == "targeted"
                    else "source logit - max(non-source)")
     config = {
@@ -295,6 +300,7 @@ def main() -> None:
         "evaluation_unit": "one victim forward pass on one flow (realized quantized flow or "
                            "continuous surrogate); gradient steps additionally cost one backward",
         "success": objective_rule,
+        "search_validity_gate": not args.no_validity_gate,
         "incumbent": "success > failure; successes by normalized cost p/p_hi + delay/delay_hi "
                      f"(then margin); failures by margin {margin_rule}",
         "budgets": {b: BUDGET_LABEL[b] for b in budgets}, "classes": classes,

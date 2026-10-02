@@ -1,6 +1,6 @@
 # Final Experiment D — Objective sensitivity (targeted → Benign vs untargeted)
 
-PrimAttack with the selected optimizer (Prim-PGD), joint mode, p75 budget, on identical flows and seeds. Targeted success = prediction == Benign. Untargeted success = prediction ≠ source class. Both arms use the same validator gate and the same incumbent rule. Only the objective margin differs. The targeted arm is the Exp B cell and the untargeted arm is the Exp A PrimAttack cell.
+PrimAttack with the selected optimizer (Prim-PGD), joint mode, p75 budget, on identical flows and seeds. Targeted success = prediction == Benign. Untargeted success = prediction ≠ source class. Both arms use the same realized-flow search, the same incumbent rule and the same post-hoc validator. Only the objective margin differs. The targeted arm is the Exp B cell and the untargeted arm is the Exp A PrimAttack cell.
 
 ## Results
 

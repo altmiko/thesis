@@ -24,7 +24,7 @@ Repository evidence:
 
 ## 4.2 Research and Experimental Design
 
-The final evaluation is a white-box, offline, flow-level experiment. The adversary knows the frozen victim, preprocessing transformation, feature definitions, PrimAttack mapping, train-calibrated budgets, and validator rules. Gradients through the victim and through differentiable attack representations are available. The adversary starts from a malicious test flow belonging to DoS, DDoS, Recon, or BruteForce. Benign flows are not attack sources.
+The final evaluation is a white-box, offline, flow-level experiment. The adversary knows the frozen victim, preprocessing transformation, feature definitions, PrimAttack mapping, and train-calibrated budgets. Validator_v2 rules are applied to every method's final outputs after the attack. Gradients through the victim and through differentiable attack representations are available. The adversary starts from a malicious test flow belonging to DoS, DDoS, Recon, or BruteForce. Benign flows are not attack sources.
 
 The unit of analysis is one clean-correct source flow under one frozen victim. For each dataset–victim–class combination, a seed-42 uniform permutation of all class test rows is created. The victim takes the first 800 correctly classified rows and the chosen positions are restored to test order. This produces 3,200 attempted flows per dataset–victim cell. A failed attack, invalid output, stalled optimizer, or flow with no primitive headroom remains in the denominator as a failure. The same ordered sample identifiers, raw-input hash, clean predictions, and checkpoint hash are verified for every compared condition.
 
@@ -212,7 +212,7 @@ Repository evidence:
 
 ## 4.6 Adversarial Threat Model
 
-The evaluated adversary has white-box access to one frozen category classifier, its input transformation, and gradients. Feature-space baselines directly optimize scaled or train-min–max-normalized feature vectors. PrimAttack additionally knows the primitive mapping, training-derived envelopes, class-calibrated budgets, and validator. PrimAttack uses validator acceptance in its search predicate; the baselines do not, except that C-PGD includes a differentiable subset of relations in its objective. This asymmetry is part of the methods' native threat models and is not presented as equal query access.
+The evaluated adversary has white-box access to one frozen category classifier, its input transformation, and gradients. Feature-space baselines directly optimize scaled or train-min–max-normalized feature vectors. PrimAttack additionally knows the primitive mapping, training-derived envelopes, and class-calibrated budgets. Every method's final output is judged by validator_v2 after the attack; C-PGD also includes a differentiable subset of relations in its objective. The FINAL PrimAttack runs placed validator acceptance in the search predicate as well. Amendment A6 reran them without it and reproduced bit-identical final flows, so all methods effectively receive the same post hoc validator treatment.
 
 The source is an existing malicious flow. Allowed PrimAttack actions are increase-only forward packet-length augmentation and added forward timing delay. It cannot shorten packets, accelerate traffic, add or remove packets, change backward traffic, ports, protocol, endpoints, labels, flags, or arbitrary extracted features. A targeted attack seeks Benign; an untargeted attack seeks any class other than the source class.
 
@@ -416,7 +416,7 @@ The 23-feature mask is generated from the actual write sites of PrimAttack's can
 \text{same potential support}\neq\text{same feasible set}.
 \]
 
-The comparison controls one important confound—the set of downstream coordinates—but not directionality, coupling, source capability, primitive budgets, or validator-aware selection.
+The comparison controls one important confound—the set of downstream coordinates—but not directionality, coupling, source capability, or primitive budgets.
 
 <!--
 Repository evidence:
@@ -632,7 +632,7 @@ For untargeted attack from source class $y$, they minimize
 m_u(x)=z_y(x)-\max_{k\ne y}z_k(x).
 \]
 
-A negative margin indicates the classifier objective, but recorded success additionally requires validator_v2 acceptance on the realized, quantized flow. Candidate selection is lexicographic: a valid success beats a failure; among successes, lower normalized primitive cost wins, then lower margin; among failures, lower margin wins.
+A negative margin indicates the classifier objective. The search counts a candidate as a hit when it meets this objective on the realized, quantized flow $x'$, after integer rounding and $\phi$. Candidate selection is lexicographic: a hit beats a non-hit; among hits, lower normalized primitive cost wins, then lower margin; among non-hits, lower margin wins. Validator_v2 `hybrid_valid`$(x'\mid x)$ is applied after the search, in the post-attack evaluation (`evaluate_cell`), exactly as for the baselines. PrimAttack's validity comes from $\phi$, which recomputes every dependent feature, from integer rounding and quantization, from capability gating, and from the train-calibrated per-flow box. The FINAL runs also required validator acceptance in the search success test (`FINAL_OUTPUTS/00_PROTOCOL.md` §4). Amendment A6 reran every FINAL PrimAttack configuration without that requirement (`scripts/run_primattack_optimizer_ablation.py --no-validity-gate`); the final adversarial flows were bit-identical in all 806,400 flow attacks, and every Raw and Valid ASR is unchanged (`outputs/primattack_nogate_ablation/gate_ablation_report.md`).
 
 The proposed Hybrid Search first scores identity, then enumerates integer padding from one byte to $\lfloor p_{hi}\rfloor$ in increasing cost order. Unresolved timing-capable rows enter adaptive projected sign-momentum refinement. The continuous relaxation supplies gradients, but every retained candidate is projected, quantized, recomputed, and re-evaluated. Step size is halved after stalled checkpoints, and restarts continue until the 256-forward-evaluation cap is consumed.
 
@@ -662,9 +662,9 @@ Repository evidence:
 The execution sequence is source flow → capability inference → hard per-flow bounds → selected primitive mode → optimizer → integer projection → deterministic recomputation → victim prediction → validator verdict → Raw/Valid metrics. Artifacts preserve sample IDs, source and adversarial vectors, requested and projected controls, bounds, capability reasons, per-row effective mode, predictions, success masks, validator verdicts, costs, evaluation counts, and checkpoint/input hashes.
 
 > **[FIGURE 4.6 PLACEHOLDER — Detailed PrimAttack pipeline]**
-> Suggested content: source $x_0$ → infer $(m_p,m_t)$ → compute $(p_{hi},d_{hi},s_{hi})$ → optimizer in normalized controls → project/round → $\phi$ → frozen scaler/victim and validator → incumbent and metrics.
+> Suggested content: source $x_0$ → infer $(m_p,m_t)$ → compute $(p_{hi},d_{hi},s_{hi})$ → optimizer in normalized controls → project/round → $\phi$ → frozen scaler/victim → incumbent → validator_v2 → metrics.
 > Suggested source/artifact: `src/attack/primitive_optimizer.py`, `scripts/run_primattack_optimizer_ablation.py`.
-> Purpose: Shows where capabilities, quantization, classifier evaluation, and validity enter the search.
+> Purpose: Shows where capabilities, quantization, and classifier evaluation enter the search, and where validator_v2 is applied after it.
 
 <!--
 Repository evidence:
@@ -910,7 +910,7 @@ This comparison matches source flows, victims, attack seeds, final validator, an
 | 2018 | CNN-s42 | 1.16% ± 0.00% | 0.29% ± 0.07% | +0.86 pp | 37 / 7 | $1.23\times10^{-5}$ |
 | 2018 | FT-Transformer-s42 | 0.00% ± 0.00% | 0.00% ± 0.00% | 0.00 pp | — | Not performed; omnibus Q not significant |
 
-The results show that direct constrained feature optimization can locate valid feature vectors that differ from PrimAttack-reachable vectors, while PrimAttack can outperform the direct baseline when validator-aware timing search aligns with a victim boundary. Neither direction establishes physical realizability. The evidence supports three nested notions: validator-valid feature point, PrimAttack-reachable point, and packet-realizable point; only the first two are represented experimentally.
+The results show that direct constrained feature optimization can locate valid feature vectors that differ from PrimAttack-reachable vectors, while PrimAttack can outperform the direct baseline when its timing parameterization and capability-aware box align with a victim boundary. Neither direction establishes physical realizability. The evidence supports three nested notions: validator-valid feature point, PrimAttack-reachable point, and packet-realizable point; only the first two are represented experimentally.
 
 <!--
 Repository evidence:
@@ -1196,7 +1196,7 @@ Repository evidence:
 
 **Primitive coverage.** Only uniform forward packet-length augmentation and added forward delay are modeled. Packet splitting, injection, selective per-packet padding, payload transformation, backward changes, flag changes, endpoint changes, and adaptive target feedback are excluded.
 
-**White-box assumption.** The attacks require victim gradients and knowledge of preprocessing. PrimAttack additionally uses mappings, budgets, and validator access. This is stronger than many operational attacker models.
+**White-box assumption.** The attacks require victim gradients and knowledge of preprocessing. PrimAttack additionally uses mappings and budgets. This is stronger than many operational attacker models.
 
 **Feature-extractor dependence.** PrimAttack's equations and validator identities are tied to the corrected DistriNet CICFlowMeter feature definitions. Other extractors or releases require new audits, profiles, and calibration.
 
@@ -1208,7 +1208,7 @@ Repository evidence:
 
 **Statistical scope.** Inference uses one reference attack seed and one fixed source roster. Mean ± SD over attack seeds is descriptive. Non-significant results do not prove equivalence. The primitive-mode tests were added post-run. The auxiliary `statistics/` budget request conflicts with the locked p50/p75/envelope family and lacks p25 artifacts.
 
-**Comparability of methods.** Experiment A pairs flows and outcomes but does not equalize native budgets, representations, query counts, or validator access. Native CAPGD has a different 16-feature mask and is descriptive. Matched support still does not imply matched feasibility.
+**Comparability of methods.** Experiment A pairs flows and outcomes but does not equalize native budgets, representations, or query counts. Validator_v2 is applied to every method's final outputs in the same post hoc way. Native CAPGD has a different 16-feature mask and is descriptive. Matched support still does not imply matched feasibility.
 
 **No distributional-realism claim.** The final policy excludes VAE IDR and True-IDSR. Structural validity must not be described as in-distribution realism.
 
@@ -1294,7 +1294,7 @@ Repository evidence:
 | Experiment | Dataset | Method | Current artifact | Valid under final methodology? | Rerun required? | Reason | Expected output path |
 |---|---|---|---|---|---|---|---|
 | A | 2017/2018 | PGD, C&W, CAPGD-PrimSupport, C-PGD-PrimSupport, native CAPGD | `FINAL_OUTPUTS/runs/*/baselines_untargeted/` | Yes | No | Re-run after validator amendment A2; source-conditioned validation included | Existing path |
-| A | 2017/2018 | Capability-aware PrimAttack, Prim-PGD p75 | `FINAL_OUTPUTS/runs/*/primattack_untargeted/` | Yes | No | Final padding capability and validator rule enforced before/after search | Existing path |
+| A | 2017/2018 | Capability-aware PrimAttack, Prim-PGD p75 | `FINAL_OUTPUTS/runs/*/primattack_untargeted/` | Yes | No | Final padding capability enforced before search; validator_v2, including the `PROTO_0080` rule, applied after search | Existing path |
 | A descriptive | 2017/2018 | PrimAttack envelope-only | same | Yes, as envelope-only sensitivity | No | Retains p99 envelope/capability/rate rules; not a named empirical budget | Existing path |
 | A2 primitive ablation | 2017/2018 | Joint/timing-only/padding-only | `FINAL_OUTPUTS/runs/*/primattack_untargeted_modes/` plus joint headline cell | Yes | No | Fresh capability-aware mode runs complete | Existing path |
 | B | 2017/2018 | Hybrid, Prim-PGD, Prim-C&W | `FINAL_OUTPUTS/runs/*/primattack_targeted_optimizers/` | Yes | No | Complete three-seed p75 paired run; Prim-PGD selected | Existing path |

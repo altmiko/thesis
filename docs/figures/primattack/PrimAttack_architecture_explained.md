@@ -16,7 +16,7 @@ PrimAttack is a white-box evasion attack on flow-based NIDS classifiers. For eac
 
 ### 1.2 Threat model
 
-The attacker has white-box access to the victim's gradients. It controls only the forward (client-to-server) direction: it can make its own packets larger and send them later. It cannot remove bytes, add or remove packets, change flags, ports or protocol, or modify the backward direction in any way. Success is measured on the realized flow, after the controls have been rounded to integer bytes and microseconds and the flow has been quantized, and that realized flow must pass validator_v2.
+The attacker has white-box access to the victim's gradients. It controls only the forward (client-to-server) direction: it can make its own packets larger and send them later. It cannot remove bytes, add or remove packets, change flags, ports or protocol, or modify the backward direction in any way. Success is measured on the realized flow, after the controls have been rounded to integer bytes and microseconds and the flow has been quantized. Valid success also requires validator_v2 to accept the realized flow in the post-attack evaluation, the same check every baseline receives.
 
 ### 1.3 Contrast with feature-space attacks
 
@@ -29,9 +29,15 @@ PGD and C&W move all 79 features independently. CAPGD and C-PGD-PrimSupport move
 | Discreteness | integer bytes and µs; realized flow quantized | ignored | integer truncation at the end |
 | Per-flow capability | padding only where physically meaningful | none | none |
 | Budget | train-calibrated per class + p99 envelope + rate floor | $\varepsilon$-ball | $\varepsilon$-ball + train box |
-| Sees validator_v2 during search | yes, as part of the success predicate | no | no |
+| validator_v2 check | after the attack (`evaluate_cell`) | after the attack | after the attack |
 
-The last row is a deliberate threat-model difference and is documented in the protocol. PrimAttack searches with the validity gate inside its success test, while the baselines are checked for validity only after the attack.
+PrimAttack and the baselines are treated alike in the last row: validator_v2 judges each method's final flow after the attack. PrimAttack's validity rests on $\varphi$, which recomputes every dependent feature, on integer rounding and quantization, on capability gating and on the train-calibrated per-flow box. Amendment A6 (Section 1.4) rules out validator access as the source of PrimAttack's advantage in valid success over CAPGD and C-PGD-PrimSupport. The comparison does not equalize the parameterization, the capability-aware box, the query budget (256 victim evaluations per flow for PrimAttack, 10 steps × 2 restarts for CAPGD, 40 steps for C-PGD), the objective or the representation, so the advantage cannot be assigned to any one of them. It holds only on the victims where timing alone moves the decision. On the CICIDS2017 FT-Transformer, PrimAttack reaches 0.12% untargeted Valid ASR at p75 against 0.18% for CAPGD-PrimSupport, a difference that is not significant (Holm p = 1); on the CICIDS2018 FT-Transformer both reach 0%.
+
+### 1.4 The search predicate in the FINAL runs
+
+The FINAL runs (`FINAL_OUTPUTS/00_PROTOCOL.md` §4) executed `RealizedSearch` with validator_v2 in the search predicate: a candidate counted as a success only if it met the objective on the realized flow and $\texttt{hybrid\_valid}(x' \mid x)$ accepted it. The baselines never query validator_v2 during their attack. Protocol amendment A6 reran every FINAL PrimAttack configuration with `scripts/run_primattack_optimizer_ablation.py --no-validity-gate`, so that a search success is an objective hit alone. The rerun covers Hybrid, Prim-PGD, Prim-C&W and the Prim-Random null; targeted and untargeted attacks; the p50, p75 and unbounded budgets; the joint, timing-only and padding-only modes; both datasets; and attack seeds 42, 2024 and 2026, with the same frozen flows, victims, hyperparameters and environment. In all 806,400 flow attacks the final adversarial flows are bit-identical to the FINAL runs. The ungated search never kept an invalid hit, every Raw and Valid ASR is unchanged, and McNemar tests find 0 vs 0 discordant flows on every victim. An earlier check of untargeted Prim-PGD alone (`scripts/run_primattack_no_validator_gate.py`, outputs in `outputs/primattack_no_validator_gate/`) found identical Raw and Valid ASR and no discordant rows.
+
+The rerun is non-canonical and is stored outside `FINAL_OUTPUTS`, in `outputs/primattack_nogate_ablation/` (report `gate_ablation_report.md`, analysis `scripts/analyze_gate_ablation.py`). The figures and this note describe the search without the in-search check, which produces the same flows. The runner's default is unchanged and keeps the check unless `--no-validity-gate` is passed; `RealizedSearch` scores the objective hit alone when its `validity_fn` is `None`.
 
 ## 2. Figure guide
 
@@ -41,7 +47,7 @@ The last row is a deliberate threat-model difference and is documented in the pr
 
 Panel (a) has two columns. On the left, an offline column uses the TRAIN split only. Budget calibration reads it and produces the per-class caps $p_{\max}$ and $r_{\max}$, the 9-feature p99 envelope and the DoS/DDoS minimum packet-rate floor, which feed the per-flow hard box.
 
-The right column is executed once per cell. A cell fixes the dataset, victim, source class, budget, primitive mode, attack seed and optimizer. The column runs from the frozen selection of 800 test flows, through capability inference and the per-flow hard box with its primitive mode, into the RealizedSearch loop and finally to post-attack evaluation, which reports nested ASR. Two frozen components sit beside the column. The victim $f$ feeds RealizedSearch, and validator_v2 feeds both RealizedSearch and the post-attack evaluation. validator_v2 therefore appears twice: it gates every candidate inside the search, and it checks the final $x'$ again afterwards, where every ASR shares the denominator $N = 800$.
+The right column is executed once per cell. A cell fixes the dataset, victim, source class, budget, primitive mode, attack seed and optimizer. The column runs from the frozen selection of 800 test flows, through capability inference and the per-flow hard box with its primitive mode, into the RealizedSearch loop and finally to post-attack evaluation, which reports nested ASR. Two frozen components sit beside the column. The victim $f$ feeds RealizedSearch, and validator_v2 feeds only the post-attack evaluation. There it checks the final $x'$ against its source flow, and every ASR shares the denominator $N = 800$.
 
 The victim plays two more roles that the panel leaves undrawn. It decides which test flows count as clean-correct during source selection, and it scores raw success in the post-attack evaluation.
 
@@ -49,15 +55,15 @@ The victim plays two more roles that the panel leaves undrawn. It decides which 
 
 ![RealizedSearch, per flow](primattack_architecture_b.png)
 
-Panel (b) zooms into the search box of panel (a). The optimizer takes a step on the normalised controls $q \in [0,1]^3$. A gradient-only surrogate, drawn dashed, supplies the gradient for that step: it is $\varphi$ with `quantize=False`. The new point then travels along the realized path. It is projected to integers, passed through $\varphi$ with `quantize=True`, and the resulting flow $x'$ goes in parallel to the victim prediction $f(x')$ and to the validator_v2 gate. Both results feed the incumbent update. The loop returns to the optimizer while the flow can still afford another step, and otherwise emits the final $x'$.
+Panel (b) zooms into the search box of panel (a). The optimizer takes a step on the normalised controls $q \in [0,1]^3$. A gradient-only surrogate, drawn dashed, supplies the gradient for that step: it is $\varphi$ with `quantize=False`. The new point then travels along the realized path. It is projected to integers, passed through $\varphi$ with `quantize=True`, and the resulting flow $x'$ goes to the victim prediction $f(x')$. Its hit flag and margin feed the incumbent update directly. The loop returns to the optimizer while the flow can still afford another step, and otherwise emits the final $x'$.
 
-The dashed styling marks the surrogate as a source of gradients only. A surrogate output can never become the incumbent; only realized, quantized flows can. The identity flow is scored first at a cost of 1, each gradient step costs 2 victim evaluations, and the cap is $B = 256$ evaluations per flow.
+The blue accent is reserved for $\varphi$, and the dashed styling marks the surrogate as a source of gradients only. A surrogate output can never become the incumbent; only realized, quantized flows can. The identity flow is scored first at a cost of 1, each gradient step costs 2 victim evaluations, and the cap is $B = 256$ evaluations per flow.
 
 ### 2.3 Detailed architecture
 
 ![PrimAttack detailed architecture](primattack_detailed_architecture.png)
 
-The detailed figure is a single 16:9 slide. It reads left to right through four groups: offline calibration on the training split (g0), per-cell setup (g1), the per-flow RealizedSearch, capped at $B = 256$ victim evaluations (g2), and post-attack evaluation (g3). One blue accent marks the canonical transform node and the validator_v2 gate node, the two components that make a candidate a realized and valid flow. The surrogate node and its two edges are dashed gray, and the optimizer-settings node is a dashed note.
+The detailed figure is a single 16:9 slide. It reads left to right through four groups: offline calibration on the training split (g0), per-cell setup (g1), the per-flow RealizedSearch, capped at $B = 256$ victim evaluations (g2), and post-attack evaluation (g3). One blue accent marks the canonical transform node, the component that turns a candidate into a realized flow. The surrogate node and its two edges are dashed gray, and the optimizer-settings node is a dashed note.
 
 #### Group g0: offline, train split only
 
@@ -81,13 +87,13 @@ The step node feeds the projection node, which rounds $p$ and $D$ to integer byt
 
 The projection node feeds the canonical-transform node, $\varphi(x; p, D, s)$ with `quantize=True`. It writes the padding block, the timing block, the recomputed rates and the integer rounding, and touches only the 23-feature write support. LEVEL_C features stay constant, and a row with $p = D = 0$ is returned unchanged.
 
-From the transform node, two edges fan out in parallel. One reaches the victim-prediction node: the frozen white-box victim computes logits on $(x' - \text{median})/\text{IQR}$ and the targeted or untargeted margin, with a hit when the margin is negative. The other reaches the validator_v2 gate node, which computes $\texttt{hybrid\_valid}(x' \mid x)$, the conjunction of SCHEMA, EXTRACTOR, PROTOCOL and MINED, including the source-conditioned rule `PROTO_0080`. Both edges converge on the decision diamond, which declares success when the candidate is a hit and is valid.
+From the transform node, the realized flow $x'$ goes to the victim-prediction node: the frozen white-box victim computes logits on $(x' - \text{median})/\text{IQR}$ and the targeted or untargeted margin, with a hit when the margin is negative.
 
-The diamond feeds the incumbent-update node, which keeps the best realized candidate per flow by the rule in Section 3.6. Two edges leave the incumbent node. The back edge to the optimizer step, labelled with the budget condition, closes the loop while the row can afford another step. The forward edge to the final-flow node in g3 fires once the row cannot afford another step.
+The victim node feeds the incumbent-update node directly and passes it the hit flag and the margin. The incumbent node keeps the best realized candidate per flow by the rule in Section 3.6. Two edges leave the incumbent node. The back edge to the optimizer step, labelled with the budget condition, closes the loop while the row can afford another step. The forward edge to the final-flow node in g3 fires once the row cannot afford another step.
 
 #### Group g3: post-attack evaluation
 
-The final-flow node holds the adversarial flow $x'$ and the per-row `.npz` record (Section 5.4). The integrity node applies the runner's abort conditions and records `incumbent_final_mismatch`. The gates node re-evaluates the flow independently of the search through `evaluate_cell` and `FlowSemanticValidator`: raw success, `validator_pass`, `realizable`, `primitive_feasible` and `semantic_pass` with the class rules. The metrics node turns these gates into nested ASR on the same $N = 800$ flows. The analyzer that produces these metrics recomputes validator_v2 and the victim predictions from the stored flows and aborts on any mismatch. The gates score every incumbent, including those whose search failed, and an integrity failure aborts the whole run.
+The final-flow node holds the adversarial flow $x'$ and the per-row `.npz` record (Section 5.4). The integrity node applies the runner's abort conditions and records `incumbent_final_mismatch`. The gates node, the only node in the figure that uses validator_v2, re-evaluates the flow independently of the search through `evaluate_cell` and `FlowSemanticValidator`: raw success, `validator_pass`, `realizable`, `primitive_feasible` and `semantic_pass` with the class rules. The metrics node turns these gates into nested ASR on the same $N = 800$ flows. The analyzer that produces these metrics recomputes validator_v2 and the victim predictions from the stored flows and aborts on any mismatch. The gates score every incumbent, including those whose search failed, and an integrity failure aborts the whole run.
 
 #### Edge summary
 
@@ -106,10 +112,7 @@ The final-flow node holds the adversarial flow $x'$ and the per-row `.npz` recor
 | enumeration | projection | Hybrid stage-1 padding candidates |
 | projection | canonical transform | integer, capability-respecting controls |
 | canonical transform | victim prediction | realized flow $x'$ |
-| canonical transform | validator_v2 gate | realized flow $x'$ with its source $x$ |
-| victim prediction | decision | hit |
-| validator_v2 gate | decision | $V$ |
-| decision | incumbent update | success flag and margin |
+| victim prediction | incumbent update | hit and margin |
 | incumbent update | optimizer step | loop while another step is affordable |
 | incumbent update | final flow | after the last affordable step |
 | final flow → integrity → gates → metrics | — | post-attack chain |
@@ -199,15 +202,15 @@ $$
 \text{untargeted}: \quad m = z_y - \max_{j \ne y} z_j, \qquad \text{hit} \iff \arg\max_j z_j \ne y.
 $$
 
-A candidate succeeds when it is a hit on the realized flow and $V = \texttt{hybrid\_valid}(x' \mid x) = 1$.
+A candidate succeeds in the search when it is a hit on the realized flow. Its validity $V = \texttt{hybrid\_valid}(x' \mid x)$ is decided after the search, in the post-attack evaluation (Section 5.1), as for the baselines.
 
 ### 3.6 The incumbent rule
 
 `_candidate_take` keeps one incumbent per flow:
 
-1. a success always replaces a failure;
-2. among successes, the lowest normalised cost $p/p^{hi} + D/D^{hi}$ wins, with ties going to the lower margin;
-3. among failures, the lowest margin wins.
+1. a hit always replaces a non-hit;
+2. among hits, the lowest normalised cost $p/p^{hi} + D/D^{hi}$ wins, with ties going to the lower margin;
+3. among non-hits, the lowest margin wins.
 
 Only realized, quantized flows are candidates. Surrogate points supply gradients and are never stored.
 
@@ -273,11 +276,11 @@ For DoS and DDoS, `Flow Packets/s` must stay at or above the class train p05; a 
 
 ### 5.3 Runner integrity checks
 
-The runner aborts if any output value is non-finite, if any feature outside the 23-feature support changed, if padding was applied to a flow without padding capability, or if an empty forward packet was filled. For every row it also records `incumbent_final_mismatch`, which flags disagreement between the search's own success flag and the recomputed final success.
+The runner aborts if any output value is non-finite, if any feature outside the 23-feature support changed, if padding was applied to a flow without padding capability, or if an empty forward packet was filled. For every row it also records `incumbent_final_mismatch`, which flags disagreement between the search's own success flag and the recomputed final success, hit ∧ `hybrid_valid`. Without the in-search check, a mismatch is a kept invalid hit.
 
 ### 5.4 Stored artifacts
 
-Each per-row `.npz` file stores the final adversarial raw flow, the controls, the box, the costs, the evaluation counts, the candidate source, the failure reason (`success`, `invalid`, `exhausted` or `no_headroom`) and the capability reason codes. The analyzer recomputes validator_v2 and the victim predictions from these stored flows and aborts on any mismatch. Budget calibrations live in `artifacts/primattack/budget_calibration.json` (CICIDS2017) and `artifacts/primattack/budget_calibration_cicids2018.json`; the frozen selections live in `FINAL_OUTPUTS/runs/<dataset>/baselines_untargeted/selection.json`.
+Each per-row `.npz` file stores the final adversarial raw flow, the controls, the box, the costs, the evaluation counts, the candidate source, the failure reason (`success`, `invalid`, `exhausted` or `no_headroom`, where `invalid` marks a flow that hit the objective but ended without a valid success) and the capability reason codes. The analyzer recomputes validator_v2 and the victim predictions from these stored flows and aborts on any mismatch. Budget calibrations live in `artifacts/primattack/budget_calibration.json` (CICIDS2017) and `artifacts/primattack/budget_calibration_cicids2018.json`; the frozen selections live in `FINAL_OUTPUTS/runs/<dataset>/baselines_untargeted/selection.json`.
 
 ## 6. PrimAttack in the FINAL suite
 
@@ -330,6 +333,6 @@ The seeds 42, 2024 and 2026 vary only the attack, on one frozen victim per archi
 | `src/attack/run_cicids2017_primitive_attack.py` (`_apply_primitive_mode`, `evaluate_cell`) | primitive modes, cell evaluation |
 | `src/attack/realizability/validator.py` | internal realizability checks |
 | `src/attack/flow_semantics.py` | semantic and primitive-feasibility checks |
-| `validation/attack_interface.py:structural_masks`, `primitive_optimizer.py:hybrid_valid_gate` | validator_v2 gate |
+| `validation/attack_interface.py:structural_masks`, `primitive_optimizer.py:hybrid_valid_gate` | validator_v2 attack interface; `hybrid_valid_gate` is the in-search predicate of the FINAL runs; per amendment A6 (Section 1.4) it changed no final flow or outcome |
 | `scripts/run_primattack_optimizer_ablation.py` (driven by `scripts/run_final_suite.py`) | FINAL runner |
 | `scripts/analyze_final_suite.py` → `FINAL_OUTPUTS/` | analysis |
