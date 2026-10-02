@@ -24,6 +24,7 @@ import argparse
 import hashlib
 import json
 import sys
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -622,6 +623,18 @@ METHOD_COLORS = ["#4c72b0", "#dd8452", "#55a868", "#c44e52", "#8172b3", "#937860
                  "#da8bc3"]
 
 
+# Portrait page geometry for the bar charts: datasets are stacked vertically so each panel spans
+# the full width, tick labels stay horizontal (wrapped), and one shared legend sits below them.
+PORTRAIT_WIDTH = 8.0
+PANEL_HEIGHT = 4.6
+
+
+def portrait_axes(ncols: int = 1):
+    n = len(DATASETS)
+    return plt.subplots(n, ncols, figsize=(PORTRAIT_WIDTH, PANEL_HEIGHT * n + 1.2),
+                        squeeze=False, layout="constrained")
+
+
 def grouped_bars(ax, groups: list[str], series: list[str], means, sds, colors, ylabel: str,
                  percent: bool = True) -> None:
     x = np.arange(len(groups))
@@ -632,30 +645,49 @@ def grouped_bars(ax, groups: list[str], series: list[str], means, sds, colors, y
         scale = 100 if percent else 1
         ax.bar(x + (i - (len(series) - 1) / 2) * width, m * scale, width, yerr=e * scale,
                capsize=2, label=s, color=colors[i % len(colors)])
+    crowded = len(groups) * ax.get_subplotspec().get_gridspec().ncols > 5
+    wrap = 10 if crowded else 14
     ax.set_xticks(x)
-    ax.set_xticklabels(groups, rotation=20, ha="right", fontsize=8)
-    ax.set_ylabel(ylabel)
+    ax.set_xticklabels([textwrap.fill(g, wrap, break_long_words=False) for g in groups],
+                       fontsize=9 if crowded else 10)
+    ax.tick_params(axis="y", labelsize=10)
+    ax.set_ylabel(ylabel, fontsize=11)
+    ax.set_ylim(bottom=0)
     ax.grid(axis="y", alpha=0.3)
+
+
+def portrait_figure(fig, title: str, path: Path) -> None:
+    """Suptitle plus one shared legend below the panels, keyed by bar colour: series drawn in the
+    same colour in different panels (e.g. `mlp` / `mlp-s42`) share one entry."""
+    entries: dict = {}
+    for ax in fig.axes:
+        for h, lab in zip(*ax.get_legend_handles_labels()):
+            colour = matplotlib.colors.to_hex(h.patches[0].get_facecolor())
+            _, labs = entries.setdefault(colour, (h, []))
+            if lab not in labs:
+                labs.append(lab)
+    fig.suptitle(title, fontsize=12)
+    fig.legend([h for h, _ in entries.values()], [" / ".join(labs) for _, labs in entries.values()],
+               loc="outside lower center", ncol=2 if len(entries) == 4 else min(len(entries), 3),
+               fontsize=10, frameon=False)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
 
 
 def per_dataset_bars(table: pd.DataFrame, group_col: str, series_col: str, metric: str,
                      title: str, ylabel: str, path: Path, group_order: dict, series_order: dict,
                      colors, percent: bool = True) -> None:
-    fig, axes = plt.subplots(1, len(DATASETS), figsize=(6.5 * len(DATASETS), 4.2), squeeze=False)
-    for ax, dataset in zip(axes[0], DATASETS):
+    fig, axes = portrait_axes()
+    for ax, dataset in zip(axes[:, 0], DATASETS):
         t = table[table.dataset == dataset]
         groups = [g for g in group_order[dataset] if g in set(t[group_col])]
         series = [s for s in series_order[dataset] if s in set(t[series_col])]
         means = {(r[group_col], r[series_col]): r[f"{metric}_mean"] for _, r in t.iterrows()}
         sds = {(r[group_col], r[series_col]): r[f"{metric}_sd"] for _, r in t.iterrows()}
         grouped_bars(ax, groups, series, means, sds, colors, ylabel, percent)
-        ax.set_title(DS_LABEL[dataset])
-    axes[0][0].legend(fontsize=7, loc="upper left")
-    fig.suptitle(title + "  (mean ± SD over seeds 42/2024/2026)", fontsize=10)
-    fig.tight_layout()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=150)
-    plt.close(fig)
+        ax.set_title(DS_LABEL[dataset], fontsize=12)
+    portrait_figure(fig, title + "\n(mean ± SD over seeds 42/2024/2026)", path)
 
 
 # ----------------------------------------------------------------------------- outputs
@@ -1665,21 +1697,19 @@ def experiment_b(store: Store, selection: dict, final: bool) -> dict:
 
 
 def runtime_plot(vt: pd.DataFrame, labels: list[str], path: Path) -> None:
-    fig, axes = plt.subplots(2, len(DATASETS), figsize=(6.5 * len(DATASETS), 7), squeeze=False)
-    for j, dataset in enumerate(DATASETS):
+    metrics = (("mean_model_evaluations", "victim evaluations / flow"),
+               ("ms_per_flow", "runtime (ms / flow)"))
+    fig, axes = portrait_axes(len(metrics))
+    for i, dataset in enumerate(DATASETS):
         t = vt[vt.dataset == dataset]
-        for i, (metric, ylab) in enumerate((("mean_model_evaluations", "victim evaluations / flow"),
-                                            ("ms_per_flow", "runtime (ms / flow)"))):
+        for j, (metric, ylab) in enumerate(metrics):
             means = {(r.victim, r.method): r[f"{metric}_mean"] for _, r in t.iterrows()}
             sds = {(r.victim, r.method): r[f"{metric}_sd"] for _, r in t.iterrows()}
             grouped_bars(axes[i][j], list(DATASETS[dataset]), labels, means, sds, METHOD_COLORS,
                          ylab, percent=False)
-            axes[i][j].set_title(f"{DS_LABEL[dataset]} — {ylab}")
-    axes[0][0].legend(fontsize=7)
-    fig.suptitle("Exp B — cost of the three PrimAttack optimizers (mean ± SD over seeds)", fontsize=10)
-    fig.tight_layout()
-    fig.savefig(path, dpi=150)
-    plt.close(fig)
+            axes[i][j].set_title(f"{DS_LABEL[dataset]} — {ylab}", fontsize=11)
+    portrait_figure(fig, "Exp B — cost of the three PrimAttack optimizers\n(mean ± SD over seeds)",
+                    path)
 
 
 def report_b(out: Path, table: pd.DataFrame, stats: pd.DataFrame, selection: dict,

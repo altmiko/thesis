@@ -6,13 +6,14 @@ import csv
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
+from textwrap import fill
 from typing import Mapping, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import LogLocator, NullFormatter
 
-REVISION = "class-distribution-v2"
+REVISION = "class-distribution-v3"
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "outputs" / "preprocessing_class_distribution"
 CLASSES = ("Benign", "DoS", "DDoS", "Recon", "BruteForce")
@@ -157,30 +158,44 @@ def render(spec: FigureSpec) -> Path:
     plt.rcParams.update({
         "font.family": "DejaVu Sans",
         "font.size": 12,
-        "axes.titlesize": 18,
+        "axes.titlesize": 16,
         "axes.labelsize": 14,
-        "legend.fontsize": 12,
+        "legend.fontsize": 11,
     })
-    fig, ax = plt.subplots(figsize=(10, 20 / 3), dpi=180, facecolor="white")
-    fig.subplots_adjust(left=0.10, right=0.98, top=0.87, bottom=0.22)
+    fig, ax = plt.subplots(figsize=(20 / 3, 10), dpi=180, facecolor="white")
+    fig.subplots_adjust(left=0.16, right=0.96, top=0.78, bottom=0.19)
     x = np.arange(len(CLASSES))
-    width = 0.36
+    width = 0.32
     colors = ("#0072B2", "#D55E00")
     before_bars = ax.bar(x - width / 2, spec.before, width, label=BEFORE_LABEL, color=colors[0])
     after_bars = ax.bar(x + width / 2, spec.after, width, label=AFTER_LABEL, color=colors[1])
     ax.set_yscale("log")
     ax.set_ylim(2_500, max(max(spec.before), max(spec.after)) * 3.1)
-    ax.set_title(spec.title, fontweight="bold", pad=14)
-    ax.set_xlabel(X_LABEL, labelpad=9)
-    ax.set_ylabel(Y_LABEL, labelpad=9)
+    ax.set_title(
+        fill(spec.title, width=38, break_long_words=False, break_on_hyphens=False),
+        fontweight="bold",
+        pad=66,
+        linespacing=1.15,
+    )
+    ax.set_xlabel(X_LABEL, labelpad=11)
+    ax.set_ylabel(Y_LABEL, labelpad=11)
     ax.set_xticks(x, CLASSES)
+    ax.tick_params(axis="x", pad=7)
+    ax.margins(x=0.055)
     ax.yaxis.set_minor_locator(LogLocator(base=10, subs=np.arange(2, 10) * 0.1))
     ax.yaxis.set_minor_formatter(NullFormatter())
     ax.grid(axis="y", which="major", color="#AAB2B8", linewidth=0.8, alpha=0.65)
     ax.grid(axis="y", which="minor", color="#D5DADD", linewidth=0.45, alpha=0.50)
     ax.set_axisbelow(True)
     ax.spines[["top", "right"]].set_visible(False)
-    ax.legend(frameon=False, loc="upper right", ncols=2)
+    ax.legend(
+        frameon=False,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.02),
+        ncols=2,
+        columnspacing=2.0,
+        handletextpad=0.7,
+    )
 
     for bars in (before_bars, after_bars):
         for bar in bars:
@@ -188,16 +203,25 @@ def render(spec: FigureSpec) -> Path:
             ax.annotate(
                 f"{value:,}",
                 (bar.get_x() + bar.get_width() / 2, value),
-                xytext=(0, 5),
+                xytext=(0, 6),
                 textcoords="offset points",
                 ha="center",
                 va="bottom",
                 rotation=90,
-                fontsize=8.5,
+                fontsize=9,
                 color="#202124",
             )
 
-    fig.text(0.5, 0.055, spec.footnote, ha="center", va="center", fontsize=9.5, color="#3C4043")
+    fig.text(
+        0.5,
+        0.06,
+        fill(spec.footnote, width=76, break_long_words=False, break_on_hyphens=False),
+        ha="center",
+        va="center",
+        fontsize=9.5,
+        linespacing=1.35,
+        color="#3C4043",
+    )
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     destination = OUTPUT_DIR / spec.filename
     fig.savefig(
