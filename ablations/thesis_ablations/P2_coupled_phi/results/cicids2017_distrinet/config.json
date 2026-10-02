@@ -1,0 +1,91 @@
+{
+  "dataset": "cicids2017_distrinet",
+  "objective": "targeted",
+  "mode": "joint",
+  "success": "victim argmax == Benign on the realized flow AND the condition's validator_v2 search gate",
+  "final_validity": "validator_v2 hybrid_valid = schema & extractor & protocol & mined, given the source flow (identical for every condition)",
+  "conditions": [
+    {
+      "name": "full_phi",
+      "description": "canonical \u03c6 (FINAL targeted Hybrid configuration, validator_v2 gate in the search, capability-aware)",
+      "hybrid": {
+        "steps": 40,
+        "learning_rate": 0.1,
+        "eval_budget": 256,
+        "restarts": null,
+        "padding_sweep": true,
+        "refinement": true,
+        "adaptive_step": true,
+        "momentum": 0.75,
+        "surrogate_floor": 0.001,
+        "validity_in_search": true,
+        "selection": "incumbent",
+        "fixed_shape": null,
+        "loss": "margin"
+      },
+      "gate_layers": [
+        "schema",
+        "extractor",
+        "protocol",
+        "mined"
+      ],
+      "capability_aware": true
+    },
+    {
+      "name": "direct_only",
+      "description": "search sees only \u03c6's direct writes; derived features stay at source values; returned primitives re-realized through canonical \u03c6",
+      "hybrid": {
+        "steps": 40,
+        "learning_rate": 0.1,
+        "eval_budget": 256,
+        "restarts": null,
+        "padding_sweep": true,
+        "refinement": true,
+        "adaptive_step": true,
+        "momentum": 0.75,
+        "surrogate_floor": 0.001,
+        "validity_in_search": false,
+        "selection": "incumbent",
+        "fixed_shape": null,
+        "loss": "margin"
+      },
+      "gate_layers": [
+        "schema",
+        "extractor",
+        "protocol",
+        "mined"
+      ],
+      "capability_aware": true,
+      "recompute_mode": "direct_only"
+    }
+  ],
+  "budgets": {
+    "maximum-evaluated": "p75",
+    "unbounded": "unb"
+  },
+  "classes": [
+    "DoS",
+    "DDoS",
+    "Recon",
+    "BruteForce"
+  ],
+  "seeds": [
+    42,
+    2024,
+    2026
+  ],
+  "victims": [
+    "mlp",
+    "cnn",
+    "ft_transformer"
+  ],
+  "selection_from": "FINAL_OUTPUTS/runs/cicids2017_distrinet/baselines_untargeted/selection.json",
+  "selection_sha256": "fcdf5aec27f56e6b4c06fa47a40fe42fcfa7ce097bff8b35032a1315540840bf",
+  "limit_rows": null,
+  "calibration": "artifacts/primattack/budget_calibration.json",
+  "calibration_sha256": "7ce039a8fc54d7d74a71824e2e53c1b7294f7fbe4e838e2e5a84036fa011a2b9",
+  "benign_anchor_pool": null,
+  "torch": "2.5.1+cu121",
+  "device": "cuda",
+  "python": "3.11.15"
+}

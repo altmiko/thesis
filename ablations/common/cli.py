@@ -22,8 +22,11 @@ def experiment_main(
     *,
     add_arguments: Callable[[argparse.ArgumentParser], None] | None = None,
     select: Callable[[argparse.Namespace, list[Condition]], list[Condition]] | None = None,
+    objective: str = "untargeted",
 ) -> None:
     """``analyze(results_dir, reference_results_dir)`` writes the experiment's tables.
+
+    ``objective``: attack objective of every cell (``"untargeted"`` or ``"targeted"``).
 
     ``add_arguments`` adds experiment-specific options (e.g. a toggle); ``select`` maps the
     parsed options to the conditions to run (applied before ``--conditions``).
@@ -58,6 +61,7 @@ def experiment_main(
             args.results_dir, selected, datasets=_csv(args.datasets),
             budgets=tuple(_csv(args.budgets)), seeds=tuple(int(s) for s in _csv(args.seeds)),
             victims=_csv(args.victims) if args.victims else None,
-            classes=tuple(_csv(args.classes)), device=args.device, limit_rows=args.limit_rows)
+            classes=tuple(_csv(args.classes)), device=args.device, limit_rows=args.limit_rows,
+            objective=objective)
     if analyze is not None and not args.skip_analysis:
         analyze(args.results_dir, args.reference_results)

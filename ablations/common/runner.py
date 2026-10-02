@@ -4,7 +4,8 @@ Protocol (identical to the FINAL suite's Exp A Hybrid cells, amendment A5, unles
 changes it): both datasets; one victim per architecture (2017 canonical checkpoints, 2018
 ``*-s42``); the canonical frozen 800 clean-correct test flows per (dataset, victim, class) from
 ``FINAL_OUTPUTS/runs/<dataset>/baselines_untargeted/selection.json`` (sha256-verified); attack
-seeds 42/2024/2026; untargeted objective; joint mode; capability-aware primitives; train-fit
+seeds 42/2024/2026; untargeted objective (``objective="targeted"``: realized flow classified
+Benign, the Exp B / A5 targeted arm); joint mode; capability-aware primitives; train-fit
 budget calibration at p75 (``maximum-evaluated``) and envelope-only ``unbounded``; per-flow
 evaluation budget 256; Hybrid Search with ``PRIM_ARGS``; validator_v2 ``hybrid_valid`` in the
 search success predicate.
@@ -12,12 +13,18 @@ search success predicate.
 Whatever a condition changes, every realized flow is scored afterwards by the same full
 validator_v2 (all four layers, source-conditioned), and the per-row npz records each layer.
 
+``recompute_mode="direct_only"`` (ablation P2): the search sees only φ's direct writes
+(``phi_mapping.DirectOnlyPrimitiveModel``); the primitives it returns are realized again through
+canonical φ, and that full-φ flow is the one scored, stored as ``adv_raw`` and counted. The
+reduced flow the search believed in is stored next to it (``reduced_*``).
+
 Layout written per experiment: ``<exp>/results/<dataset>/{config.json, cells.json,
 artifacts/<victim>__<class>__<budget>__<condition>__seed<s>.npz}``. Finished cells are skipped
 on re-runs (resume by default).
 """
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import os
@@ -39,6 +46,9 @@ import torch  # noqa: E402
 
 from ablations.common.extra_rules import EXTRA_RULES, extra_rule_masks  # noqa: E402
 from ablations.common.hybrid import HybridConfig, optimize_hybrid_ablation  # noqa: E402
+from ablations.common.phi_mapping import (  # noqa: E402
+    DirectOnlyPrimitiveModel, derive_phi_mapping, realize_full_phi,
+)
 from attack.flow_semantics import FlowSemanticValidator, SemanticStatus  # noqa: E402
 from attack.primattack_budget import (  # noqa: E402
     class_calibration, load_calibration, unbounded_calibration,
@@ -68,6 +78,7 @@ SEEDS = (42, 2024, 2026)
 BUDGETS = ("maximum-evaluated", "unbounded")
 LAYERS = ("schema", "extractor", "protocol", "mined")
 ABLATED_CAPABILITY = "CAPABILITY_INFERENCE_ABLATED"
+RECOMPUTE_MODES = ("full_phi", "direct_only")
 
 
 @dataclass(frozen=True)
@@ -80,6 +91,7 @@ class Condition:
     gate_layers: tuple[str, ...] = LAYERS     # validator_v2 layers ANDed in the search gate
     capability_aware: bool = True             # source-dependent capability mask M(x)
     extra_rules: tuple[str, ...] = ()         # candidate rules (extra_rules.py) toggled on
+    recompute_mode: str = "full_phi"          # "direct_only" (P2): search sees φ's direct writes only
 
     def __post_init__(self) -> None:
         if not self.name or "__" in self.name:
@@ -88,13 +100,21 @@ class Condition:
             raise ValueError(f"gate_layers must be a non-empty subset of {LAYERS}")
         if set(self.extra_rules) - set(EXTRA_RULES):
             raise ValueError(f"extra_rules must be a subset of {sorted(EXTRA_RULES)}")
+        if self.recompute_mode not in RECOMPUTE_MODES:
+            raise ValueError(f"recompute_mode must be one of {RECOMPUTE_MODES}")
+        if self.recompute_mode == "direct_only" and self.hybrid.validity_in_search:
+            # validator_v2 would judge the reduced flow, which breaks φ's identities by design.
+            raise ValueError("direct_only needs HybridConfig(validity_in_search=False)")
 
     def to_dict(self) -> dict:
         d = {"name": self.name, "description": self.description,
              "hybrid": self.hybrid.to_dict(), "gate_layers": list(self.gate_layers),
              "capability_aware": self.capability_aware}
-        if self.extra_rules:  # omitted when off: keeps earlier result configs comparable
+        # Non-default options only: keeps earlier result configs comparable.
+        if self.extra_rules:
             d["extra_rules"] = list(self.extra_rules)
+        if self.recompute_mode != "full_phi":
+            d["recompute_mode"] = self.recompute_mode
         return d
 
 
@@ -176,6 +196,9 @@ def _stats(values) -> tuple[float, float]:
     return float(values.mean()), float(np.median(values))
 
 
+OBJECTIVES = ("untargeted", "targeted")
+
+
 def run_conditions(
     results_dir: Path,
     conditions: list[Condition],
@@ -187,19 +210,25 @@ def run_conditions(
     classes: tuple[str, ...] = CLASSES,
     device: str = "cuda",
     limit_rows: int | None = None,
+    objective: str = "untargeted",
 ) -> None:
-    """Run every (dataset, victim, class, budget, condition, seed) cell into ``results_dir``."""
+    """Run every (dataset, victim, class, budget, condition, seed) cell into ``results_dir``.
+
+    ``objective``: ``"untargeted"`` (leave the source class) or ``"targeted"`` (-> Benign).
+    """
+    if objective not in OBJECTIVES:
+        raise ValueError(f"objective must be one of {OBJECTIVES}")
     names = [c.name for c in conditions]
     if len(set(names)) != len(names):
         raise ValueError("duplicate condition names")
     for dataset in datasets or list(DATASETS):
         _run_dataset(results_dir / dataset, dataset, conditions, budgets=budgets,
                      seeds=seeds, victims=victims, classes=classes, device=device,
-                     limit_rows=limit_rows)
+                     limit_rows=limit_rows, objective_kind=objective)
 
 
 def _run_dataset(out: Path, dataset: str, conditions, *, budgets, seeds, victims, classes,
-                 device, limit_rows) -> None:
+                 device, limit_rows, objective_kind) -> None:
     spec = DATASETS[dataset]
     adapter = get_adapter(spec["cli"])
     if adapter.name != dataset:
@@ -213,6 +242,8 @@ def _run_dataset(out: Path, dataset: str, conditions, *, budgets, seeds, victims
     scale = torch.tensor(transform.scale, dtype=torch.float32, device=device)
     model = CICIDS2017PrimitiveModel(manifest)
     support_mask = primattack_joint_feature_mask(manifest).to(device)
+    reduced_model = (DirectOnlyPrimitiveModel(model, derive_phi_mapping(manifest))
+                     if any(c.recompute_mode == "direct_only" for c in conditions) else None)
     realizability = RealizabilityValidator(model)
     calibration_path = DATASET_DEFAULTS[dataset]["calibration"]
     calibration = load_calibration(calibration_path)
@@ -238,16 +269,21 @@ def _run_dataset(out: Path, dataset: str, conditions, *, budgets, seeds, victims
         if previous.get("limit_rows") != limit_rows:
             raise ValueError(f"{out}: existing results use limit_rows="
                              f"{previous.get('limit_rows')}; refusing to mix")
+        if previous.get("objective") != objective_kind:
+            raise ValueError(f"{out}: existing results use objective="
+                             f"{previous.get('objective')}; refusing to mix")
         known = {c["name"]: c for c in previous["conditions"]}
     for cond in conditions:
         if cond.name in known and known[cond.name] != cond.to_dict():
             raise ValueError(f"{out}: condition {cond.name!r} was run with a different "
                              "definition; refusing to mix")
         known[cond.name] = cond.to_dict()
+    target_text = ("victim argmax == Benign" if objective_kind == "targeted"
+                   else "victim argmax != true source class")
     config = {
-        "dataset": dataset, "objective": "untargeted", "mode": "joint",
-        "success": "victim argmax != true source class on the realized flow AND the "
-                   "condition's validator_v2 search gate",
+        "dataset": dataset, "objective": objective_kind, "mode": "joint",
+        "success": f"{target_text} on the realized flow AND the condition's validator_v2 "
+                   "search gate",
         "final_validity": "validator_v2 hybrid_valid = schema & extractor & protocol & mined, "
                           "given the source flow (identical for every condition)",
         "conditions": list(known.values()),
@@ -299,7 +335,8 @@ def _run_dataset(out: Path, dataset: str, conditions, *, budgets, seeds, victims
             timing_cap = caps_true.timing_allowed.cpu().numpy()
             fwd_min_zero = (raw[:, model.i["Fwd Packet Length Min"]] == 0).cpu().numpy()
             raw_np = raw.cpu().numpy()
-            objective = AttackObjective("untargeted", cid)
+            objective = (AttackObjective("targeted", int(mapping.name_to_id["Benign"]))
+                         if objective_kind == "targeted" else AttackObjective("untargeted", cid))
             anchor = anchors(raw) if anchors is not None else None
             for budget in budgets:
                 ccfg = (unbounded_calibration(calibration, cname) if budget == "unbounded"
@@ -322,18 +359,26 @@ def _run_dataset(out: Path, dataset: str, conditions, *, budgets, seeds, victims
                         if device.startswith("cuda"):
                             torch.cuda.synchronize()
                         t0 = time.perf_counter()
+                        direct_only = cond.recompute_mode == "direct_only"
                         res, diag = optimize_hybrid_ablation(
-                            model, victim, raw, center, scale, bounds, caps,
-                            config=cond.hybrid, seed=seed, validity_fn=gate,
+                            reduced_model if direct_only else model, victim, raw, center, scale,
+                            bounds, caps, config=cond.hybrid, seed=seed, validity_fn=gate,
                             objective=objective, anchor=anchor,
                             nonfinite_gradients="raise" if cond.capability_aware else "zero")
                         if device.startswith("cuda"):
                             torch.cuda.synchronize()
                         elapsed = time.perf_counter() - t0
+                        if direct_only:
+                            # Outcome measurement through canonical φ (not a search query).
+                            res, reduced = realize_full_phi(
+                                reduced_model, res, victim=victim, raw=raw, center=center,
+                                scale=scale, bounds=bounds, caps=caps, objective=objective)
+                            diag = dataclasses.replace(diag, extra={**diag.extra, **reduced})
                         cell = _evaluate_and_save(
                             npz, cond, res, diag, elapsed, model=model, victim=victim,
                             realizability=realizability, semantic_validator=semantic_validator,
-                            raw=raw, raw_np=raw_np, center=center, scale=scale, cid=cid,
+                            raw=raw, raw_np=raw_np, center=center, scale=scale,
+                            objective=objective,
                             labels=labels, src_meta=src_meta, bounds=bounds, ccfg=ccfg,
                             support_mask=support_mask, pad_cap=pad_cap, timing_cap=timing_cap,
                             caps_true=caps_true, fwd_min_zero=fwd_min_zero, movable=movable,
@@ -351,7 +396,8 @@ def _run_dataset(out: Path, dataset: str, conditions, *, budgets, seeds, victims
 
 
 def _evaluate_and_save(npz, cond, res, diag, elapsed, *, model, victim, realizability,
-                       semantic_validator, raw, raw_np, center, scale, cid, labels, src_meta,
+                       semantic_validator, raw, raw_np, center, scale, objective, labels,
+                       src_meta,
                        bounds, ccfg, support_mask, pad_cap, timing_cap, caps_true,
                        fwd_min_zero, movable, row_modes, dataset, vname, arch, cname, budget,
                        seed, sids, idx, ckpt_sha) -> dict:
@@ -364,7 +410,9 @@ def _evaluate_and_save(npz, cond, res, diag, elapsed, *, model, victim, realizab
     if (outside != 0).any():
         raise AssertionError(f"PrimAttack changed a feature outside its joint support {npz.name}")
     with torch.no_grad():
-        adv_pred = np_(victim((adv - center) / scale).argmax(1)).astype(np.int64)
+        adv_logits = victim((adv - center) / scale)
+    adv_pred = np_(adv_logits.argmax(1)).astype(np.int64)
+    hit = np_(objective.hit(adv_logits)).astype(bool)
     adv_np = np_(adv)
     layers = layer_masks(adv_np, raw_np, dataset)
     full_valid = np.logical_and.reduce([layers[k] for k in LAYERS])
@@ -380,7 +428,6 @@ def _evaluate_and_save(npz, cond, res, diag, elapsed, *, model, victim, realizab
     prim_feasible = semantic.primitive_feasible & realizable
     sem_pass = semantic.semantic_status == SemanticStatus.PASS.value
 
-    hit = adv_pred != cid
     valid_success = hit & full_valid
     gate_success = hit & gate_valid
     search_success = np_(res.success).astype(bool)
@@ -396,6 +443,42 @@ def _evaluate_and_save(npz, cond, res, diag, elapsed, *, model, victim, realizab
     total = np_(res.total_evaluations)
     grad_steps, zero_steps = np_(diag.gradient_steps), np_(diag.zero_gradient_steps)
     nonfinite_steps = np_(diag.nonfinite_gradient_steps)
+    arm_extra = {k: np_(v) for k, v in diag.extra.items()}
+    cont_cell = {}
+    if "continuous_adv_raw" in arm_extra:
+        # P1: the same validator_v2 on the unrealized continuous flow (diagnostic only).
+        cont_layers = layer_masks(arm_extra["continuous_adv_raw"], raw_np, dataset)
+        cont_valid = np.logical_and.reduce([cont_layers[k] for k in LAYERS])
+        arm_extra.update({f"continuous_{k}_valid": v for k, v in cont_layers.items()})
+        arm_extra["continuous_validator_pass"] = cont_valid
+        cont_hit = arm_extra["continuous_success"].astype(bool)
+        cont_cell = {
+            "asr_continuous": float(cont_hit.mean()),
+            "continuous_hit_realized_miss": int((cont_hit & ~hit).sum()),
+            "continuous_miss_realized_hit": int((~cont_hit & hit).sum()),
+            "prediction_changed_by_realization": int(
+                (arm_extra["continuous_pred"] != adv_pred).sum()),
+            "continuous_validator_pass_rate": float(cont_valid.mean()),
+        }
+    reduced_cell = {}
+    if "reduced_adv_raw" in arm_extra:
+        # P2: validator_v2 on the direct-only flow the search believed in (diagnostic only).
+        red_layers = layer_masks(arm_extra["reduced_adv_raw"], raw_np, dataset)
+        red_valid = np.logical_and.reduce([red_layers[k] for k in LAYERS])
+        arm_extra.update({f"reduced_{k}_valid": v for k, v in red_layers.items()})
+        arm_extra["reduced_validator_pass"] = red_valid
+        red_hit = arm_extra["reduced_success"].astype(bool)
+        pred_changed = arm_extra["reduced_pred"] != adv_pred
+        reduced_cell = {
+            "asr_reduced": float(red_hit.mean()), "reduced_successes": int(red_hit.sum()),
+            "reduced_hit_full_miss": int((red_hit & ~hit).sum()),
+            "reduced_hit_full_invalid": int((red_hit & hit & ~full_valid).sum()),
+            "reduced_hit_not_valid_success": int((red_hit & ~valid_success).sum()),
+            "reduced_miss_full_hit": int((~red_hit & hit).sum()),
+            "prediction_changed_by_full_phi": int(pred_changed.sum()),
+            "prediction_changed_among_reduced_hits": int((pred_changed & red_hit).sum()),
+            "reduced_validator_pass_rate": float(red_valid.mean()),
+        }
 
     np.savez_compressed(
         npz, sample_id=sids, positional_idx=idx, true_class=labels, adv_pred=adv_pred,
@@ -430,6 +513,7 @@ def _evaluate_and_save(npz, cond, res, diag, elapsed, *, model, victim, realizab
         source_fwd_min_zero=fwd_min_zero, empty_fwd_packet_filled=filled,
         checkpoint_sha256=ckpt_sha, condition=cond.name, victim=vname, attack_class=cname,
         budget=budget, seed=seed, dataset=dataset, elapsed_seconds=np.float64(elapsed),
+        **arm_extra,
     )
     s = valid_success
     n = len(hit)
@@ -457,10 +541,12 @@ def _evaluate_and_save(npz, cond, res, diag, elapsed, *, model, victim, realizab
         "rel_duration_median": _stats(semantic.costs.relative_duration_change[s])[1],
         "frac_success_padding": float((p[s] > 0).mean()) if s.any() else float("nan"),
         "frac_success_timing": float((d[s] > 0).mean()) if s.any() else float("nan"),
-        "evals_mean": float(total.mean()),
+        "evals_mean": float(total.mean()), "evals_max": int(total.max()),
         "first_success_median": _stats(first_s[first_s > 0])[1],
         "gradient_steps": int(grad_steps.sum()), "zero_gradient_steps": int(zero_steps.sum()),
         "nonfinite_gradient_steps": int(nonfinite_steps.sum()),
         "rows_with_nonfinite_gradient": int((nonfinite_steps > 0).sum()),
         "iterations": res.iterations, "restarts": res.restarts, "elapsed_seconds": elapsed,
+        **cont_cell,
+        **reduced_cell,
     }

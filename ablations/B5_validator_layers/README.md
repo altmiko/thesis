@@ -52,7 +52,7 @@ reference everywhere. Every layer's pass rate over the final flows is ≥ 99.6% 
   - So the low Valid ASR is **not** caused by the validator. It is set by the calibrated budget
     and by the victim (`../D5_overhead`, `../A1_hybrid_components`). Raw ASR = Valid ASR in
     every cell.
-- **The validator does bind once capability inference is removed** (`../D6_capability_inference`):
+- **The validator does bind once capability inference is removed** (`../thesis_ablations/D6_capability_inference`):
   - PROTOCOL rejects all capability-violating objective hits on CICIDS2017;
   - MINED and PROTOCOL reject most of them on CICIDS2018.
 

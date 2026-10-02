@@ -6,19 +6,24 @@ Each experiment has its own folder with `run.py`, `README.md` and `results/`
 (`report.md`, `summary.csv`, `tests.csv`, extra tables and per-dataset artifacts).
 The per-row npz artifacts are git-ignored but retained locally.
 
+D6, A2, P1 and P2 live in `thesis_ablations/`; `thesis_ablations/All_Ablations.md` describes
+their design, evaluation and results together.
+
 | Folder | Question | New attack runs |
 |---|---|---|
 | `reference/` | Shared reference arm; reproduces the FINAL suite's Hybrid cells flow-for-flow | yes |
 | `A1_hybrid_components/` | What does each Hybrid Search component contribute? (leave-one-out + coverage) | yes |
-| `A2_shape_allocation/` | Does the learned delay allocation `shape` matter vs a fixed allocation? | yes |
+| `thesis_ablations/A2_shape_allocation/` | Does the learned delay allocation `shape` matter vs a fixed allocation? | yes |
 | `A3_loss_function/` | Margin vs cross-entropy vs DLR refinement loss; are gradients zero? | yes |
 | `A4_mimicry_objective/` | Victim-guided search vs imitating the nearest Benign train flow | yes |
 | `B1_convergence/` | Does more steps / restarts / queries raise Valid ASR? (anytime curve) | yes |
 | `B5_validator_layers/` | Valid ASR when one validator_v2 layer (SCHEMA, EXTRACTOR, PROTOCOL, MINED) is removed | yes |
 | `D5_overhead/` | Bytes and time the attacker pays per valid success (cost curves) | no (FINAL artifacts) |
-| `D6_capability_inference/` | `u = M(x) ⊙ (p, D, s)` vs `u = (p, D, s)`, both judged by the same validator_v2 | yes |
+| `thesis_ablations/D6_capability_inference/` | `u = M(x) ⊙ (p, D, s)` vs `u = (p, D, s)`, both judged by the same validator_v2 | yes |
 | `V1_single_fwd_packet_rule/` | Toggle-able validator rule `Total Fwd Packet ≤ 1 ⇒ forward IAT = 0` (closes the D6 gap), on capability-aware and capability-ablated PrimAttack | yes |
 | `seeded_rows/` | How does random clean-correct row selection change p75 and unbounded Prim-PGD Valid ASR? | yes (new cohorts for seeds 2024/2026; seed 42 copied from FINAL) |
+| `thesis_ablations/P1_realization_aware_search/` | Does scoring/selecting realized integer states during the search matter vs a continuous-state search realized once at the end? (targeted → Benign; own targeted reference arm) | yes |
+| `thesis_ablations/P2_coupled_phi/` | Is φ's coupled recomputation of dependent features needed, vs a search that moves only each primitive's direct statistics? (targeted → Benign; own targeted reference arm; returned primitives re-realized through full φ) | yes |
 
 ## Key results
 
@@ -35,6 +40,8 @@ The per-row npz artifacts are git-ignored but retained locally.
 | D6 | Removing M(x) lowers Valid ASR in 10 of 12 cells (e.g. 2017 CNN unbounded 59.94% → 7.25%) while Raw ASR rises up to 98%. validator_v2 misses delay added to single-forward-packet flows: 1,512 such "valid" successes on CICIDS2018. |
 | V1 | The rule `Total Fwd Packet ≤ 1 ⇒ forward IAT = 0` accepts all 2.91 M genuine flows and never binds for capability-aware PrimAttack (identical Valid ASR in all 12 cells). It removes all 1,512 single-packet timing successes of the capability-ablated attack (2018 MLP unbounded 38.52% → 23.30%). |
 | seeded_rows | New seed-specific random cohorts change Valid ASR (2017 CNN p75: 13.47%, 12.47%, 12.88%; 2018 MLP p75: 2.53%, 2.25%, 1.88%). Paired p75 vs unbounded Valid ASR differs in 5/6 victims after Holm on seed 42; this is not a cross-method or cross-seed paired test. |
+| P1 | Targeted → Benign. A continuous-state search realized once at the end gives the reference's valid successes flow-for-flow in all 12 cells × 3 seeds (Δ Valid ASR 0.00 pp, 0 discordant flows, Holm p = 1). 0 of 14,635 continuous hits lose the Benign prediction after rounding (< 1 µs). 94.3% of them fail validator_v2 SCHEMA before realization. Realization is needed for validity, but doing it inside the search adds nothing at µs granularity. Its targeted reference reproduces all 115,200 FINAL targeted Hybrid flows. |
+| P2 | Targeted → Benign. φ's 23 writes traced from code: 7 direct, 16 derived. A search that holds the derived features at source values loses 1.0–8.0 pp Valid ASR on 2017 MLP/CNN and 0.45–0.78 pp on 2018 MLP/CNN unbounded (6/12 cells significant, 0 P2-only valid flows); FT-Transformer and 2018 p75 unchanged. 76.6% (2017) / 93.8% (2018) of its reduced-space successes survive full φ, all losses through the victim's prediction. It overstates evasion on 2017 MLP (28.91% seen vs 14.90% real, unbounded) and misses it on 2018 MLP (1.61% vs 24.02%). The derived delay features (Fwd IAT Mean, Flow Duration, Flow IAT Mean/Max) account for ≥ 96.9% of the lost successes. validator_v2 accepts 8.3–78.5% of the inconsistent reduced flows (no EXTRACTOR rule on forward IAT mean or flow duration). Its targeted reference reproduces all 115,200 FINAL targeted Hybrid flows. |
 
 ## Shared protocol
 
@@ -71,9 +78,17 @@ proxies on CICFlowMeter aggregates, no PCAP edited or replayed.
 * `common/hybrid.py` - `HybridConfig` + `optimize_hybrid_ablation`: the canonical Hybrid Search
   (`attack.primitive_optimizer.optimize_primitive_candidates`) with switchable components. The
   canonical module is not modified. Default config = canonical behaviour.
+  `realization_aware_search=False` (P1) scores candidates on the continuous state
+  (`ContinuousSearch`) and realizes the returned candidate once (`realize_once`).
 * `common/runner.py` - cell runner (frozen flows, victims, calibration, search, final
   validator_v2, npz + `cells.json`); `Condition` = one arm (Hybrid config, validator layers in the
-  search gate, capability masking on/off). Finished cells are skipped on re-runs.
+  search gate, capability masking on/off). Finished cells are skipped on re-runs. `objective`
+  selects untargeted (default) or targeted → Benign cells (P1); per-arm extra per-row arrays
+  (`SearchDiagnostics.extra`) are stored in the npz. `Condition.recompute_mode="direct_only"`
+  (P2) runs the search on `phi_mapping.DirectOnlyPrimitiveModel` and re-realizes the returned
+  primitives through canonical φ (`realize_full_phi`); the reduced flow is stored as `reduced_*`.
+* `common/phi_mapping.py` - traces the data flow of `CICIDS2017PrimitiveModel.generate` (φ) and
+  classifies each write as direct or derived (P2).
 * `common/analysis.py` - comparison with the reference, McNemar/Newcombe/Holm, report tables.
 * `common/cli.py` - shared command line of every `run.py`.
 
@@ -84,10 +99,14 @@ From the repo root in the `thesis` env (`PYTHONPATH` is set by the scripts):
 ```
 python ablations/reference/run.py --device cuda          # first: the shared reference arm
 python ablations/A1_hybrid_components/run.py --device cuda
-...                                                       # A2, A3, A4, B1, B5, D6 likewise
+...                                                       # A3, A4, B1, B5 likewise
+python ablations/thesis_ablations/A2_shape_allocation/run.py --device cuda
+python ablations/thesis_ablations/D6_capability_inference/run.py --device cuda
 python ablations/D5_overhead/run.py                      # analysis of FINAL artifacts only
 python ablations/seeded_rows/run.py --device cuda  # new random row cohort per seed
 python ablations/seeded_rows/analyze.py --device cuda
+python ablations/thesis_ablations/P1_realization_aware_search/run.py --device cuda  # targeted
+python ablations/thesis_ablations/P2_coupled_phi/run.py --device cuda  # targeted; own full_phi reference arm
 ```
 
 Options: `--datasets`, `--budgets`, `--seeds`, `--victims`, `--classes`, `--conditions`,

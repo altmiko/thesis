@@ -14,7 +14,7 @@ packets and a positive `Fwd IAT Total`. The reference applies the mask in three 
 per-flow box, the projection and the canonical map φ. The ablated arm builds the box from the
 numeric train-envelope/budget headroom alone. Its φ then applies padding or delay to any flow.
 
-Everything else is the shared protocol (`../README.md`):
+Everything else is the shared protocol (`../../README.md`):
 
 - the same Hybrid Search, with validator_v2 `hybrid_valid` in the success predicate;
 - the same frozen flows, victims, seeds and budgets;
@@ -27,7 +27,7 @@ d sqrt(var)/dp = ∞·0. The canonical search raises on a non-finite gradient. T
 instead zeroes the affected gradient coordinates and counts them. On CICIDS2018 this happened
 for 69 flows per (victim, budget), pooled over seeds; on CICIDS2017 it never happened.
 
-Run: `python ablations/D6_capability_inference/run.py --device cuda`. Full tables are in
+Run: `python ablations/thesis_ablations/D6_capability_inference/run.py --device cuda`. Full tables are in
 `results/report.md`.
 
 ## Results

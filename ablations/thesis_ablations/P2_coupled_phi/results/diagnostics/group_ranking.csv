@@ -1,0 +1,9 @@
+dataset,group,rows,changed_rows,alone_breaks_success,reverting_restores_success,alone_breaks_pct,reverting_restores_pct,changed_pct
+cicids2017_distrinet,affine allocation of total forward delay,2416,2416,2340,2234,96.8543046357616,92.46688741721854,100.0
+cicids2017_distrinet,rates,2416,2416,182,76,7.533112582781457,3.1456953642384105,100.0
+cicids2017_distrinet,forward packet-length augmentation,2416,0,0,0,0.0,0.0,0.0
+cicids2017_distrinet,combined packet-length statistics,2416,0,0,0,0.0,0.0,0.0
+cicids2018_distrinet,affine allocation of total forward delay,132,132,132,129,100.0,97.72727272727273,100.0
+cicids2018_distrinet,rates,132,132,3,0,2.272727272727273,0.0,100.0
+cicids2018_distrinet,forward packet-length augmentation,132,0,0,0,0.0,0.0,0.0
+cicids2018_distrinet,combined packet-length statistics,132,0,0,0,0.0,0.0,0.0

@@ -9,11 +9,13 @@ cells. The canonical module is not modified: it is the locked FINAL-suite code.
 
 Every variant keeps the shared :class:`~attack.primitive_optimizer.RealizedSearch` (attack space,
 projection, quantized realization, victim scoring, query accounting), so an ablation changes only
-the component it names.
+the component it names. The one exception is ``realization_aware_search=False`` (ablation P1):
+the search scores its candidates on the continuous primitive state (:class:`ContinuousSearch`)
+and the canonical realization is applied once, to the returned candidate.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 import torch
 import torch.nn.functional as F
@@ -26,11 +28,13 @@ from attack.primitive_optimizer import (
     CONTROL_NAMES,
     SURROGATE_FLOOR,
     TARGET_BENIGN,
+    _VICTIM_CHUNK_ROWS,
     AttackObjective,
     PrimitiveOptimizationResult,
     RealizedSearch,
     _controls_from_q,
     _mask_q,
+    _normalized_cost,
     _q_from_controls,
     _random_q,
     _subset_bounds,
@@ -59,6 +63,10 @@ class HybridConfig:
     selection: str = "incumbent"         # "incumbent": success-first lowest cost; "last": last iterate
     fixed_shape: float | None = None     # None: shape is optimized; else pinned to this value
     loss: str = "margin"                 # gradient loss of the refinement stage
+    # False (ablation P1): candidates are scored and selected on the continuous primitive state;
+    # the canonical realization (integer bytes / µs, box, M(x), quantized φ) is applied once, to
+    # the returned candidate, and costs one of the ``eval_budget`` evaluations.
+    realization_aware_search: bool = True
 
     def __post_init__(self) -> None:
         if self.steps < 0 or self.learning_rate <= 0 or self.eval_budget < 1:
@@ -75,9 +83,18 @@ class HybridConfig:
             raise ValueError(f"loss must be one of {LOSSES}")
         if self.fixed_shape is not None and not 0.0 <= self.fixed_shape <= 1.0:
             raise ValueError("fixed_shape must lie in [0, 1]")
+        if not self.realization_aware_search and self.validity_in_search:
+            raise ValueError("validator_v2 judges realized flows: a continuous-state search "
+                             "(realization_aware_search=False) needs validity_in_search=False")
+        if not self.realization_aware_search and self.eval_budget < 2:
+            raise ValueError("a continuous-state search needs eval_budget >= 2 (identity + "
+                             "final realization)")
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        if self.realization_aware_search:  # omitted when canonical: keeps earlier configs comparable
+            del d["realization_aware_search"]
+        return d
 
 
 @dataclass(frozen=True)
@@ -87,6 +104,9 @@ class SearchDiagnostics:
     gradient_steps: torch.Tensor        # refinement gradient steps taken by the row
     zero_gradient_steps: torch.Tensor   # steps whose gradient was exactly 0 on every free coordinate
     nonfinite_gradient_steps: torch.Tensor  # steps with a non-finite gradient (zeroed; D6 only)
+    # Per-row arrays an arm records in addition (P1: the continuous search state before the
+    # final realization). Saved verbatim to the cell npz.
+    extra: dict[str, torch.Tensor] = field(default_factory=dict)
 
 
 class AblationSearch(RealizedSearch):
@@ -180,6 +200,110 @@ class AblationSearch(RealizedSearch):
         )
 
 
+def continuous_controls(requested: dict[str, torch.Tensor], bounds: dict[str, torch.Tensor],
+                        caps) -> dict[str, torch.Tensor]:
+    """``project_controls`` without the integer rounding: the continuous per-flow box
+    ``[0, bounds]`` (the domain of the relaxation ``bounds * q``) and the capability mask M(x)."""
+    p = torch.minimum(requested["p"].clamp(min=0.0), bounds["p"].clamp(min=0.0))
+    delay = torch.minimum(requested["delay"].clamp(min=0.0), bounds["delay"].clamp(min=0.0))
+    shape = torch.minimum(requested["shape"].clamp(0.0, 1.0), bounds["shape"].clamp(0.0, 1.0))
+    p = torch.where(caps.pad_allowed, p, torch.zeros_like(p))
+    delay = torch.where(caps.timing_allowed, delay, torch.zeros_like(delay))
+    shape = torch.where((delay > 0.0) & caps.timing_allowed, shape, torch.zeros_like(shape))
+    return {"p": p, "delay": delay, "shape": shape}
+
+
+class ContinuousSearch(AblationSearch):
+    """Search whose candidates are scored on the continuous primitive state (ablation P1).
+
+    Every candidate (identity, padding enumeration, refinement iterate) is mapped by
+    :func:`continuous_controls` and the canonical φ with ``quantize=False``; its victim logits
+    give the objective hit (the search success: ``validity_fn`` is None) and the margin, and the
+    canonical incumbent rule selects on them. Nothing is rounded during the search. One
+    candidate costs one victim evaluation, as in ``RealizedSearch`` (the inherited
+    ``realized`` counter therefore counts continuous candidates here).
+    """
+
+    def _score(self, rows: torch.Tensor, requested: dict[str, torch.Tensor]) -> dict:
+        parts = []
+        for start in range(0, rows.numel(), _VICTIM_CHUNK_ROWS):
+            r = rows[start:start + _VICTIM_CHUNK_ROWS]
+            req = {name: requested[name][start:start + _VICTIM_CHUNK_ROWS] for name in CONTROL_NAMES}
+            raw_s = self.raw[r]
+            bounds_s = _subset_bounds(self.bounds, r)
+            caps_s = _subset_capabilities(self.caps, r)
+            controls = continuous_controls(req, bounds_s, caps_s)
+            adv = self.model.generate(raw_s, controls, quantize=False, capabilities=caps_s)
+            logits = self.victim((adv - self.center) / self.scale)
+            hit = self.objective.hit(logits)
+            parts.append({
+                "projected": controls, "adv": adv, "logits": logits,
+                "margin": self.objective.margin(logits),
+                "cost": _normalized_cost(controls, bounds_s),
+                "hit": hit, "valid": torch.ones_like(hit), "success": hit,
+            })
+        if len(parts) == 1:
+            return parts[0]
+        out = {k: torch.cat([p[k] for p in parts]) for k in parts[0] if k != "projected"}
+        out["projected"] = {
+            name: torch.cat([p["projected"][name] for p in parts]) for name in CONTROL_NAMES
+        }
+        return out
+
+
+@torch.no_grad()
+def realize_once(search: ContinuousSearch) -> tuple[PrimitiveOptimizationResult,
+                                                     dict[str, torch.Tensor]]:
+    """Apply the canonical realization to the continuous search's returned candidate.
+
+    ``RealizedSearch._score`` (the FINAL code path, ``validity_fn=None``) projects the
+    requested controls (integer bytes and µs, per-flow box, M(x)), maps them through φ with
+    ``quantize=True`` and scores the victim: one evaluation per row. The returned result
+    describes the realized flow only (success = objective hit on it); the continuous state is
+    returned separately as ``continuous_*`` diagnostics.
+    """
+    cont = search.result()
+    rows = torch.arange(search.n, device=search.raw.device)
+    s = RealizedSearch._score(search, rows, cont.requested)
+    prior = cont.realized_evaluations + cont.surrogate_evaluations
+    final_index = prior + 1
+    none = torch.full_like(final_index, -1)
+    result = PrimitiveOptimizationResult(
+        requested=cont.requested,
+        projected=s["projected"],
+        adversarial_raw=s["adv"],
+        logits=s["logits"],
+        objective_margin=s["margin"],
+        normalized_cost=s["cost"],
+        valid=s["valid"],
+        success=s["success"],
+        candidate_source=cont.candidate_source,
+        realized_evaluations=torch.ones_like(prior),
+        # Victim passes on continuous states: candidates + gradient forwards.
+        surrogate_evaluations=prior,
+        backward_evaluations=cont.backward_evaluations,
+        first_success_evaluation=torch.where(s["success"], final_index, none),
+        first_objective_hit_evaluation=torch.where(s["hit"], final_index, none),
+        first_success_phase=torch.where(s["success"], cont.first_success_phase,
+                                        torch.full_like(cont.first_success_phase, -2)),
+        iterations=cont.iterations,
+        restarts=cont.restarts,
+    )
+    extra = {
+        "continuous_success": cont.success,
+        "continuous_pred": cont.logits.argmax(1),
+        "continuous_margin": cont.objective_margin,
+        "continuous_cost": cont.normalized_cost,
+        "continuous_adv_raw": cont.adversarial_raw,
+        **{f"continuous_{name}": cont.projected[name] for name in CONTROL_NAMES},
+        "continuous_candidate_evaluations": cont.realized_evaluations,
+        "continuous_gradient_evaluations": cont.surrogate_evaluations,
+        "continuous_first_hit_evaluation": cont.first_objective_hit_evaluation,
+        "final_realization_evaluations": result.realized_evaluations,
+    }
+    return result, extra
+
+
 def refinement_loss(
     kind: str,
     objective: AttackObjective,
@@ -249,10 +373,13 @@ def optimize_hybrid_ablation(
     cfg = config
     if cfg.restarts is None and cfg.eval_budget is None:
         raise ValueError("restarts=None (fill the budget) requires eval_budget")
-    search = AblationSearch(
+    # A continuous-state search keeps one evaluation per row for the final realization.
+    search_cls = AblationSearch if cfg.realization_aware_search else ContinuousSearch
+    search = search_cls(
         model, victim, raw, center, scale, bounds, caps,
         validity_fn=validity_fn if cfg.validity_in_search else None,
-        objective=objective, eval_budget=cfg.eval_budget,
+        objective=objective,
+        eval_budget=cfg.eval_budget - (0 if cfg.realization_aware_search else 1),
         surrogate_floor=cfg.surrogate_floor, shape_free=cfg.fixed_shape is None,
         track_last=cfg.selection == "last",
     )
@@ -380,4 +507,7 @@ def optimize_hybrid_ablation(
                         velocity[stalled] = 0.0
                         checkpoint_margin = restart_best_margin.clone()
             restart += 1
+    if not cfg.realization_aware_search:
+        res, extra = realize_once(search)
+        return res, SearchDiagnostics(grad_steps, zero_grad_steps, nonfinite_steps, extra)
     return search.result(), SearchDiagnostics(grad_steps, zero_grad_steps, nonfinite_steps)

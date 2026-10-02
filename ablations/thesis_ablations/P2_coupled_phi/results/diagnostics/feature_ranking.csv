@@ -1,0 +1,33 @@
+dataset,feature,rows,changed_rows,alone_breaks_success,reverting_restores_success,alone_breaks_pct,reverting_restores_pct,changed_pct,median_abs_scaled_change_of_cells
+cicids2017_distrinet,Fwd IAT Mean,2416,2416,1901,1419,78.68377483443709,58.73344370860927,100.0,1.3884203433990479
+cicids2017_distrinet,Flow IAT Mean,2416,2416,1466,532,60.67880794701987,22.019867549668874,100.0,1.4540328979492188
+cicids2017_distrinet,Flow Duration,2416,2416,749,367,31.001655629139073,15.190397350993377,100.0,1.1711021661758423
+cicids2017_distrinet,Flow Bytes/s,2416,2416,186,79,7.698675496688741,3.269867549668874,100.0,0.02495443820953369
+cicids2017_distrinet,Flow IAT Max,2416,2416,112,82,4.635761589403973,3.3940397350993377,100.0,1.3728454113006592
+cicids2017_distrinet,Bwd Packets/s,2416,2416,19,20,0.7864238410596026,0.8278145695364238,100.0,0.0013564785476773977
+cicids2017_distrinet,Flow Packets/s,2416,2416,2,10,0.08278145695364239,0.4139072847682119,100.0,0.0013059810735285282
+cicids2017_distrinet,Fwd Packets/s,2416,2416,2,8,0.08278145695364239,0.33112582781456956,100.0,0.0012514847330749035
+cicids2017_distrinet,Fwd Packet Length Mean,2416,0,0,0,0.0,0.0,0.0,0.0
+cicids2017_distrinet,Fwd Segment Size Avg,2416,0,0,0,0.0,0.0,0.0,0.0
+cicids2017_distrinet,Packet Length Max,2416,0,0,0,0.0,0.0,0.0,0.0
+cicids2017_distrinet,Packet Length Min,2416,0,0,0,0.0,0.0,0.0,0.0
+cicids2017_distrinet,Packet Length Mean,2416,0,0,0,0.0,0.0,0.0,0.0
+cicids2017_distrinet,Average Packet Size,2416,0,0,0,0.0,0.0,0.0,0.0
+cicids2017_distrinet,Packet Length Variance,2416,0,0,0,0.0,0.0,0.0,0.0
+cicids2017_distrinet,Packet Length Std,2416,0,0,0,0.0,0.0,0.0,0.0
+cicids2018_distrinet,Flow Duration,132,132,123,66,93.18181818181819,50.0,100.0,31.564435958862305
+cicids2018_distrinet,Fwd IAT Mean,132,132,91,85,68.93939393939394,64.39393939393939,100.0,60.91592025756836
+cicids2018_distrinet,Flow IAT Mean,132,132,37,17,28.03030303030303,12.878787878787879,100.0,50.073631286621094
+cicids2018_distrinet,Flow IAT Max,132,132,8,31,6.0606060606060606,23.484848484848484,100.0,79.92375183105469
+cicids2018_distrinet,Flow Packets/s,132,132,4,3,3.0303030303030303,2.272727272727273,100.0,0.006766072940081358
+cicids2018_distrinet,Flow Bytes/s,132,132,3,0,2.272727272727273,0.0,100.0,0.02386217936873436
+cicids2018_distrinet,Fwd Packet Length Mean,132,0,0,0,0.0,0.0,0.0,0.0
+cicids2018_distrinet,Fwd Segment Size Avg,132,0,0,0,0.0,0.0,0.0,0.0
+cicids2018_distrinet,Packet Length Max,132,0,0,0,0.0,0.0,0.0,0.0
+cicids2018_distrinet,Packet Length Min,132,0,0,0,0.0,0.0,0.0,0.0
+cicids2018_distrinet,Packet Length Mean,132,0,0,0,0.0,0.0,0.0,0.0
+cicids2018_distrinet,Average Packet Size,132,0,0,0,0.0,0.0,0.0,0.0
+cicids2018_distrinet,Packet Length Variance,132,0,0,0,0.0,0.0,0.0,0.0
+cicids2018_distrinet,Packet Length Std,132,0,0,0,0.0,0.0,0.0,0.0
+cicids2018_distrinet,Fwd Packets/s,132,132,0,0,0.0,0.0,100.0,0.006749974563717842
+cicids2018_distrinet,Bwd Packets/s,132,132,0,0,0.0,0.0,100.0,0.0067504714243113995

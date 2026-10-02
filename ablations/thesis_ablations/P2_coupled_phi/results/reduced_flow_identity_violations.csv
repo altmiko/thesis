@@ -1,0 +1,61 @@
+dataset,budget,identity,violations,v2_accepted_violations,moved_rows
+cicids2017_distrinet,p75,Fwd Packet Length Mean,9,0,21236
+cicids2017_distrinet,p75,Fwd Segment Size Avg,0,0,21236
+cicids2017_distrinet,p75,Bwd Packet Length Mean,0,0,21236
+cicids2017_distrinet,p75,Bwd Segment Size Avg,0,0,21236
+cicids2017_distrinet,p75,Packet Length Mean,9,0,21236
+cicids2017_distrinet,p75,Average Packet Size,0,0,21236
+cicids2017_distrinet,p75,Packet Length Variance,0,0,21236
+cicids2017_distrinet,p75,Packet Length Max,9,0,21236
+cicids2017_distrinet,p75,Packet Length Min,0,0,21236
+cicids2017_distrinet,p75,Fwd IAT Mean,21222,14962,21236
+cicids2017_distrinet,p75,Flow IAT Mean,0,0,21236
+cicids2017_distrinet,p75,Fwd Packets/s,0,0,21236
+cicids2017_distrinet,p75,Bwd Packets/s,0,0,21236
+cicids2017_distrinet,p75,Flow Packets/s,0,0,21236
+cicids2017_distrinet,p75,Flow Bytes/s,9,0,21236
+cicids2017_distrinet,unb,Fwd Packet Length Mean,9,0,21267
+cicids2017_distrinet,unb,Fwd Segment Size Avg,0,0,21267
+cicids2017_distrinet,unb,Bwd Packet Length Mean,0,0,21267
+cicids2017_distrinet,unb,Bwd Segment Size Avg,0,0,21267
+cicids2017_distrinet,unb,Packet Length Mean,9,0,21267
+cicids2017_distrinet,unb,Average Packet Size,0,0,21267
+cicids2017_distrinet,unb,Packet Length Variance,0,0,21267
+cicids2017_distrinet,unb,Packet Length Max,9,0,21267
+cicids2017_distrinet,unb,Packet Length Min,0,0,21267
+cicids2017_distrinet,unb,Fwd IAT Mean,21258,4514,21267
+cicids2017_distrinet,unb,Flow IAT Mean,0,0,21267
+cicids2017_distrinet,unb,Fwd Packets/s,0,0,21267
+cicids2017_distrinet,unb,Bwd Packets/s,0,0,21267
+cicids2017_distrinet,unb,Flow Packets/s,0,0,21267
+cicids2017_distrinet,unb,Flow Bytes/s,9,0,21267
+cicids2018_distrinet,p75,Fwd Packet Length Mean,48,0,14774
+cicids2018_distrinet,p75,Fwd Segment Size Avg,0,0,14774
+cicids2018_distrinet,p75,Bwd Packet Length Mean,0,0,14774
+cicids2018_distrinet,p75,Bwd Segment Size Avg,0,0,14774
+cicids2018_distrinet,p75,Packet Length Mean,48,0,14774
+cicids2018_distrinet,p75,Average Packet Size,0,0,14774
+cicids2018_distrinet,p75,Packet Length Variance,0,0,14774
+cicids2018_distrinet,p75,Packet Length Max,0,0,14774
+cicids2018_distrinet,p75,Packet Length Min,48,0,14774
+cicids2018_distrinet,p75,Fwd IAT Mean,14704,10067,14774
+cicids2018_distrinet,p75,Flow IAT Mean,0,0,14774
+cicids2018_distrinet,p75,Fwd Packets/s,0,0,14774
+cicids2018_distrinet,p75,Bwd Packets/s,0,0,14774
+cicids2018_distrinet,p75,Flow Packets/s,0,0,14774
+cicids2018_distrinet,p75,Flow Bytes/s,48,0,14774
+cicids2018_distrinet,unb,Fwd Packet Length Mean,48,0,17078
+cicids2018_distrinet,unb,Fwd Segment Size Avg,0,0,17078
+cicids2018_distrinet,unb,Bwd Packet Length Mean,0,0,17078
+cicids2018_distrinet,unb,Bwd Segment Size Avg,0,0,17078
+cicids2018_distrinet,unb,Packet Length Mean,48,0,17078
+cicids2018_distrinet,unb,Average Packet Size,0,0,17078
+cicids2018_distrinet,unb,Packet Length Variance,0,0,17078
+cicids2018_distrinet,unb,Packet Length Max,0,0,17078
+cicids2018_distrinet,unb,Packet Length Min,48,0,17078
+cicids2018_distrinet,unb,Fwd IAT Mean,17029,2615,17078
+cicids2018_distrinet,unb,Flow IAT Mean,0,0,17078
+cicids2018_distrinet,unb,Fwd Packets/s,0,0,17078
+cicids2018_distrinet,unb,Bwd Packets/s,0,0,17078
+cicids2018_distrinet,unb,Flow Packets/s,0,0,17078
+cicids2018_distrinet,unb,Flow Bytes/s,48,0,17078

@@ -13,7 +13,7 @@ as in the reference; only HOW it is allocated over the forward gaps changes:
 A pinned shape is applied to every candidate (clean start, random restarts) and receives no
 gradient step; the surrogate floor is not applied to it.
 
-    python ablations/A2_shape_allocation/run.py --device cuda
+    python ablations/thesis_ablations/A2_shape_allocation/run.py --device cuda
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 EXP_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(EXP_DIR.parents[1]))
+sys.path.insert(0, str(EXP_DIR.parents[2]))
 
 import numpy as np  # noqa: E402
 

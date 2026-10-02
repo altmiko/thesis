@@ -26,7 +26,7 @@ p75 + unbounded, both datasets, three victims, four classes, attack seeds 42/202
 
 The analysis also checks the rule on every genuine flow of the train, val and test splits of
 both datasets (a sound rule must accept them all), and confirms that the rule-off arms reproduce
-``ablations/reference`` and ``ablations/D6_capability_inference`` flow-for-flow.
+``ablations/reference`` and ``ablations/thesis_ablations/D6_capability_inference`` flow-for-flow.
 
     python ablations/V1_single_fwd_packet_rule/run.py --device cuda                  # all arms
     python ablations/V1_single_fwd_packet_rule/run.py --rule on --capability ablated  # one arm
@@ -65,8 +65,8 @@ CONDITIONS = [
 FAMILIES = (("aware", "capaware_rule_off", "capaware_rule_on"),
             ("ablated", "nocap_rule_off", "nocap_rule_on"))
 SAME_AS = {"capaware_rule_off": (REFERENCE_DIR / "results", REFERENCE.name),
-           "nocap_rule_off": (REPO_ROOT / "ablations/D6_capability_inference/results",
-                              "no_capability")}
+           "nocap_rule_off": (REPO_ROOT / "ablations" / "thesis_ablations"
+                              / "D6_capability_inference" / "results", "no_capability")}
 
 
 def add_arguments(ap) -> None:

@@ -18,7 +18,7 @@ gaps changes:
 
 A pinned shape applies to every candidate and is never updated by gradient.
 
-Run: `python ablations/A2_shape_allocation/run.py --device cuda`. Full tables:
+Run: `python ablations/thesis_ablations/A2_shape_allocation/run.py --device cuda`. Full tables:
 `results/report.md`.
 
 ## Results

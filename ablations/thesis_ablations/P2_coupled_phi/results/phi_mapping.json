@@ -1,0 +1,1628 @@
+{
+  "cicids2017_distrinet": {
+    "source": "src/attack/realizability/cicids2017.py:CICIDS2017PrimitiveModel.generate",
+    "source_sha256": "ebed83e1a77fd33d17963fea49ed881221833698edb76b8b692edba7ff7c9028",
+    "dataset": "cicids2017_distrinet",
+    "rule": "direct = the written value's backward slice (local assignments of generate) reaches the primitive controls and source columns only; derived = the slice reads a value that generate writes to another feature",
+    "write_sites": [
+      {
+        "feature": "Total Length of Fwd Packet",
+        "index": 6,
+        "line": 667,
+        "section": "forward packet-length augmentation",
+        "value": "tl_fwd",
+        "kind": "direct",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Total Fwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Fwd Packet Length Min",
+        "index": 9,
+        "line": 668,
+        "section": "forward packet-length augmentation",
+        "value": "fmin",
+        "kind": "direct",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Fwd Packet Length Min"
+        ],
+        "source_reads": [
+          "Fwd Packet Length Min"
+        ]
+      },
+      {
+        "feature": "Fwd Packet Length Max",
+        "index": 8,
+        "line": 669,
+        "section": "forward packet-length augmentation",
+        "value": "fmax",
+        "kind": "direct",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Fwd Packet Length Max"
+        ],
+        "source_reads": [
+          "Fwd Packet Length Max"
+        ]
+      },
+      {
+        "feature": "Fwd Packet Length Mean",
+        "index": 10,
+        "line": 670,
+        "section": "forward packet-length augmentation",
+        "value": "fmean",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Total Length of Fwd Packet"
+        ],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Total Fwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Fwd Segment Size Avg",
+        "index": 55,
+        "line": 671,
+        "section": "forward packet-length augmentation",
+        "value": "fmean",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Total Length of Fwd Packet"
+        ],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Total Fwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Fwd IAT Total",
+        "index": 22,
+        "line": 695,
+        "section": "affine allocation of total forward delay",
+        "value": "fit",
+        "kind": "direct",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Fwd IAT Total"
+        ]
+      },
+      {
+        "feature": "Fwd IAT Mean",
+        "index": 23,
+        "line": 696,
+        "section": "affine allocation of total forward delay",
+        "value": "fimean",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Fwd IAT Total"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Fwd IAT Total",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Fwd IAT Std",
+        "index": 24,
+        "line": 697,
+        "section": "affine allocation of total forward delay",
+        "value": "fistd",
+        "kind": "direct",
+        "primitives": [
+          "delay",
+          "shape"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Fwd IAT Std"
+        ],
+        "source_reads": [
+          "Fwd IAT Std",
+          "Fwd IAT Total"
+        ]
+      },
+      {
+        "feature": "Fwd IAT Max",
+        "index": 25,
+        "line": 698,
+        "section": "affine allocation of total forward delay",
+        "value": "fimax",
+        "kind": "direct",
+        "primitives": [
+          "delay",
+          "shape"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Fwd IAT Max"
+        ],
+        "source_reads": [
+          "Fwd IAT Max",
+          "Fwd IAT Total",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Fwd IAT Min",
+        "index": 26,
+        "line": 699,
+        "section": "affine allocation of total forward delay",
+        "value": "fimin",
+        "kind": "direct",
+        "primitives": [
+          "delay",
+          "shape"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Fwd IAT Min"
+        ],
+        "source_reads": [
+          "Fwd IAT Min",
+          "Fwd IAT Total",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Flow Duration",
+        "index": 3,
+        "line": 700,
+        "section": "affine allocation of total forward delay",
+        "value": "dur",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Fwd IAT Total"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Fwd IAT Total"
+        ]
+      },
+      {
+        "feature": "Flow IAT Mean",
+        "index": 18,
+        "line": 701,
+        "section": "affine allocation of total forward delay",
+        "value": "flow_iat_mean",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Flow Duration"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Fwd IAT Total",
+          "Total Bwd packets",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Flow IAT Max",
+        "index": 20,
+        "line": 702,
+        "section": "affine allocation of total forward delay",
+        "value": "flow_iat_max",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Flow Duration"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Flow IAT Max",
+          "Fwd IAT Total"
+        ]
+      },
+      {
+        "feature": "Packet Length Max",
+        "index": 41,
+        "line": 728,
+        "section": "combined packet-length statistics",
+        "value": "cmax",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Fwd Packet Length Max"
+        ],
+        "direct_bases": [
+          "Fwd Packet Length Max"
+        ],
+        "source_reads": [
+          "Bwd Packet Length Max",
+          "Fwd Packet Length Max",
+          "Total Bwd packets",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Packet Length Min",
+        "index": 40,
+        "line": 729,
+        "section": "combined packet-length statistics",
+        "value": "cmin",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Fwd Packet Length Min"
+        ],
+        "direct_bases": [
+          "Fwd Packet Length Min"
+        ],
+        "source_reads": [
+          "Bwd Packet Length Min",
+          "Fwd Packet Length Min",
+          "Total Bwd packets",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Packet Length Mean",
+        "index": 42,
+        "line": 730,
+        "section": "combined packet-length statistics",
+        "value": "pmean",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Total Length of Fwd Packet"
+        ],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Total Bwd packets",
+          "Total Fwd Packet",
+          "Total Length of Bwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Average Packet Size",
+        "index": 54,
+        "line": 731,
+        "section": "combined packet-length statistics",
+        "value": "pmean",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Total Length of Fwd Packet"
+        ],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Total Bwd packets",
+          "Total Fwd Packet",
+          "Total Length of Bwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Packet Length Variance",
+        "index": 44,
+        "line": 732,
+        "section": "combined packet-length statistics",
+        "value": "pvar",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Fwd Packet Length Mean",
+          "Fwd Segment Size Avg"
+        ],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Bwd Packet Length Mean",
+          "Bwd Packet Length Std",
+          "Fwd Packet Length Std",
+          "Total Bwd packets",
+          "Total Fwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Packet Length Std",
+        "index": 43,
+        "line": 733,
+        "section": "combined packet-length statistics",
+        "value": "pstd",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Packet Length Variance"
+        ],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Bwd Packet Length Mean",
+          "Bwd Packet Length Std",
+          "Fwd Packet Length Std",
+          "Total Bwd packets",
+          "Total Fwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Fwd Packets/s",
+        "index": 38,
+        "line": 738,
+        "section": "rates",
+        "value": "Nf_raw / dur_s",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Flow Duration"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Fwd IAT Total",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Bwd Packets/s",
+        "index": 39,
+        "line": 739,
+        "section": "rates",
+        "value": "Nb / dur_s",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Flow Duration"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Fwd IAT Total",
+          "Total Bwd packets"
+        ]
+      },
+      {
+        "feature": "Flow Packets/s",
+        "index": 17,
+        "line": 740,
+        "section": "rates",
+        "value": "N / dur_s",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Flow Duration"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Fwd IAT Total",
+          "Total Bwd packets",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Flow Bytes/s",
+        "index": 16,
+        "line": 741,
+        "section": "rates",
+        "value": "(tl_fwd + tl_bwd) / dur_s",
+        "kind": "derived",
+        "primitives": [
+          "p",
+          "delay"
+        ],
+        "gated_by": [
+          "p",
+          "delay"
+        ],
+        "parents": [
+          "Flow Duration",
+          "Total Length of Fwd Packet"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total",
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Fwd IAT Total",
+          "Total Fwd Packet",
+          "Total Length of Bwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      }
+    ],
+    "direct_features": [
+      "Total Length of Fwd Packet",
+      "Fwd Packet Length Min",
+      "Fwd Packet Length Max",
+      "Fwd IAT Total",
+      "Fwd IAT Std",
+      "Fwd IAT Max",
+      "Fwd IAT Min"
+    ],
+    "derived_features": [
+      "Fwd Packet Length Mean",
+      "Fwd Segment Size Avg",
+      "Fwd IAT Mean",
+      "Flow Duration",
+      "Flow IAT Mean",
+      "Flow IAT Max",
+      "Packet Length Max",
+      "Packet Length Min",
+      "Packet Length Mean",
+      "Average Packet Size",
+      "Packet Length Variance",
+      "Packet Length Std",
+      "Fwd Packets/s",
+      "Bwd Packets/s",
+      "Flow Packets/s",
+      "Flow Bytes/s"
+    ],
+    "derived_groups": {
+      "forward packet-length augmentation": [
+        "Fwd Packet Length Mean",
+        "Fwd Segment Size Avg"
+      ],
+      "affine allocation of total forward delay": [
+        "Fwd IAT Mean",
+        "Flow Duration",
+        "Flow IAT Mean",
+        "Flow IAT Max"
+      ],
+      "combined packet-length statistics": [
+        "Packet Length Max",
+        "Packet Length Min",
+        "Packet Length Mean",
+        "Average Packet Size",
+        "Packet Length Variance",
+        "Packet Length Std"
+      ],
+      "rates": [
+        "Fwd Packets/s",
+        "Bwd Packets/s",
+        "Flow Packets/s",
+        "Flow Bytes/s"
+      ]
+    },
+    "per_primitive": {
+      "p": {
+        "direct": [
+          "Total Length of Fwd Packet",
+          "Fwd Packet Length Min",
+          "Fwd Packet Length Max"
+        ],
+        "derived": [
+          "Fwd Packet Length Mean",
+          "Fwd Segment Size Avg",
+          "Packet Length Max",
+          "Packet Length Min",
+          "Packet Length Mean",
+          "Average Packet Size",
+          "Packet Length Variance",
+          "Packet Length Std",
+          "Flow Bytes/s"
+        ]
+      },
+      "delay": {
+        "direct": [
+          "Fwd IAT Total",
+          "Fwd IAT Std",
+          "Fwd IAT Max",
+          "Fwd IAT Min"
+        ],
+        "derived": [
+          "Fwd IAT Mean",
+          "Flow Duration",
+          "Flow IAT Mean",
+          "Flow IAT Max",
+          "Fwd Packets/s",
+          "Bwd Packets/s",
+          "Flow Packets/s",
+          "Flow Bytes/s"
+        ]
+      },
+      "shape": {
+        "direct": [
+          "Fwd IAT Std",
+          "Fwd IAT Max",
+          "Fwd IAT Min"
+        ],
+        "derived": []
+      }
+    },
+    "not_written": [
+      "Src Port",
+      "Dst Port",
+      "Protocol",
+      "Total Fwd Packet",
+      "Total Bwd packets",
+      "Total Length of Bwd Packet",
+      "Fwd Packet Length Std",
+      "Bwd Packet Length Max",
+      "Bwd Packet Length Min",
+      "Bwd Packet Length Mean",
+      "Bwd Packet Length Std",
+      "Flow IAT Std",
+      "Flow IAT Min",
+      "Bwd IAT Total",
+      "Bwd IAT Mean",
+      "Bwd IAT Std",
+      "Bwd IAT Max",
+      "Bwd IAT Min",
+      "Fwd PSH Flags",
+      "Bwd PSH Flags",
+      "Fwd URG Flags",
+      "Bwd URG Flags",
+      "Fwd Header Length",
+      "Bwd Header Length",
+      "FIN Flag Count",
+      "SYN Flag Count",
+      "RST Flag Count",
+      "PSH Flag Count",
+      "ACK Flag Count",
+      "URG Flag Count",
+      "CWR Flag Count",
+      "ECE Flag Count",
+      "Down/Up Ratio",
+      "Bwd Segment Size Avg",
+      "Fwd Bytes/Bulk Avg",
+      "Fwd Packet/Bulk Avg",
+      "Fwd Bulk Rate Avg",
+      "Bwd Bytes/Bulk Avg",
+      "Bwd Packet/Bulk Avg",
+      "Bwd Bulk Rate Avg",
+      "Subflow Fwd Packets",
+      "Subflow Fwd Bytes",
+      "Subflow Bwd Packets",
+      "Subflow Bwd Bytes",
+      "FWD Init Win Bytes",
+      "Bwd Init Win Bytes",
+      "Fwd Act Data Pkts",
+      "Fwd Seg Size Min",
+      "Active Mean",
+      "Active Std",
+      "Active Max",
+      "Active Min",
+      "Idle Mean",
+      "Idle Std",
+      "Idle Max",
+      "Idle Min"
+    ],
+    "empirical_check": {
+      "n_flows": 82908,
+      "observed_changed": {
+        "p": [
+          "Average Packet Size",
+          "Flow Bytes/s",
+          "Fwd Packet Length Max",
+          "Fwd Packet Length Mean",
+          "Fwd Packet Length Min",
+          "Fwd Segment Size Avg",
+          "Packet Length Max",
+          "Packet Length Mean",
+          "Packet Length Min",
+          "Packet Length Std",
+          "Packet Length Variance",
+          "Total Length of Fwd Packet"
+        ],
+        "delay": [
+          "Bwd Packets/s",
+          "Flow Bytes/s",
+          "Flow Duration",
+          "Flow IAT Max",
+          "Flow IAT Mean",
+          "Flow Packets/s",
+          "Fwd IAT Max",
+          "Fwd IAT Mean",
+          "Fwd IAT Min",
+          "Fwd IAT Std",
+          "Fwd IAT Total",
+          "Fwd Packets/s"
+        ],
+        "shape": [
+          "Fwd IAT Max",
+          "Fwd IAT Min",
+          "Fwd IAT Std"
+        ]
+      },
+      "observed_subset_of_traced": {
+        "p": true,
+        "delay": true,
+        "shape": true
+      },
+      "traced_not_observed": {
+        "p": [],
+        "delay": [],
+        "shape": []
+      },
+      "reduced_changes_only_direct": true,
+      "reduced_equals_full_on_direct": true,
+      "full_minus_reduced_only_derived": true,
+      "derived_changed_by_full": [
+        "Average Packet Size",
+        "Bwd Packets/s",
+        "Flow Bytes/s",
+        "Flow Duration",
+        "Flow IAT Max",
+        "Flow IAT Mean",
+        "Flow Packets/s",
+        "Fwd IAT Mean",
+        "Fwd Packet Length Mean",
+        "Fwd Packets/s",
+        "Fwd Segment Size Avg",
+        "Packet Length Max",
+        "Packet Length Mean",
+        "Packet Length Min",
+        "Packet Length Std",
+        "Packet Length Variance"
+      ],
+      "flows_from": "first 200,000 TRAIN flows (pristine)"
+    }
+  },
+  "cicids2018_distrinet": {
+    "source": "src/attack/realizability/cicids2017.py:CICIDS2017PrimitiveModel.generate",
+    "source_sha256": "ebed83e1a77fd33d17963fea49ed881221833698edb76b8b692edba7ff7c9028",
+    "dataset": "cicids2018_distrinet",
+    "rule": "direct = the written value's backward slice (local assignments of generate) reaches the primitive controls and source columns only; derived = the slice reads a value that generate writes to another feature",
+    "write_sites": [
+      {
+        "feature": "Total Length of Fwd Packet",
+        "index": 6,
+        "line": 667,
+        "section": "forward packet-length augmentation",
+        "value": "tl_fwd",
+        "kind": "direct",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Total Fwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Fwd Packet Length Min",
+        "index": 9,
+        "line": 668,
+        "section": "forward packet-length augmentation",
+        "value": "fmin",
+        "kind": "direct",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Fwd Packet Length Min"
+        ],
+        "source_reads": [
+          "Fwd Packet Length Min"
+        ]
+      },
+      {
+        "feature": "Fwd Packet Length Max",
+        "index": 8,
+        "line": 669,
+        "section": "forward packet-length augmentation",
+        "value": "fmax",
+        "kind": "direct",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Fwd Packet Length Max"
+        ],
+        "source_reads": [
+          "Fwd Packet Length Max"
+        ]
+      },
+      {
+        "feature": "Fwd Packet Length Mean",
+        "index": 10,
+        "line": 670,
+        "section": "forward packet-length augmentation",
+        "value": "fmean",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Total Length of Fwd Packet"
+        ],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Total Fwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Fwd Segment Size Avg",
+        "index": 55,
+        "line": 671,
+        "section": "forward packet-length augmentation",
+        "value": "fmean",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Total Length of Fwd Packet"
+        ],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Total Fwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Fwd IAT Total",
+        "index": 22,
+        "line": 695,
+        "section": "affine allocation of total forward delay",
+        "value": "fit",
+        "kind": "direct",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Fwd IAT Total"
+        ]
+      },
+      {
+        "feature": "Fwd IAT Mean",
+        "index": 23,
+        "line": 696,
+        "section": "affine allocation of total forward delay",
+        "value": "fimean",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Fwd IAT Total"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Fwd IAT Total",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Fwd IAT Std",
+        "index": 24,
+        "line": 697,
+        "section": "affine allocation of total forward delay",
+        "value": "fistd",
+        "kind": "direct",
+        "primitives": [
+          "delay",
+          "shape"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Fwd IAT Std"
+        ],
+        "source_reads": [
+          "Fwd IAT Std",
+          "Fwd IAT Total"
+        ]
+      },
+      {
+        "feature": "Fwd IAT Max",
+        "index": 25,
+        "line": 698,
+        "section": "affine allocation of total forward delay",
+        "value": "fimax",
+        "kind": "direct",
+        "primitives": [
+          "delay",
+          "shape"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Fwd IAT Max"
+        ],
+        "source_reads": [
+          "Fwd IAT Max",
+          "Fwd IAT Total",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Fwd IAT Min",
+        "index": 26,
+        "line": 699,
+        "section": "affine allocation of total forward delay",
+        "value": "fimin",
+        "kind": "direct",
+        "primitives": [
+          "delay",
+          "shape"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [],
+        "direct_bases": [
+          "Fwd IAT Min"
+        ],
+        "source_reads": [
+          "Fwd IAT Min",
+          "Fwd IAT Total",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Flow Duration",
+        "index": 3,
+        "line": 700,
+        "section": "affine allocation of total forward delay",
+        "value": "dur",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Fwd IAT Total"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Fwd IAT Total"
+        ]
+      },
+      {
+        "feature": "Flow IAT Mean",
+        "index": 18,
+        "line": 701,
+        "section": "affine allocation of total forward delay",
+        "value": "flow_iat_mean",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Flow Duration"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Fwd IAT Total",
+          "Total Bwd packets",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Flow IAT Max",
+        "index": 20,
+        "line": 702,
+        "section": "affine allocation of total forward delay",
+        "value": "flow_iat_max",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Flow Duration"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Flow IAT Max",
+          "Fwd IAT Total"
+        ]
+      },
+      {
+        "feature": "Packet Length Max",
+        "index": 41,
+        "line": 728,
+        "section": "combined packet-length statistics",
+        "value": "cmax",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Fwd Packet Length Max"
+        ],
+        "direct_bases": [
+          "Fwd Packet Length Max"
+        ],
+        "source_reads": [
+          "Bwd Packet Length Max",
+          "Fwd Packet Length Max",
+          "Total Bwd packets",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Packet Length Min",
+        "index": 40,
+        "line": 729,
+        "section": "combined packet-length statistics",
+        "value": "cmin",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Fwd Packet Length Min"
+        ],
+        "direct_bases": [
+          "Fwd Packet Length Min"
+        ],
+        "source_reads": [
+          "Bwd Packet Length Min",
+          "Fwd Packet Length Min",
+          "Total Bwd packets",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Packet Length Mean",
+        "index": 42,
+        "line": 730,
+        "section": "combined packet-length statistics",
+        "value": "pmean",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Total Length of Fwd Packet"
+        ],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Total Bwd packets",
+          "Total Fwd Packet",
+          "Total Length of Bwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Average Packet Size",
+        "index": 54,
+        "line": 731,
+        "section": "combined packet-length statistics",
+        "value": "pmean",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Total Length of Fwd Packet"
+        ],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Total Bwd packets",
+          "Total Fwd Packet",
+          "Total Length of Bwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Packet Length Variance",
+        "index": 44,
+        "line": 732,
+        "section": "combined packet-length statistics",
+        "value": "pvar",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Fwd Packet Length Mean",
+          "Fwd Segment Size Avg"
+        ],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Bwd Packet Length Mean",
+          "Bwd Packet Length Std",
+          "Fwd Packet Length Std",
+          "Total Bwd packets",
+          "Total Fwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Packet Length Std",
+        "index": 43,
+        "line": 733,
+        "section": "combined packet-length statistics",
+        "value": "pstd",
+        "kind": "derived",
+        "primitives": [
+          "p"
+        ],
+        "gated_by": [
+          "p"
+        ],
+        "parents": [
+          "Packet Length Variance"
+        ],
+        "direct_bases": [
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Bwd Packet Length Mean",
+          "Bwd Packet Length Std",
+          "Fwd Packet Length Std",
+          "Total Bwd packets",
+          "Total Fwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Fwd Packets/s",
+        "index": 38,
+        "line": 738,
+        "section": "rates",
+        "value": "Nf_raw / dur_s",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Flow Duration"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Fwd IAT Total",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Bwd Packets/s",
+        "index": 39,
+        "line": 739,
+        "section": "rates",
+        "value": "Nb / dur_s",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Flow Duration"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Fwd IAT Total",
+          "Total Bwd packets"
+        ]
+      },
+      {
+        "feature": "Flow Packets/s",
+        "index": 17,
+        "line": 740,
+        "section": "rates",
+        "value": "N / dur_s",
+        "kind": "derived",
+        "primitives": [
+          "delay"
+        ],
+        "gated_by": [
+          "delay"
+        ],
+        "parents": [
+          "Flow Duration"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Fwd IAT Total",
+          "Total Bwd packets",
+          "Total Fwd Packet"
+        ]
+      },
+      {
+        "feature": "Flow Bytes/s",
+        "index": 16,
+        "line": 741,
+        "section": "rates",
+        "value": "(tl_fwd + tl_bwd) / dur_s",
+        "kind": "derived",
+        "primitives": [
+          "p",
+          "delay"
+        ],
+        "gated_by": [
+          "p",
+          "delay"
+        ],
+        "parents": [
+          "Flow Duration",
+          "Total Length of Fwd Packet"
+        ],
+        "direct_bases": [
+          "Fwd IAT Total",
+          "Total Length of Fwd Packet"
+        ],
+        "source_reads": [
+          "Bwd IAT Total",
+          "Flow Duration",
+          "Fwd IAT Total",
+          "Total Fwd Packet",
+          "Total Length of Bwd Packet",
+          "Total Length of Fwd Packet"
+        ]
+      }
+    ],
+    "direct_features": [
+      "Total Length of Fwd Packet",
+      "Fwd Packet Length Min",
+      "Fwd Packet Length Max",
+      "Fwd IAT Total",
+      "Fwd IAT Std",
+      "Fwd IAT Max",
+      "Fwd IAT Min"
+    ],
+    "derived_features": [
+      "Fwd Packet Length Mean",
+      "Fwd Segment Size Avg",
+      "Fwd IAT Mean",
+      "Flow Duration",
+      "Flow IAT Mean",
+      "Flow IAT Max",
+      "Packet Length Max",
+      "Packet Length Min",
+      "Packet Length Mean",
+      "Average Packet Size",
+      "Packet Length Variance",
+      "Packet Length Std",
+      "Fwd Packets/s",
+      "Bwd Packets/s",
+      "Flow Packets/s",
+      "Flow Bytes/s"
+    ],
+    "derived_groups": {
+      "forward packet-length augmentation": [
+        "Fwd Packet Length Mean",
+        "Fwd Segment Size Avg"
+      ],
+      "affine allocation of total forward delay": [
+        "Fwd IAT Mean",
+        "Flow Duration",
+        "Flow IAT Mean",
+        "Flow IAT Max"
+      ],
+      "combined packet-length statistics": [
+        "Packet Length Max",
+        "Packet Length Min",
+        "Packet Length Mean",
+        "Average Packet Size",
+        "Packet Length Variance",
+        "Packet Length Std"
+      ],
+      "rates": [
+        "Fwd Packets/s",
+        "Bwd Packets/s",
+        "Flow Packets/s",
+        "Flow Bytes/s"
+      ]
+    },
+    "per_primitive": {
+      "p": {
+        "direct": [
+          "Total Length of Fwd Packet",
+          "Fwd Packet Length Min",
+          "Fwd Packet Length Max"
+        ],
+        "derived": [
+          "Fwd Packet Length Mean",
+          "Fwd Segment Size Avg",
+          "Packet Length Max",
+          "Packet Length Min",
+          "Packet Length Mean",
+          "Average Packet Size",
+          "Packet Length Variance",
+          "Packet Length Std",
+          "Flow Bytes/s"
+        ]
+      },
+      "delay": {
+        "direct": [
+          "Fwd IAT Total",
+          "Fwd IAT Std",
+          "Fwd IAT Max",
+          "Fwd IAT Min"
+        ],
+        "derived": [
+          "Fwd IAT Mean",
+          "Flow Duration",
+          "Flow IAT Mean",
+          "Flow IAT Max",
+          "Fwd Packets/s",
+          "Bwd Packets/s",
+          "Flow Packets/s",
+          "Flow Bytes/s"
+        ]
+      },
+      "shape": {
+        "direct": [
+          "Fwd IAT Std",
+          "Fwd IAT Max",
+          "Fwd IAT Min"
+        ],
+        "derived": []
+      }
+    },
+    "not_written": [
+      "Src Port",
+      "Dst Port",
+      "Protocol",
+      "Total Fwd Packet",
+      "Total Bwd packets",
+      "Total Length of Bwd Packet",
+      "Fwd Packet Length Std",
+      "Bwd Packet Length Max",
+      "Bwd Packet Length Min",
+      "Bwd Packet Length Mean",
+      "Bwd Packet Length Std",
+      "Flow IAT Std",
+      "Flow IAT Min",
+      "Bwd IAT Total",
+      "Bwd IAT Mean",
+      "Bwd IAT Std",
+      "Bwd IAT Max",
+      "Bwd IAT Min",
+      "Fwd PSH Flags",
+      "Bwd PSH Flags",
+      "Fwd URG Flags",
+      "Bwd URG Flags",
+      "Fwd Header Length",
+      "Bwd Header Length",
+      "FIN Flag Count",
+      "SYN Flag Count",
+      "RST Flag Count",
+      "PSH Flag Count",
+      "ACK Flag Count",
+      "URG Flag Count",
+      "CWR Flag Count",
+      "ECE Flag Count",
+      "Down/Up Ratio",
+      "Bwd Segment Size Avg",
+      "Fwd Bytes/Bulk Avg",
+      "Fwd Packet/Bulk Avg",
+      "Fwd Bulk Rate Avg",
+      "Bwd Bytes/Bulk Avg",
+      "Bwd Packet/Bulk Avg",
+      "Bwd Bulk Rate Avg",
+      "Subflow Fwd Packets",
+      "Subflow Fwd Bytes",
+      "Subflow Bwd Packets",
+      "Subflow Bwd Bytes",
+      "FWD Init Win Bytes",
+      "Bwd Init Win Bytes",
+      "Fwd Act Data Pkts",
+      "Fwd Seg Size Min",
+      "Active Mean",
+      "Active Std",
+      "Active Max",
+      "Active Min",
+      "Idle Mean",
+      "Idle Std",
+      "Idle Max",
+      "Idle Min"
+    ],
+    "empirical_check": {
+      "n_flows": 5161,
+      "observed_changed": {
+        "p": [
+          "Average Packet Size",
+          "Flow Bytes/s",
+          "Fwd Packet Length Max",
+          "Fwd Packet Length Mean",
+          "Fwd Packet Length Min",
+          "Fwd Segment Size Avg",
+          "Packet Length Max",
+          "Packet Length Mean",
+          "Packet Length Min",
+          "Packet Length Std",
+          "Packet Length Variance",
+          "Total Length of Fwd Packet"
+        ],
+        "delay": [
+          "Bwd Packets/s",
+          "Flow Bytes/s",
+          "Flow Duration",
+          "Flow IAT Max",
+          "Flow IAT Mean",
+          "Flow Packets/s",
+          "Fwd IAT Max",
+          "Fwd IAT Mean",
+          "Fwd IAT Min",
+          "Fwd IAT Std",
+          "Fwd IAT Total",
+          "Fwd Packets/s"
+        ],
+        "shape": [
+          "Fwd IAT Max",
+          "Fwd IAT Min",
+          "Fwd IAT Std"
+        ]
+      },
+      "observed_subset_of_traced": {
+        "p": true,
+        "delay": true,
+        "shape": true
+      },
+      "traced_not_observed": {
+        "p": [],
+        "delay": [],
+        "shape": []
+      },
+      "reduced_changes_only_direct": true,
+      "reduced_equals_full_on_direct": true,
+      "full_minus_reduced_only_derived": true,
+      "derived_changed_by_full": [
+        "Average Packet Size",
+        "Bwd Packets/s",
+        "Flow Bytes/s",
+        "Flow Duration",
+        "Flow IAT Max",
+        "Flow IAT Mean",
+        "Flow Packets/s",
+        "Fwd IAT Mean",
+        "Fwd Packet Length Mean",
+        "Fwd Packets/s",
+        "Fwd Segment Size Avg",
+        "Packet Length Max",
+        "Packet Length Mean",
+        "Packet Length Min",
+        "Packet Length Std",
+        "Packet Length Variance"
+      ],
+      "flows_from": "first 200,000 TRAIN flows (pristine)"
+    }
+  }
+}

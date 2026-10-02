@@ -2,7 +2,7 @@
 
 ## Why
 
-Ablation D6 (`../D6_capability_inference`) found a gap in validator_v2:
+Ablation D6 (`../thesis_ablations/D6_capability_inference`) found a gap in validator_v2:
 
 - PrimAttack can add forward delay to a flow with only one forward packet. Example:
   `Fwd IAT Total` goes from 0 to 1.2e7 µs while `Total Fwd Packet = 1`.

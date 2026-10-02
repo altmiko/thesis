@@ -1,0 +1,97 @@
+dataset,victim,budget,seed,group,rows,changed_rows,alone_breaks_success,reverting_restores_success
+cicids2017_distrinet,mlp,p75,42,forward packet-length augmentation,42,0,0,0
+cicids2017_distrinet,mlp,p75,42,affine allocation of total forward delay,42,42,37,30
+cicids2017_distrinet,mlp,p75,42,combined packet-length statistics,42,0,0,0
+cicids2017_distrinet,mlp,p75,42,rates,42,42,12,5
+cicids2017_distrinet,mlp,p75,2024,forward packet-length augmentation,37,0,0,0
+cicids2017_distrinet,mlp,p75,2024,affine allocation of total forward delay,37,37,33,30
+cicids2017_distrinet,mlp,p75,2024,combined packet-length statistics,37,0,0,0
+cicids2017_distrinet,mlp,p75,2024,rates,37,37,7,4
+cicids2017_distrinet,mlp,p75,2026,forward packet-length augmentation,42,0,0,0
+cicids2017_distrinet,mlp,p75,2026,affine allocation of total forward delay,42,42,37,31
+cicids2017_distrinet,mlp,p75,2026,combined packet-length statistics,42,0,0,0
+cicids2017_distrinet,mlp,p75,2026,rates,42,42,11,5
+cicids2017_distrinet,mlp,unb,42,forward packet-length augmentation,449,0,0,0
+cicids2017_distrinet,mlp,unb,42,affine allocation of total forward delay,449,449,435,410
+cicids2017_distrinet,mlp,unb,42,combined packet-length statistics,449,0,0,0
+cicids2017_distrinet,mlp,unb,42,rates,449,449,39,14
+cicids2017_distrinet,mlp,unb,2024,forward packet-length augmentation,449,0,0,0
+cicids2017_distrinet,mlp,unb,2024,affine allocation of total forward delay,449,449,435,410
+cicids2017_distrinet,mlp,unb,2024,combined packet-length statistics,449,0,0,0
+cicids2017_distrinet,mlp,unb,2024,rates,449,449,39,14
+cicids2017_distrinet,mlp,unb,2026,forward packet-length augmentation,450,0,0,0
+cicids2017_distrinet,mlp,unb,2026,affine allocation of total forward delay,450,450,434,407
+cicids2017_distrinet,mlp,unb,2026,combined packet-length statistics,450,0,0,0
+cicids2017_distrinet,mlp,unb,2026,rates,450,450,43,16
+cicids2017_distrinet,cnn,p75,42,forward packet-length augmentation,49,0,0,0
+cicids2017_distrinet,cnn,p75,42,affine allocation of total forward delay,49,49,49,46
+cicids2017_distrinet,cnn,p75,42,combined packet-length statistics,49,0,0,0
+cicids2017_distrinet,cnn,p75,42,rates,49,49,3,0
+cicids2017_distrinet,cnn,p75,2024,forward packet-length augmentation,53,0,0,0
+cicids2017_distrinet,cnn,p75,2024,affine allocation of total forward delay,53,53,52,49
+cicids2017_distrinet,cnn,p75,2024,combined packet-length statistics,53,0,0,0
+cicids2017_distrinet,cnn,p75,2024,rates,53,53,4,1
+cicids2017_distrinet,cnn,p75,2026,forward packet-length augmentation,59,0,0,0
+cicids2017_distrinet,cnn,p75,2026,affine allocation of total forward delay,59,59,59,55
+cicids2017_distrinet,cnn,p75,2026,combined packet-length statistics,59,0,0,0
+cicids2017_distrinet,cnn,p75,2026,rates,59,59,4,0
+cicids2017_distrinet,cnn,unb,42,forward packet-length augmentation,255,0,0,0
+cicids2017_distrinet,cnn,unb,42,affine allocation of total forward delay,255,255,250,251
+cicids2017_distrinet,cnn,unb,42,combined packet-length statistics,255,0,0,0
+cicids2017_distrinet,cnn,unb,42,rates,255,255,4,5
+cicids2017_distrinet,cnn,unb,2024,forward packet-length augmentation,250,0,0,0
+cicids2017_distrinet,cnn,unb,2024,affine allocation of total forward delay,250,250,244,242
+cicids2017_distrinet,cnn,unb,2024,combined packet-length statistics,250,0,0,0
+cicids2017_distrinet,cnn,unb,2024,rates,250,250,8,6
+cicids2017_distrinet,cnn,unb,2026,forward packet-length augmentation,267,0,0,0
+cicids2017_distrinet,cnn,unb,2026,affine allocation of total forward delay,267,267,261,259
+cicids2017_distrinet,cnn,unb,2026,combined packet-length statistics,267,0,0,0
+cicids2017_distrinet,cnn,unb,2026,rates,267,267,8,6
+cicids2017_distrinet,ft_transformer,unb,42,forward packet-length augmentation,5,0,0,0
+cicids2017_distrinet,ft_transformer,unb,42,affine allocation of total forward delay,5,5,5,5
+cicids2017_distrinet,ft_transformer,unb,42,combined packet-length statistics,5,0,0,0
+cicids2017_distrinet,ft_transformer,unb,42,rates,5,5,0,0
+cicids2017_distrinet,ft_transformer,unb,2024,forward packet-length augmentation,5,0,0,0
+cicids2017_distrinet,ft_transformer,unb,2024,affine allocation of total forward delay,5,5,5,5
+cicids2017_distrinet,ft_transformer,unb,2024,combined packet-length statistics,5,0,0,0
+cicids2017_distrinet,ft_transformer,unb,2024,rates,5,5,0,0
+cicids2017_distrinet,ft_transformer,unb,2026,forward packet-length augmentation,4,0,0,0
+cicids2017_distrinet,ft_transformer,unb,2026,affine allocation of total forward delay,4,4,4,4
+cicids2017_distrinet,ft_transformer,unb,2026,combined packet-length statistics,4,0,0,0
+cicids2017_distrinet,ft_transformer,unb,2026,rates,4,4,0,0
+cicids2018_distrinet,mlp-s42,p75,42,forward packet-length augmentation,4,0,0,0
+cicids2018_distrinet,mlp-s42,p75,42,affine allocation of total forward delay,4,4,4,4
+cicids2018_distrinet,mlp-s42,p75,42,combined packet-length statistics,4,0,0,0
+cicids2018_distrinet,mlp-s42,p75,42,rates,4,4,0,0
+cicids2018_distrinet,mlp-s42,p75,2024,forward packet-length augmentation,4,0,0,0
+cicids2018_distrinet,mlp-s42,p75,2024,affine allocation of total forward delay,4,4,4,4
+cicids2018_distrinet,mlp-s42,p75,2024,combined packet-length statistics,4,0,0,0
+cicids2018_distrinet,mlp-s42,p75,2024,rates,4,4,0,0
+cicids2018_distrinet,mlp-s42,p75,2026,forward packet-length augmentation,4,0,0,0
+cicids2018_distrinet,mlp-s42,p75,2026,affine allocation of total forward delay,4,4,4,4
+cicids2018_distrinet,mlp-s42,p75,2026,combined packet-length statistics,4,0,0,0
+cicids2018_distrinet,mlp-s42,p75,2026,rates,4,4,0,0
+cicids2018_distrinet,mlp-s42,unb,42,forward packet-length augmentation,24,0,0,0
+cicids2018_distrinet,mlp-s42,unb,42,affine allocation of total forward delay,24,24,24,24
+cicids2018_distrinet,mlp-s42,unb,42,combined packet-length statistics,24,0,0,0
+cicids2018_distrinet,mlp-s42,unb,42,rates,24,24,0,0
+cicids2018_distrinet,mlp-s42,unb,2024,forward packet-length augmentation,24,0,0,0
+cicids2018_distrinet,mlp-s42,unb,2024,affine allocation of total forward delay,24,24,24,24
+cicids2018_distrinet,mlp-s42,unb,2024,combined packet-length statistics,24,0,0,0
+cicids2018_distrinet,mlp-s42,unb,2024,rates,24,24,0,0
+cicids2018_distrinet,mlp-s42,unb,2026,forward packet-length augmentation,28,0,0,0
+cicids2018_distrinet,mlp-s42,unb,2026,affine allocation of total forward delay,28,28,28,28
+cicids2018_distrinet,mlp-s42,unb,2026,combined packet-length statistics,28,0,0,0
+cicids2018_distrinet,mlp-s42,unb,2026,rates,28,28,0,0
+cicids2018_distrinet,cnn-s42,unb,42,forward packet-length augmentation,14,0,0,0
+cicids2018_distrinet,cnn-s42,unb,42,affine allocation of total forward delay,14,14,14,13
+cicids2018_distrinet,cnn-s42,unb,42,combined packet-length statistics,14,0,0,0
+cicids2018_distrinet,cnn-s42,unb,42,rates,14,14,1,0
+cicids2018_distrinet,cnn-s42,unb,2024,forward packet-length augmentation,15,0,0,0
+cicids2018_distrinet,cnn-s42,unb,2024,affine allocation of total forward delay,15,15,15,14
+cicids2018_distrinet,cnn-s42,unb,2024,combined packet-length statistics,15,0,0,0
+cicids2018_distrinet,cnn-s42,unb,2024,rates,15,15,1,0
+cicids2018_distrinet,cnn-s42,unb,2026,forward packet-length augmentation,15,0,0,0
+cicids2018_distrinet,cnn-s42,unb,2026,affine allocation of total forward delay,15,15,15,14
+cicids2018_distrinet,cnn-s42,unb,2026,combined packet-length statistics,15,0,0,0
+cicids2018_distrinet,cnn-s42,unb,2026,rates,15,15,1,0

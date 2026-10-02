@@ -19,7 +19,7 @@ and are then scored by the SAME final validator_v2 (all four layers, source-cond
 analysis splits the ablated arm's valid successes by whether they used a primitive the source
 flow's capability forbids, and reports which validator layer (if any) rejected such candidates.
 
-    python ablations/D6_capability_inference/run.py --device cuda
+    python ablations/thesis_ablations/D6_capability_inference/run.py --device cuda
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 
 EXP_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(EXP_DIR.parents[1]))
+sys.path.insert(0, str(EXP_DIR.parents[2]))
 
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402

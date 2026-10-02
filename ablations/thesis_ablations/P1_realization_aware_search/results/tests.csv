@@ -1,0 +1,13 @@
+dataset,victim,budget,seed,n,outcome,p1_valid_asr,ref_valid_asr,diff_pp,ci95_lo_pp,ci95_hi_pp,p1_only,ref_only,test,p_value,p_holm
+cicids2017_distrinet,mlp,p75,42,3200,valid_success,0.0409375,0.0409375,0.0,-0.12595859882272095,0.12595859882272095,0,0,exact binomial McNemar,1.0,1.0
+cicids2017_distrinet,mlp,unb,42,3200,valid_success,0.229375,0.229375,0.0,-0.08921052191366745,0.08921052191366745,0,0,exact binomial McNemar,1.0,1.0
+cicids2017_distrinet,cnn,p75,42,3200,valid_success,0.1325,0.1325,0.0,-0.1073006083807403,0.1073006083807403,0,0,exact binomial McNemar,1.0,1.0
+cicids2017_distrinet,cnn,unb,42,3200,valid_success,0.596875,0.596875,0.0,-0.06547215754892502,0.06547215754892502,0,0,exact binomial McNemar,1.0,1.0
+cicids2017_distrinet,ft_transformer,p75,42,3200,valid_success,0.00125,0.00125,0.0,-0.13435602132112592,0.13435602132112592,0,0,exact binomial McNemar,1.0,1.0
+cicids2017_distrinet,ft_transformer,unb,42,3200,valid_success,0.005625,0.005625,0.0,-0.1334229478800769,0.1334229478800769,0,0,exact binomial McNemar,1.0,1.0
+cicids2018_distrinet,mlp-s42,p75,42,3200,valid_success,0.0078125,0.0078125,0.0,-0.13295706005731076,0.13295706005731076,0,0,exact binomial McNemar,1.0,1.0
+cicids2018_distrinet,mlp-s42,unb,42,3200,valid_success,0.2478125,0.2478125,0.0,-0.08604766160468047,0.08604766160468047,0,0,exact binomial McNemar,1.0,1.0
+cicids2018_distrinet,cnn-s42,p75,42,3200,valid_success,0.0,0.0,0.0,-0.1199016515039459,0.1199016515039459,0,0,exact binomial McNemar,1.0,1.0
+cicids2018_distrinet,cnn-s42,unb,42,3200,valid_success,0.2609375,0.2609375,0.0,-0.08386550882681312,0.08386550882681312,0,0,exact binomial McNemar,1.0,1.0
+cicids2018_distrinet,ft_transformer-s42,p75,42,3200,valid_success,0.0,0.0,0.0,-0.1199016515039459,0.1199016515039459,0,0,exact binomial McNemar,1.0,1.0
+cicids2018_distrinet,ft_transformer-s42,unb,42,3200,valid_success,0.00125,0.00125,0.0,-0.13435602132112592,0.13435602132112592,0,0,exact binomial McNemar,1.0,1.0
