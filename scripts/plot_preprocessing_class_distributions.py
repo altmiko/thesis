@@ -13,14 +13,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import LogLocator, NullFormatter
 
-REVISION = "class-distribution-v3"
+REVISION = "class-distribution-v5"
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "outputs" / "preprocessing_class_distribution"
 CLASSES = ("Benign", "DoS", "DDoS", "Recon", "BruteForce")
 BEFORE_LABEL = "Before preprocessing"
 AFTER_LABEL = "After preprocessing"
-X_LABEL = "Class"
-Y_LABEL = "Flow count (log scale)"
+X_LABEL = "Flow count (log scale)"
+Y_LABEL = "Class"
 
 SOURCE_TO_CATEGORY = {
     "BENIGN": "Benign",
@@ -163,29 +163,35 @@ def render(spec: FigureSpec) -> Path:
         "legend.fontsize": 11,
     })
     fig, ax = plt.subplots(figsize=(20 / 3, 10), dpi=180, facecolor="white")
-    fig.subplots_adjust(left=0.16, right=0.96, top=0.78, bottom=0.19)
-    x = np.arange(len(CLASSES))
-    width = 0.32
+    fig.subplots_adjust(left=0.26, right=0.93, top=0.76, bottom=0.17)
+    y = np.arange(len(CLASSES))
+    height = 0.32
     colors = ("#0072B2", "#D55E00")
-    before_bars = ax.bar(x - width / 2, spec.before, width, label=BEFORE_LABEL, color=colors[0])
-    after_bars = ax.bar(x + width / 2, spec.after, width, label=AFTER_LABEL, color=colors[1])
-    ax.set_yscale("log")
-    ax.set_ylim(2_500, max(max(spec.before), max(spec.after)) * 3.1)
-    ax.set_title(
+    before_bars = ax.barh(
+        y - height / 2, spec.before, height, label=BEFORE_LABEL, color=colors[0]
+    )
+    after_bars = ax.barh(
+        y + height / 2, spec.after, height, label=AFTER_LABEL, color=colors[1]
+    )
+    ax.set_xscale("log")
+    ax.set_xlim(2_500, max(max(spec.before), max(spec.after)) * 4.8)
+    fig.suptitle(
         fill(spec.title, width=38, break_long_words=False, break_on_hyphens=False),
+        y=0.93,
+        fontsize=16,
         fontweight="bold",
-        pad=66,
         linespacing=1.15,
     )
     ax.set_xlabel(X_LABEL, labelpad=11)
     ax.set_ylabel(Y_LABEL, labelpad=11)
-    ax.set_xticks(x, CLASSES)
-    ax.tick_params(axis="x", pad=7)
-    ax.margins(x=0.055)
-    ax.yaxis.set_minor_locator(LogLocator(base=10, subs=np.arange(2, 10) * 0.1))
-    ax.yaxis.set_minor_formatter(NullFormatter())
-    ax.grid(axis="y", which="major", color="#AAB2B8", linewidth=0.8, alpha=0.65)
-    ax.grid(axis="y", which="minor", color="#D5DADD", linewidth=0.45, alpha=0.50)
+    ax.set_yticks(y, CLASSES)
+    ax.invert_yaxis()
+    ax.tick_params(axis="y", pad=7)
+    ax.margins(y=0.09)
+    ax.xaxis.set_minor_locator(LogLocator(base=10, subs=np.arange(2, 10) * 0.1))
+    ax.xaxis.set_minor_formatter(NullFormatter())
+    ax.grid(axis="x", which="major", color="#AAB2B8", linewidth=0.8, alpha=0.65)
+    ax.grid(axis="x", which="minor", color="#D5DADD", linewidth=0.45, alpha=0.50)
     ax.set_axisbelow(True)
     ax.spines[["top", "right"]].set_visible(False)
     ax.legend(
@@ -199,15 +205,15 @@ def render(spec: FigureSpec) -> Path:
 
     for bars in (before_bars, after_bars):
         for bar in bars:
-            value = int(bar.get_height())
+            value = int(bar.get_width())
             ax.annotate(
                 f"{value:,}",
-                (bar.get_x() + bar.get_width() / 2, value),
-                xytext=(0, 6),
+                (value, bar.get_y() + bar.get_height() / 2),
+                xytext=(6, 0),
                 textcoords="offset points",
-                ha="center",
-                va="bottom",
-                rotation=90,
+                ha="left",
+                va="center",
+                rotation=0,
                 fontsize=9,
                 color="#202124",
             )
@@ -215,7 +221,7 @@ def render(spec: FigureSpec) -> Path:
     fig.text(
         0.5,
         0.06,
-        fill(spec.footnote, width=76, break_long_words=False, break_on_hyphens=False),
+        fill(spec.footnote, width=60, break_long_words=False, break_on_hyphens=False),
         ha="center",
         va="center",
         fontsize=9.5,
